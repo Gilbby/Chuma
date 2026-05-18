@@ -1,0 +1,151 @@
+{
+  "project_info": {
+    "name": "Chuma",
+    "type": "React Native (Expo)",
+    "language": "TypeScript",
+    "theme": "Light & Dark Mode (Manual toggle in profile)",
+    "archetype": "Organic & Earthy (Premium African Fintech)",
+    "currency": "Zambian Kwacha (ZMW / K)",
+    "logged_in_user": "Gilbert"
+  },
+  "typography": {
+    "headings": "Plus Jakarta Sans",
+    "body": "Manrope",
+    "banned_fonts": ["Inter", "Roboto", "Open Sans"],
+    "scales": {
+      "h1": "text-4xl (32px), tracking-tight, leading-none, font-bold",
+      "h2": "text-3xl (28px), tracking-tight, font-semibold",
+      "h3": "text-2xl (24px), font-medium",
+      "h4": "text-xl (20px), font-medium",
+      "body_lg": "text-lg (18px), leading-relaxed",
+      "body_md": "text-base (16px), leading-relaxed",
+      "body_sm": "text-sm (14px)",
+      "overline": "text-xs (12px), uppercase, tracking-widest, font-bold"
+    }
+  },
+  "colors": {
+    "light": {
+      "background": "#F9FAF9",
+      "surface": "#FFFFFF",
+      "surface_secondary": "#F3F5F4",
+      "primary": "#0A5C36",
+      "primary_accent": "#10B981",
+      "text_main": "#064E3B",
+      "text_muted": "#6B7280",
+      "border": "#E5E7EB",
+      "success": "#059669",
+      "warning": "#F59E0B",
+      "danger": "#EF4444"
+    },
+    "dark": {
+      "background": "#050A07",
+      "surface": "#0C1410",
+      "surface_secondary": "#15241C",
+      "primary": "#10B981",
+      "primary_accent": "#34D399",
+      "text_main": "#F9FAF9",
+      "text_muted": "#A3A3A3",
+      "border": "#1E3328",
+      "success": "#10B981",
+      "warning": "#FBBF24",
+      "danger": "#F87171"
+    }
+  },
+  "spacing_and_layout": {
+    "grid": "8pt base grid",
+    "padding_standard": "p-4 (16px) or p-6 (24px) for screens",
+    "card_padding": "p-4 to p-6 (16px to 24px) depending on hierarchy",
+    "gap_standard": "gap-4 (16px)",
+    "border_radius": {
+      "sm": "rounded-sm (4px)",
+      "md": "rounded-md (8px)",
+      "lg": "rounded-xl (12px)",
+      "xl": "rounded-2xl (16px)",
+      "full": "rounded-full (9999px)"
+    }
+  },
+  "components": {
+    "cards": "Premium feel. Light mode: subtle shadow or flat with 1px border. Dark mode: flat with 1px border (#1E3328).",
+    "buttons": "Primary buttons use Primary color. Full width for main actions. Rounded-xl. Height 56px (h-14). Font semibold. Use reduced opacity for disabled states.",
+    "inputs": "Height 56px (h-14). Subtle background fill or clear 1px border. Label text-sm above input. Focus state changes border to Primary.",
+    "transaction_rows": "Avatar/Icon left, Title & Date center, Amount right. Amount color reflects transaction type (green for in, text_main for out).",
+    "status_badges": "Pill shaped (rounded-full), px-3 py-1, text-xs. Colors depend on status (Pending: warning, Success: success).",
+    "financial_widget_cards": "Use deep Emerald background with white text for premium feel in light mode. Layout with optical alignment.",
+    "charts": "Use react-native-svg for custom sparklines and bar charts. Primary accent colors for lines/bars."
+  },
+  "iconography": {
+    "library": "lucide-react-native",
+    "style": "Stroke width 2, clean, consistent size (24px or 20px for inline)."
+  },
+  "motion": {
+    "library": "react-native-reanimated",
+    "patterns": {
+      "screen_transition": "Fade and slight slide up",
+      "button_press": "Scale down to 0.98",
+      "success_state": "Checkmark draw animation or subtle scale bounce",
+      "bottom_sheet": "Spring physics for natural drag and snap"
+    }
+  },
+  "screens": {
+    "splash_onboarding": {
+      "splash": "Full screen splash_bg image, Chuma logo in white, fade transition to onboarding.",
+      "onboarding": "Swipeable carousel, uses onboarding_1 illustration. Headlines: 'Community Wealth, Digitized'. Primary CTA 'Get Started'."
+    },
+    "auth": {
+      "phone_login": "Minimalist input for phone number. ZMW code (+260) prefixed.",
+      "otp": "4 or 6 digit PIN squares.",
+      "pin_setup": "Numpad custom UI. Secure dots.",
+      "biometric": "FaceID / Fingerprint prompt with premium iconography. Skip option."
+    },
+    "main_tabs": {
+      "home": "Greeting 'Hi, Gilbert' + Avatar. Main Card: Personal & Group Savings combined balance. Quick Actions: 4 circular icon buttons (Save, Request Loan, Repay, Approvals). Group Health Widget: Mini chart showing active contributions. Recent Activity: Top 3 transactions.",
+      "groups": "List of active groups. Group card shows total pool, member count, user role.",
+      "group_details": "Top Tabs: Contributions, Loans, Approvals, Reports, Governance. Shows members list, roles (Chairperson/Treasurer/Secretary/Member).",
+      "transactions": "Full list, search bar, filter pills (All, In, Out, Loans).",
+      "profile": "Avatar, Gilbert's details. Sections: Settings, Security (PIN/Biometrics toggle), Dark Mode Manual Toggle, Logout."
+    },
+    "flows": {
+      "contributions": "Enter amount (ZMW), select group, confirm bottom sheet, success modal.",
+      "loan": "Request loan -> enter amount -> select duration -> breakdown of interest/repayment -> confirm -> goes to pending (Approval Center).",
+      "repayment": "Select active loan -> Full or Partial input -> confirm.",
+      "approvals": "Approval Center tab in Group Details. Shows pending proposals/loans. Voting progress bar (e.g., 3/5 approved). Approve/Reject CTA."
+    }
+  },
+  "media": {
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1588178454780-441fa5b99fa5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwzfHxhZnJpY2FuJTIwcHJvZmVzc2lvbmFsJTIwaGVhZHNob3QlMjBzbWlsaW5nfGVufDB8fHx8MTc3OTA1NTI4M3ww&ixlib=rb-4.1.0&q=85",
+        "category": "user_avatar",
+        "description": "Gilbert's profile picture"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1508002366005-75a695ee2d17?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwyfHxhZnJpY2FuJTIwcHJvZmVzc2lvbmFsJTIwaGVhZHNob3QlMjBzbWlsaW5nfGVufDB8fHx8MTc3OTA1NTI4M3ww&ixlib=rb-4.1.0&q=85",
+        "category": "member_avatar",
+        "description": "Chairperson / Other member avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1614023342667-6f060e9d1e04?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwcHJvZmVzc2lvbmFsJTIwaGVhZHNob3QlMjBzbWlsaW5nfGVufDB8fHx8MTc3OTA1NTI4M3ww&ixlib=rb-4.1.0&q=85",
+        "category": "member_avatar",
+        "description": "Treasurer / Other member avatar"
+      }
+    ],
+    "backgrounds": [
+      {
+        "url": "https://static.prod-images.emergentagent.com/jobs/ad57d3a5-0066-4217-af01-a981f77ed10e/images/3aaee2b2f25053386a7dc86ee27194d3ead5308fa01ae8ad39f426e0ff785d7b.png",
+        "category": "splash_screen",
+        "description": "Abstract premium emerald green and gold subtle texture background"
+      }
+    ],
+    "illustrations": [
+      {
+        "url": "https://static.prod-images.emergentagent.com/jobs/ad57d3a5-0066-4217-af01-a981f77ed10e/images/362be6b24dca1d8362b1edf64493d137d6e1d1ef98ecaad53096dc4f6a626d22.png",
+        "category": "onboarding",
+        "description": "African village community meeting under a tree, modern minimalist vector illustration"
+      }
+    ]
+  },
+  "testing": {
+    "attributes": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case format."
+  },
+  "instructions_to_main_agent": "Implement a UI-only React Native Expo app. Follow color tokens precisely to implement Light and Dark modes. The user can toggle themes manually in the Profile. Build out navigation with bottom tabs. Use mock data realistically reflecting Zambian Kwacha (e.g. K 5,000.00). Use the provided image URLs for avatars and splash. Leverage react-native-reanimated for micro-interactions and react-native-svg for charts. Use lucide-react-native for icons. Maintain a high-trust, minimal, premium African fintech aesthetic. Ensure data-testid on elements."
+}
