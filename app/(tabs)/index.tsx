@@ -154,7 +154,7 @@ export default function Home() {
         </View>
 
         {/* Financial overview cards */}
-        <View style={{ paddingHorizontal: 20 }}>
+        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
           <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Overview</Text>
         </View>
         <ScrollView
