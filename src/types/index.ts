@@ -11,10 +11,33 @@ export interface Member {
   loanActive?: number;
 }
 
+export type GroupType =
+  | "savings-group"
+  | "cooperative"
+  | "womens-group"
+  | "church-group"
+  | "investment-group";
+
+export interface GroupConstitution {
+  penaltyRules: {
+    lateContribution: { enabled: boolean; amount: number };
+    missingMeeting: { enabled: boolean; amount: number };
+    lateRepayment: { enabled: boolean; amount: number };
+  };
+  gracePeriodDays: number;
+  loanMultiplier: number;
+  loanInterestRate: number;
+  loanRepaymentMonths: number;
+  internalLendingEnabled: boolean;
+  approvalThreshold: "2-of-3" | "majority" | "all";
+}
+
 export interface Group {
   id: string;
   name: string;
   description: string;
+  groupType?: GroupType;
+  constitution?: GroupConstitution;
   totalSavings: number;
   walletBalance: number;
   loanCirculation: number;

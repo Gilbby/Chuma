@@ -100,7 +100,7 @@ export default function Groups() {
         ))}
 
         <Pressable
-          onPress={() => router.push("/(tabs)/groups")}
+          onPress={() => router.push("/(modals)/create-group")}
           style={({ pressed }) => [
             styles.discover,
             { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },

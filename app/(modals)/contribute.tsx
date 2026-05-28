@@ -2,10 +2,13 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   Pressable,
   KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,7 +24,19 @@ import { Check, ChevronDown, Receipt } from "lucide-react-native";
 
 type Step = "entry" | "confirm" | "success";
 
-const TYPES = ["Cycle contribution", "Top-up", "Penalty payment"];
+const TYPES = [
+  { label: "Cycle contribution", description: "Regular required savings contribution for the active group cycle." },
+  { label: "Top-up", description: "Optional extra savings added above the required cycle contribution." },
+  { label: "Penalty payment", description: "Payment for fines or penalties issued by the group." },
+];
+
+const PAYMENT_METHODS = [
+  { label: "MTN MoMo", description: "Pay via MTN Mobile Money wallet" },
+  { label: "Airtel Money", description: "Pay via Airtel Money wallet" },
+  { label: "Zamtel Kwacha", description: "Pay via Zamtel Kwacha wallet" },
+  { label: "Bank Transfer", description: "Pay via direct bank transfer" },
+  { label: "Cash", description: "Recorded by a group admin on your behalf" },
+];
 
 export default function Contribute() {
   const { colors } = useTheme();
@@ -32,11 +47,26 @@ export default function Contribute() {
   const [type, setType] = useState(TYPES[0]);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1]);
+  const [showPaymentPicker, setShowPaymentPicker] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const handleAmountChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length > 2) return;
+    if (parts[1] !== undefined && parts[1].length > 2) return;
+    setAmount(cleaned);
+    if (submitAttempted && parseFloat(cleaned) > 0) setSubmitAttempted(false);
+  };
 
   const num = parseFloat(amount.replace(/,/g, "")) || 0;
   const fee = num > 0 ? Math.max(1, Math.round(num * 0.005)) : 0;
-  const error =
-    num <= 0 ? "Enter a valid amount" : num < selectedGroup.contributionAmount && type === "Cycle contribution" ? `Minimum K ${selectedGroup.contributionAmount} for this cycle` : "";
+  const minError =
+    num > 0 && num < selectedGroup.contributionAmount && type.label === "Cycle contribution"
+      ? `Minimum K ${selectedGroup.contributionAmount} for this cycle`
+      : "";
+  const displayError = (submitAttempted && num <= 0 ? "Enter a valid amount" : "") || minError;
 
   if (step === "success") {
     return <SuccessScreen amount={num} group={selectedGroup.name} colors={colors} router={router} />;
@@ -52,6 +82,7 @@ export default function Contribute() {
         title={step === "entry" ? "Make contribution" : "Confirm contribution"}
         onBack={step === "confirm" ? () => setStep("entry") : undefined}
       />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.content}>
           {step === "entry" ? (
@@ -60,16 +91,22 @@ export default function Contribute() {
               <View
                 style={[
                   styles.amountWrap,
-                  { backgroundColor: colors.surface, borderColor: error ? colors.danger : colors.border },
+                  { backgroundColor: colors.surface, borderColor: displayError ? colors.danger : colors.border },
                 ]}
               >
                 <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
-                <Text style={[styles.amountText, { color: colors.textMain }]} testID="contribute-amount-display">
-                  {amount || "0"}
-                </Text>
+                <TextInput
+                  style={[styles.amountInput, { color: colors.textMain }]}
+                  value={amount}
+                  onChangeText={handleAmountChange}
+                  keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                  testID="contribute-amount-input"
+                />
               </View>
-              {error ? (
-                <Text style={[styles.errText, { color: colors.danger }]}>{error}</Text>
+              {displayError ? (
+                <Text style={[styles.errText, { color: colors.danger }]}>{displayError}</Text>
               ) : (
                 <Text style={[styles.helper, { color: colors.textMuted }]}>
                   Suggested: {formatZMW(selectedGroup.contributionAmount)}
@@ -128,7 +165,7 @@ export default function Contribute() {
               <View style={{ height: 14 }} />
               <Picker
                 label="Contribution type"
-                value={type}
+                value={type.label}
                 onPress={() => setShowTypePicker((s) => !s)}
                 colors={colors}
               />
@@ -136,7 +173,7 @@ export default function Contribute() {
                 <Card padding={4} style={{ marginTop: 8 }}>
                   {TYPES.map((t) => (
                     <Pressable
-                      key={t}
+                      key={t.label}
                       onPress={() => {
                         setType(t);
                         setShowTypePicker(false);
@@ -146,8 +183,43 @@ export default function Contribute() {
                         { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
                       ]}
                     >
-                      <Text style={{ color: colors.textMain, fontWeight: "500" }}>{t}</Text>
-                      {t === type && <Check size={18} color={colors.primary} />}
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.textMain, fontWeight: "500" }}>{t.label}</Text>
+                        <Text style={{ color: colors.textMuted, fontSize: 12 }}>{t.description}</Text>
+                      </View>
+                      {t.label === type.label && <Check size={18} color={colors.primary} />}
+                    </Pressable>
+                  ))}
+                </Card>
+              )}
+
+              {/* Payment method picker */}
+              <Picker
+                label="Payment method"
+                value={paymentMethod.label}
+                onPress={() => setShowPaymentPicker((s) => !s)}
+                colors={colors}
+                testID="contribute-payment-picker"
+              />
+              {showPaymentPicker && (
+                <Card padding={4} style={{ marginTop: 8 }}>
+                  {PAYMENT_METHODS.map((m) => (
+                    <Pressable
+                      key={m.label}
+                      onPress={() => {
+                        setPaymentMethod(m);
+                        setShowPaymentPicker(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.option,
+                        { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.textMain, fontWeight: "500" }}>{m.label}</Text>
+                        <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.description}</Text>
+                      </View>
+                      {m.label === paymentMethod.label && <Check size={18} color={colors.primary} />}
                     </Pressable>
                   ))}
                 </Card>
@@ -176,8 +248,11 @@ export default function Contribute() {
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button
                 label="Review"
-                disabled={!!error || num <= 0}
-                onPress={() => setStep("confirm")}
+                disabled={!!minError}
+                onPress={() => {
+                  if (num <= 0) { setSubmitAttempted(true); return; }
+                  setStep("confirm");
+                }}
                 testID="contribute-review-btn"
               />
             </>
@@ -192,13 +267,13 @@ export default function Contribute() {
                 <ConfirmRow label="Contribution" value={formatZMW(num)} colors={colors} />
                 <ConfirmRow label="Transaction fee" value={formatZMW(fee)} colors={colors} />
                 <ConfirmRow label="Group" value={selectedGroup.name} colors={colors} />
-                <ConfirmRow label="Type" value={type} colors={colors} />
+                <ConfirmRow label="Type" value={type.label} colors={colors} />
                 <ConfirmRow
                   label="Cycle"
                   value={`#${Math.round(selectedGroup.cycleProgress * 12)} of 12`}
                   colors={colors}
                 />
-                <ConfirmRow label="From" value="Mobile money · MTN" colors={colors} last />
+                <ConfirmRow label="From" value={paymentMethod.label} colors={colors} last />
               </Card>
 
               <View style={{ flex: 1, minHeight: 24 }} />
@@ -213,6 +288,7 @@ export default function Contribute() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
@@ -372,7 +448,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   currency: { fontSize: 28, fontWeight: "700" },
-  amountText: { fontSize: 44, fontWeight: "700", letterSpacing: -1 },
+  amountInput: { flex: 1, fontSize: 44, fontWeight: "700", letterSpacing: -1, padding: 0 },
   helper: { fontSize: 12, marginTop: 8 },
   errText: { fontSize: 12, marginTop: 8, fontWeight: "500" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },

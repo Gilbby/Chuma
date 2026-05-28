@@ -2,10 +2,13 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   ScrollView,
   Pressable,
   KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -39,6 +42,16 @@ export default function Loan() {
   const [duration, setDuration] = useState(DURATIONS[1]);
   const [grp, setGrp] = useState(groups[0]);
   const [showGroup, setShowGroup] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const handleAmountChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length > 2) return;
+    if (parts[1] !== undefined && parts[1].length > 2) return;
+    setAmount(cleaned);
+    if (submitAttempted && parseFloat(cleaned) > 0) setSubmitAttempted(false);
+  };
 
   const num = parseFloat(amount) || 0;
   const maxLoan = personalSavings * grp.loanMaxMultiplier;
@@ -124,6 +137,7 @@ export default function Loan() {
               : undefined
         }
       />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.content}>
           {step === "request" && (
@@ -134,13 +148,27 @@ export default function Loan() {
                   styles.amountWrap,
                   {
                     backgroundColor: colors.surface,
-                    borderColor: !eligible && num > 0 ? colors.danger : colors.border,
+                    borderColor:
+                      (!eligible && num > 0) || (submitAttempted && num <= 0)
+                        ? colors.danger
+                        : colors.border,
                   },
                 ]}
               >
                 <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
-                <Text style={[styles.amountText, { color: colors.textMain }]}>{amount || "0"}</Text>
+                <TextInput
+                  style={[styles.amountInput, { color: colors.textMain }]}
+                  value={amount}
+                  onChangeText={handleAmountChange}
+                  keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                  testID="loan-amount-input"
+                />
               </View>
+              {submitAttempted && num <= 0 && (
+                <Text style={[styles.errText, { color: colors.danger }]}>Enter a valid amount</Text>
+              )}
 
               <View style={styles.chips}>
                 {[2000, 5000, 10000, 15000].map((v) => (
@@ -248,8 +276,11 @@ export default function Loan() {
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button
                 label="See breakdown"
-                disabled={!eligible}
-                onPress={() => setStep("breakdown")}
+                disabled={num > 0 && !eligible}
+                onPress={() => {
+                  if (num <= 0) { setSubmitAttempted(true); return; }
+                  setStep("breakdown");
+                }}
                 testID="loan-breakdown-btn"
               />
             </>
@@ -317,6 +348,7 @@ export default function Loan() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
@@ -366,7 +398,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   currency: { fontSize: 28, fontWeight: "700" },
-  amountText: { fontSize: 44, fontWeight: "700", letterSpacing: -1 },
+  amountInput: { flex: 1, fontSize: 44, fontWeight: "700", letterSpacing: -1, padding: 0 },
+  errText: { fontSize: 12, marginTop: 8, fontWeight: "500" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
   chip: {
     paddingHorizontal: 14,
