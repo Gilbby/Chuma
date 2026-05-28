@@ -9,13 +9,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { ScreenHeader } from "@/src/components/shared/ScreenHeader";
+import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { loans, formatZMW } from "@/src/data/mock";
+import { loans } from "@/src/data/mock";
+import { formatZMW } from "@/src/utils/currency";
 import { Check } from "lucide-react-native";
 
 export default function Repay() {

@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ScreenHeader } from "@/src/components/shared/ScreenHeader";
+import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { notifications as initial, Notice } from "@/src/data/mock";
+import { notifications as initial } from "@/src/data/mock";
+import { Notice } from "@/src/types";
 import {
   Banknote,
   PiggyBank,

@@ -21,7 +21,7 @@ import {
   Users,
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
-import { TransactionRow } from "@/src/components/shared/TransactionRow";
+import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { LineChart } from "@/src/components/charts/Charts";
@@ -31,10 +31,10 @@ import {
   transactions,
   approvals,
   savingsTrend,
-  formatZMW,
   notifications,
 } from "@/src/data/mock";
-import { useRole } from "@/src/state/RoleContext";
+import { formatZMW } from "@/src/utils/currency";
+import { useRole } from "@/src/contexts/RoleContext";
 import { Dimensions } from "react-native";
 
 const { width } = Dimensions.get("window");

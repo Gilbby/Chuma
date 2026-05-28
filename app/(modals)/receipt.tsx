@@ -12,10 +12,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import { ScreenHeader } from "@/src/components/shared/ScreenHeader";
+import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { transactions, formatZMW } from "@/src/data/mock";
+import { transactions } from "@/src/data/mock";
+import { formatZMW } from "@/src/utils/currency";
 import {
   CheckCircle2,
   Download,

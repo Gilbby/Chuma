@@ -6,7 +6,8 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
-import { groups, formatZMW } from "@/src/data/mock";
+import { groups } from "@/src/data/mock";
+import { formatZMW } from "@/src/utils/currency";
 import { Users, Plus, ChevronRight } from "lucide-react-native";
 
 export default function Groups() {

@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { formatZMW, TxnItem } from "@/src/data/mock";
+import { formatZMW } from "@/src/utils/currency";
+import { TxnItem } from "@/src/types";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import {
   ArrowDownLeft,

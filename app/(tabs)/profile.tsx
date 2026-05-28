@@ -17,8 +17,9 @@ import {
   ChevronRight,
   Users,
 } from "lucide-react-native";
-import { currentUser, groups, Role } from "@/src/data/mock";
-import { useRole } from "@/src/state/RoleContext";
+import { currentUser, groups } from "@/src/data/mock";
+import { Role } from "@/src/types";
+import { useRole } from "@/src/contexts/RoleContext";
 
 export default function Profile() {
   const { colors, mode, toggle } = useTheme();

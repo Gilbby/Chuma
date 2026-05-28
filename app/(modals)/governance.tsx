@@ -11,12 +11,12 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ScreenHeader } from "@/src/components/shared/ScreenHeader";
+import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { useRole } from "@/src/state/RoleContext";
+import { useRole } from "@/src/contexts/RoleContext";
 import { Crown, Shield, FileText, Vote, Edit3, Plus, Lock, X } from "lucide-react-native";
 
 interface Rule {

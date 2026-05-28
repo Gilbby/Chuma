@@ -9,19 +9,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { ScreenHeader } from "@/src/components/shared/ScreenHeader";
+import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
-import {
-  groups,
-  approvals,
-  transactions,
-  formatZMW,
-  Member,
-} from "@/src/data/mock";
+import { groups, approvals, transactions } from "@/src/data/mock";
+import { formatZMW } from "@/src/utils/currency";
+import { Member } from "@/src/types";
 import {
   Users,
   Calendar,

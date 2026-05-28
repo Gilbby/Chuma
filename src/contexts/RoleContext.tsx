@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from "react";
 import { storage } from "@/src/utils/storage";
-import { Role } from "@/src/data/mock";
+import { Role } from "@/src/types";
 
 type Permission =
   | "approve.loan"

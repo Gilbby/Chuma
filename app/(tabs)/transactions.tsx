@@ -11,8 +11,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
-import { TransactionRow } from "@/src/components/shared/TransactionRow";
-import { transactions, TxnItem } from "@/src/data/mock";
+import { TransactionRow } from "@/src/components/common/TransactionRow";
+import { transactions } from "@/src/data/mock";
+import { TxnItem } from "@/src/types";
 import { Search, SlidersHorizontal } from "lucide-react-native";
 
 const FILTERS: { key: TxnItem["type"] | "all"; label: string }[] = [

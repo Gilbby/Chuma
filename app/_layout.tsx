@@ -4,7 +4,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider, useTheme } from "@/src/theme/ThemeContext";
-import { RoleProvider } from "@/src/state/RoleContext";
+import { RoleProvider } from "@/src/contexts/RoleContext";
+import { AuthProvider } from "@/src/contexts/AuthContext";
 
 function StackInner() {
   const { mode } = useTheme();
@@ -27,9 +28,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <RoleProvider>
-            <StackInner />
-          </RoleProvider>
+          <AuthProvider>
+            <RoleProvider>
+              <StackInner />
+            </RoleProvider>
+          </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

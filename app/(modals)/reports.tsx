@@ -1,11 +1,12 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ScreenHeader } from "@/src/components/shared/ScreenHeader";
+import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { LineChart, BarChart } from "@/src/components/charts/Charts";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { savingsTrend, repaymentRate, formatZMW, groups } from "@/src/data/mock";
+import { savingsTrend, repaymentRate, groups } from "@/src/data/mock";
+import { formatZMW } from "@/src/utils/currency";
 import { TrendingUp, TrendingDown, Users, Banknote } from "lucide-react-native";
 
 const { width } = Dimensions.get("window");
