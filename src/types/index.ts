@@ -32,12 +32,21 @@ export interface GroupConstitution {
   approvalThreshold: "2-of-3" | "majority" | "all";
 }
 
+export interface GroupGovernance {
+  chairperson: "self" | string;
+  treasurerPhone: string | null;
+  secretaryPhone: string | null;
+  approvalThreshold: GroupConstitution["approvalThreshold"];
+  permissions: Record<string, boolean>;
+}
+
 export interface Group {
   id: string;
   name: string;
   description: string;
   groupType?: GroupType;
   constitution?: GroupConstitution;
+  governance?: GroupGovernance;
   totalSavings: number;
   walletBalance: number;
   loanCirculation: number;

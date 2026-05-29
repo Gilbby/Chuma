@@ -122,9 +122,8 @@ export default function CreateGroup() {
   const [lateRepaymentPenaltyRate, setLateRepaymentPenaltyRate] = useState("1");
 
   // Step 4 — Governance
-  const [chairperson, setChairperson] = useState("");
-  const [treasurer, setTreasurer] = useState("");
-  const [secretary, setSecretary] = useState("");
+  const [treasurerPhone, setTreasurerPhone] = useState("");
+  const [secretaryPhone, setSecretaryPhone] = useState("");
   const [approvalThreshold, setApprovalThreshold] = useState<GroupConstitution["approvalThreshold"]>("majority");
   const [permissions, setPermissions] = useState<Permissions>({
     loanApprovals: true,
@@ -175,6 +174,9 @@ export default function CreateGroup() {
     setter(!isNaN(val) && val > 30 ? "30" : cleaned);
   };
 
+  const isValidZambianPhone = (s: string) =>
+    (s.startsWith("+260") || s.startsWith("0")) && s.replace(/\D/g, "").length >= 10;
+
   const clearErr = (key: string) =>
     setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
 
@@ -192,7 +194,8 @@ export default function CreateGroup() {
       }
     }
     if (step === 4) {
-      if (!chairperson.trim()) e.chairperson = "Chairperson name or phone is required";
+      if (treasurerPhone.trim() && !isValidZambianPhone(treasurerPhone.trim())) e.treasurerPhone = "Enter a valid Zambian phone number";
+      if (secretaryPhone.trim() && !isValidZambianPhone(secretaryPhone.trim())) e.secretaryPhone = "Enter a valid Zambian phone number";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -262,6 +265,13 @@ export default function CreateGroup() {
       loanMaxMultiplier: parseInt(loanMultiplier) || 2,
       members: [],
       yourRole: "Chairperson",
+      governance: {
+        chairperson: "self",
+        treasurerPhone: treasurerPhone || null,
+        secretaryPhone: secretaryPhone || null,
+        approvalThreshold,
+        permissions: permissions as unknown as Record<string, boolean>,
+      },
       constitution: {
         penaltyRules: {
           lateContribution: { enabled: lateContribEnabled, penaltyRate: toNum(lateContributionPenaltyRate) || 1 },
@@ -638,39 +648,35 @@ export default function CreateGroup() {
             {/* ─── STEP 4 — Governance ────────────────────────────────────────── */}
             {step === 4 && (
               <>
-                <FL text="Chairperson" colors={colors} />
-                <Text style={[styles.fieldHint, { color: colors.textMuted }]}>
-                  Usually the group founder — defaults to you
-                </Text>
-                <TextInput
-                  style={[styles.inputField, { marginTop: 8, color: colors.textMain, backgroundColor: colors.surface, borderColor: errors.chairperson ? colors.danger : colors.border }]}
-                  value={chairperson}
-                  onChangeText={(t) => { setChairperson(t); clearErr("chairperson"); }}
-                  placeholder="Name or phone number"
-                  placeholderTextColor={colors.textMuted}
-                  testID="create-group-chairperson"
-                />
-                {errors.chairperson ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.chairperson}</Text> : null}
+                <View style={[styles.infoNote, { backgroundColor: colors.primarySoft, marginBottom: 20 }]}>
+                  <Text style={{ color: colors.primary, fontSize: 13, lineHeight: 20 }}>
+                    You will be automatically assigned as Chairperson as the group founder.
+                  </Text>
+                </View>
 
-                <FL text="Treasurer (optional)" colors={colors} style={{ marginTop: 20 }} />
+                <FL text="Treasurer (optional)" colors={colors} />
                 <TextInput
-                  style={[styles.inputField, { color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
-                  value={treasurer}
-                  onChangeText={setTreasurer}
-                  placeholder="Name or phone number"
+                  style={[styles.inputField, { color: colors.textMain, backgroundColor: colors.surface, borderColor: errors.treasurerPhone ? colors.danger : colors.border }]}
+                  value={treasurerPhone}
+                  onChangeText={(t) => { setTreasurerPhone(t); clearErr("treasurerPhone"); }}
+                  placeholder="+260 9XX XXX XXX"
                   placeholderTextColor={colors.textMuted}
+                  keyboardType="phone-pad"
                   testID="create-group-treasurer"
                 />
+                {errors.treasurerPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.treasurerPhone}</Text> : null}
 
                 <FL text="Secretary (optional)" colors={colors} style={{ marginTop: 20 }} />
                 <TextInput
-                  style={[styles.inputField, { color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
-                  value={secretary}
-                  onChangeText={setSecretary}
-                  placeholder="Name or phone number"
+                  style={[styles.inputField, { color: colors.textMain, backgroundColor: colors.surface, borderColor: errors.secretaryPhone ? colors.danger : colors.border }]}
+                  value={secretaryPhone}
+                  onChangeText={(t) => { setSecretaryPhone(t); clearErr("secretaryPhone"); }}
+                  placeholder="+260 9XX XXX XXX"
                   placeholderTextColor={colors.textMuted}
+                  keyboardType="phone-pad"
                   testID="create-group-secretary"
                 />
+                {errors.secretaryPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.secretaryPhone}</Text> : null}
 
                 <FL text="Approval threshold" colors={colors} style={{ marginTop: 20 }} />
                 <View style={styles.chipsRow}>
@@ -867,9 +873,9 @@ export default function CreateGroup() {
                 </RC>
 
                 <RC title="Governance" onEdit={() => goToStep(4)} colors={colors} style={{ marginTop: 14 }}>
-                  <RRow label="Chairperson" value={chairperson || "—"} colors={colors} />
-                  <RRow label="Treasurer" value={treasurer || "—"} colors={colors} />
-                  <RRow label="Secretary" value={secretary || "—"} colors={colors} />
+                  <RRow label="Chairperson" value="You (group founder)" colors={colors} />
+                  <RRow label="Treasurer" value={treasurerPhone || "Not assigned"} colors={colors} />
+                  <RRow label="Secretary" value={secretaryPhone || "Not assigned"} colors={colors} />
                   <RRow label="Threshold" value={thresholdLabel} colors={colors} />
                   <RRow label="Permissions" value={`${activePermCount} active`} colors={colors} last />
                 </RC>
