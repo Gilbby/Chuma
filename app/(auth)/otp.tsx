@@ -50,7 +50,7 @@ export default function Otp() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      router.push("/pin");
+      router.push("/kyc");
     }, 700);
   };
 
