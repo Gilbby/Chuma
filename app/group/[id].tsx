@@ -15,7 +15,7 @@ import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
-import { groups, approvals, transactions } from "@/src/data/mock";
+import { groups, approvals, transactions, loans } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { Member } from "@/src/types";
 import {
@@ -42,6 +42,7 @@ export default function GroupDetails() {
   const group = useMemo(() => groups.find((g) => g.id === id) ?? groups[0], [id]);
   const groupApprovals = approvals.filter((a) => a.groupId === group.id);
   const groupTxn = transactions.filter((t) => t.groupId === group.id);
+  const groupLoans = loans.filter((l) => l.groupId === group.id);
 
   return (
     <SafeAreaView
@@ -211,16 +212,31 @@ export default function GroupDetails() {
               testID="group-loan-btn"
             />
             <View style={{ height: 14 }} />
-            <Card padding={16}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                ACTIVE LOANS IN GROUP
-              </Text>
-              <View style={{ marginTop: 8 }}>
-                <LoanLine name="Chisomo Banda" amount={4500} balance={2250} colors={colors} />
-                <LoanLine name="Mwansa Tembo" amount={3200} balance={1067} colors={colors} />
-                <LoanLine name="Thandiwe Zulu" amount={5800} balance={4350} colors={colors} />
-              </View>
-            </Card>
+            {groupLoans.length === 0 ? (
+              <Card padding={20}>
+                <Text style={{ color: colors.textMain, fontWeight: "700" }}>No active loans</Text>
+                <Text style={{ color: colors.textMuted, marginTop: 6, fontSize: 13 }}>
+                  No members currently have active loans in this group.
+                </Text>
+              </Card>
+            ) : (
+              <Card padding={16}>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+                  ACTIVE LOANS IN GROUP
+                </Text>
+                <View style={{ marginTop: 8 }}>
+                  {groupLoans.map((loan) => (
+                    <LoanLine
+                      key={loan.id}
+                      name={loan.memberName}
+                      amount={loan.principal}
+                      balance={loan.outstanding}
+                      colors={colors}
+                    />
+                  ))}
+                </View>
+              </Card>
+            )}
           </View>
         )}
 
@@ -427,6 +443,9 @@ const LoanLine = ({
     <View style={{ marginTop: 8 }}>
       <ProgressBar progress={1 - balance / amount} />
     </View>
+    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6 }}>
+      {formatZMW(balance)} remaining of {formatZMW(amount)}
+    </Text>
   </View>
 );
 

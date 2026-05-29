@@ -77,6 +77,8 @@ export interface Loan {
   id: string;
   groupId: string;
   groupName: string;
+  memberId: string;
+  memberName: string;
   principal: number;
   outstanding: number;
   interestRate: number;
