@@ -174,8 +174,10 @@ export default function CreateGroup() {
     setter(!isNaN(val) && val > 30 ? "30" : cleaned);
   };
 
-  const isValidZambianPhone = (s: string) =>
-    (s.startsWith("+260") || s.startsWith("0")) && s.replace(/\D/g, "").length >= 10;
+  const isValidZambianPhone = (s: string) => /^\d{9}$/.test(s.replace(/\s/g, ""));
+
+  const handlePhoneInput = (text: string, setter: (v: string) => void) =>
+    setter(text.replace(/\D/g, "").slice(0, 9));
 
   const clearErr = (key: string) =>
     setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
@@ -267,8 +269,8 @@ export default function CreateGroup() {
       yourRole: "Chairperson",
       governance: {
         chairperson: "self",
-        treasurerPhone: treasurerPhone || null,
-        secretaryPhone: secretaryPhone || null,
+        treasurerPhone: treasurerPhone ? `+260${treasurerPhone}` : null,
+        secretaryPhone: secretaryPhone ? `+260${secretaryPhone}` : null,
         approvalThreshold,
         permissions: permissions as unknown as Record<string, boolean>,
       },
@@ -655,27 +657,35 @@ export default function CreateGroup() {
                 </View>
 
                 <FL text="Treasurer (optional)" colors={colors} />
-                <TextInput
-                  style={[styles.inputField, { color: colors.textMain, backgroundColor: colors.surface, borderColor: errors.treasurerPhone ? colors.danger : colors.border }]}
-                  value={treasurerPhone}
-                  onChangeText={(t) => { setTreasurerPhone(t); clearErr("treasurerPhone"); }}
-                  placeholder="+260 9XX XXX XXX"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="phone-pad"
-                  testID="create-group-treasurer"
-                />
+                <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: errors.treasurerPhone ? colors.danger : colors.border }]}>
+                  <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>+260</Text>
+                  <TextInput
+                    style={[styles.inlineInput, { color: colors.textMain, flex: 1 }]}
+                    value={treasurerPhone}
+                    onChangeText={(t) => { handlePhoneInput(t, setTreasurerPhone); clearErr("treasurerPhone"); }}
+                    placeholder="9XX XXX XXX"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="phone-pad"
+                    maxLength={9}
+                    testID="create-group-treasurer"
+                  />
+                </View>
                 {errors.treasurerPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.treasurerPhone}</Text> : null}
 
                 <FL text="Secretary (optional)" colors={colors} style={{ marginTop: 20 }} />
-                <TextInput
-                  style={[styles.inputField, { color: colors.textMain, backgroundColor: colors.surface, borderColor: errors.secretaryPhone ? colors.danger : colors.border }]}
-                  value={secretaryPhone}
-                  onChangeText={(t) => { setSecretaryPhone(t); clearErr("secretaryPhone"); }}
-                  placeholder="+260 9XX XXX XXX"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="phone-pad"
-                  testID="create-group-secretary"
-                />
+                <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: errors.secretaryPhone ? colors.danger : colors.border }]}>
+                  <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>+260</Text>
+                  <TextInput
+                    style={[styles.inlineInput, { color: colors.textMain, flex: 1 }]}
+                    value={secretaryPhone}
+                    onChangeText={(t) => { handlePhoneInput(t, setSecretaryPhone); clearErr("secretaryPhone"); }}
+                    placeholder="9XX XXX XXX"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="phone-pad"
+                    maxLength={9}
+                    testID="create-group-secretary"
+                  />
+                </View>
                 {errors.secretaryPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.secretaryPhone}</Text> : null}
 
                 <FL text="Approval threshold" colors={colors} style={{ marginTop: 20 }} />
@@ -874,8 +884,8 @@ export default function CreateGroup() {
 
                 <RC title="Governance" onEdit={() => goToStep(4)} colors={colors} style={{ marginTop: 14 }}>
                   <RRow label="Chairperson" value="You (group founder)" colors={colors} />
-                  <RRow label="Treasurer" value={treasurerPhone || "Not assigned"} colors={colors} />
-                  <RRow label="Secretary" value={secretaryPhone || "Not assigned"} colors={colors} />
+                  <RRow label="Treasurer" value={treasurerPhone ? `+260 ${treasurerPhone}` : "Not assigned"} colors={colors} />
+                  <RRow label="Secretary" value={secretaryPhone ? `+260 ${secretaryPhone}` : "Not assigned"} colors={colors} />
                   <RRow label="Threshold" value={thresholdLabel} colors={colors} />
                   <RRow label="Permissions" value={`${activePermCount} active`} colors={colors} last />
                 </RC>

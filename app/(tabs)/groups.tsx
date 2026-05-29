@@ -28,6 +28,7 @@ export default function Groups() {
         </View>
         <Pressable
           style={[styles.addBtn, { backgroundColor: colors.primary }]}
+          onPress={() => router.push("/(modals)/create-group")}
           testID="groups-add-btn"
         >
           <Plus size={20} color="#fff" strokeWidth={2.4} />
@@ -99,18 +100,6 @@ export default function Groups() {
           </Pressable>
         ))}
 
-        <Pressable
-          onPress={() => router.push("/(modals)/create-group")}
-          style={({ pressed }) => [
-            styles.discover,
-            { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-          ]}
-        >
-          <Plus size={18} color={colors.primary} />
-          <Text style={[styles.discoverText, { color: colors.primary }]}>
-            Create or join a new group
-          </Text>
-        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -161,15 +150,4 @@ const styles = StyleSheet.create({
   },
   cycleLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.3 },
   cycleValue: { fontSize: 13, fontWeight: "700" },
-  discover: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    gap: 8,
-  },
-  discoverText: { fontSize: 14, fontWeight: "600", marginLeft: 8 },
 });
