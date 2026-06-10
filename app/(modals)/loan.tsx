@@ -43,6 +43,7 @@ export default function Loan() {
   const [grp, setGrp] = useState(groups[0]);
   const [showGroup, setShowGroup] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [reason, setReason] = useState("");
 
   const handleAmountChange = (text: string) => {
     const cleaned = text.replace(/[^0-9.]/g, "");
@@ -169,6 +170,35 @@ export default function Loan() {
               {submitAttempted && num <= 0 && (
                 <Text style={[styles.errText, { color: colors.danger }]}>Enter a valid amount</Text>
               )}
+
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
+                PURPOSE (OPTIONAL)
+              </Text>
+              <TextInput
+                value={reason}
+                onChangeText={setReason}
+                placeholder="e.g. School fees, Medical emergency, Business stock"
+                placeholderTextColor={colors.textMuted}
+                multiline={true}
+                numberOfLines={3}
+                maxLength={200}
+                style={{
+                  backgroundColor: colors.surface,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  padding: 14,
+                  color: colors.textMain,
+                  fontSize: 15,
+                  lineHeight: 22,
+                  minHeight: 90,
+                  textAlignVertical: "top",
+                }}
+                testID="loan-reason-input"
+              />
+              <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4, textAlign: "right" }}>
+                {reason.length}/200
+              </Text>
 
               <View style={styles.chips}>
                 {[2000, 5000, 10000, 15000].map((v) => (
@@ -335,7 +365,10 @@ export default function Loan() {
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 <Row label="Amount" value={formatZMW(num)} colors={colors} />
                 <Row label="Duration" value={duration.label} colors={colors} />
-                <Row label="Group" value={grp.name} colors={colors} last />
+                <Row label="Group" value={grp.name} colors={colors} last={reason.trim() === ""} />
+                {reason.trim() !== "" && (
+                  <Row label="Purpose" value={reason.trim()} colors={colors} last />
+                )}
               </Card>
 
               <View style={{ flex: 1, minHeight: 24 }} />
