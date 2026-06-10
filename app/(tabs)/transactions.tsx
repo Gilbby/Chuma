@@ -16,6 +16,26 @@ import { transactions } from "@/src/data/mock";
 import { TxnItem } from "@/src/types";
 import { Search, SlidersHorizontal } from "lucide-react-native";
 
+const DATE_RANGES: { key: "all" | "week" | "month" | "3months"; label: string }[] = [
+  { key: "all", label: "All time" },
+  { key: "week", label: "This week" },
+  { key: "month", label: "This month" },
+  { key: "3months", label: "Last 3 months" },
+];
+
+function isInRange(dateStr: string, range: "all" | "week" | "month" | "3months"): boolean {
+  if (range === "all") return true;
+  const now = new Date();
+  const txDate = new Date(dateStr);
+  if (isNaN(txDate.getTime())) return true;
+  const diffMs = now.getTime() - txDate.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  if (range === "week") return diffDays <= 7;
+  if (range === "month") return diffDays <= 30;
+  if (range === "3months") return diffDays <= 90;
+  return true;
+}
+
 const FILTERS: { key: TxnItem["type"] | "all"; label: string }[] = [
   { key: "all", label: "All" },
   { key: "contribution", label: "Contributions" },
@@ -29,20 +49,23 @@ export default function TransactionsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [filter, setFilter] = useState<TxnItem["type"] | "all">("all");
+  const [dateRange, setDateRange] = useState<"all" | "week" | "month" | "3months">("all");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const data = useMemo(() => {
     return transactions.filter((t) => {
       const matchType = filter === "all" || t.type === filter;
+      const matchDate = isInRange(t.date, dateRange);
       const q = query.trim().toLowerCase();
       const matchQ =
         !q ||
         t.groupName.toLowerCase().includes(q) ||
         t.type.toLowerCase().includes(q) ||
         (t.note ?? "").toLowerCase().includes(q);
-      return matchType && matchQ;
+      return matchType && matchDate && matchQ;
     });
-  }, [filter, query]);
+  }, [filter, dateRange, query]);
 
   return (
     <SafeAreaView
@@ -75,12 +98,53 @@ export default function TransactionsScreen() {
           />
         </View>
         <Pressable
-          style={[styles.filterBtn, { backgroundColor: colors.surfaceSecondary }]}
+          style={[styles.filterBtn, { backgroundColor: filterOpen || dateRange !== "all" ? colors.primary : colors.surfaceSecondary }]}
+          onPress={() => setFilterOpen((o) => !o)}
           testID="transactions-filter-btn"
         >
-          <SlidersHorizontal size={18} color={colors.textMain} />
+          <SlidersHorizontal size={18} color={filterOpen || dateRange !== "all" ? "#fff" : colors.textMain} />
+          {dateRange !== "all" && !filterOpen && (
+            <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+          )}
         </Pressable>
       </View>
+
+      {filterOpen && (
+        <View style={[styles.filterPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.filterPanelLabel, { color: colors.textMuted }]}>DATE RANGE</Text>
+          <View style={styles.filterChipsWrap}>
+            {DATE_RANGES.map((item) => {
+              const active = item.key === dateRange;
+              return (
+                <Pressable
+                  key={item.key}
+                  onPress={() => setDateRange(item.key)}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: active ? colors.primary : colors.surface,
+                      borderColor: active ? colors.primary : colors.border,
+                    },
+                  ]}
+                  testID={`txn-date-${item.key}`}
+                >
+                  <Text style={[styles.chipText, { color: active ? "#fff" : colors.textMain }]}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {(dateRange !== "all" || filter !== "all") && (
+            <Pressable
+              onPress={() => { setDateRange("all"); setFilter("all"); setFilterOpen(false); }}
+              testID="txn-clear-filters"
+            >
+              <Text style={[styles.clearBtn, { color: colors.danger }]}>Clear filters</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <View>
         <FlatList
@@ -121,14 +185,12 @@ export default function TransactionsScreen() {
         data={data}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 }}
-        ItemSeparatorComponent={() => (
-          <View style={[styles.sep, { backgroundColor: colors.border }]} />
-        )}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={[styles.emptyTitle, { color: colors.textMain }]}>No transactions</Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>
-              Try a different filter or search term.
+              Try adjusting your filters or search term.
             </Text>
           </View>
         }
@@ -174,6 +236,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
+  filterPanel: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  filterPanelLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    marginBottom: 10,
+  },
+  filterChipsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  clearBtn: {
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 12,
+  },
   filterRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 6 },
   chip: {
     paddingHorizontal: 14,
@@ -185,7 +279,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   chipText: { fontSize: 13, fontWeight: "600" },
-  sep: { height: 10, backgroundColor: "transparent" },
   empty: { alignItems: "center", padding: 40 },
   emptyTitle: { fontSize: 16, fontWeight: "700" },
   emptySub: { fontSize: 13, marginTop: 6, textAlign: "center" },
