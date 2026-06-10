@@ -5,6 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  Modal,
+  Linking,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -29,6 +32,9 @@ import {
   FileBarChart,
   Scale,
   Coins,
+  Phone,
+  AlertTriangle,
+  UserMinus,
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
@@ -38,6 +44,8 @@ export default function GroupDetails() {
   const { colors } = useTheme();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("members");
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const group = useMemo(() => groups.find((g) => g.id === id) ?? groups[0], [id]);
   const groupApprovals = approvals.filter((a) => a.groupId === group.id);
@@ -161,7 +169,12 @@ export default function GroupDetails() {
             <Card padding={0}>
               {group.members.slice(0, 12).map((m, i) => (
                 <View key={m.id}>
-                  <MemberRow member={m} colors={colors} />
+                  <Pressable
+                    onPress={() => { setSelectedMember(m); setSheetVisible(true); }}
+                    testID={`member-row-${m.id}`}
+                  >
+                    <MemberRow member={m} colors={colors} />
+                  </Pressable>
                   {i < 11 && <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />}
                 </View>
               ))}
@@ -356,6 +369,223 @@ export default function GroupDetails() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={sheetVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSheetVisible(false)}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <Pressable
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
+            onPress={() => setSheetVisible(false)}
+          />
+          <ScrollView
+            style={{
+              backgroundColor: colors.background,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              maxHeight: "80%",
+            }}
+            contentContainerStyle={{ padding: 24, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: colors.border,
+                alignSelf: "center",
+                marginBottom: 20,
+              }}
+            />
+            {selectedMember && (
+              <>
+                {/* Header */}
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Avatar name={selectedMember.name} size={52} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 18 }}>
+                      {selectedMember.name}
+                    </Text>
+                    <View style={{ marginTop: 4 }}>
+                      <StatusBadge
+                        label={selectedMember.role}
+                        variant={
+                          selectedMember.role === "Chairperson"
+                            ? "primary"
+                            : selectedMember.role === "Treasurer"
+                              ? "warning"
+                              : selectedMember.role === "Secretary"
+                                ? "info"
+                                : "neutral"
+                        }
+                      />
+                    </View>
+                    <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
+                      {selectedMember.phone}
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => Linking.openURL(`tel:${selectedMember.phone}`)}>
+                    <Phone size={20} color={colors.primary} />
+                  </Pressable>
+                </View>
+
+                {/* Savings */}
+                <Card padding={16} style={{ marginTop: 20 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
+                    SAVINGS IN THIS GROUP
+                  </Text>
+                  <View style={{ flexDirection: "row", marginTop: 12 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Total saved</Text>
+                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
+                        {formatZMW(selectedMember.savings)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Contributions</Text>
+                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
+                        {selectedMember.contributions}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Active loan</Text>
+                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
+                        {selectedMember.loanActive ? formatZMW(selectedMember.loanActive) : "None"}
+                      </Text>
+                    </View>
+                  </View>
+                </Card>
+
+                {/* Loan progress */}
+                {selectedMember.loanActive != null && selectedMember.loanActive > 0 && (
+                  <Card padding={16} style={{ marginTop: 12 }}>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
+                      ACTIVE LOAN
+                    </Text>
+                    <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 16, marginTop: 8 }}>
+                      {formatZMW(selectedMember.loanActive)}
+                    </Text>
+                    <View style={{ marginTop: 8 }}>
+                      <ProgressBar
+                        progress={1 - selectedMember.loanActive / (selectedMember.loanActive * 1.5)}
+                      />
+                    </View>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6 }}>
+                      {formatZMW(selectedMember.loanActive)} remaining
+                    </Text>
+                  </Card>
+                )}
+
+                {/* Recent activity */}
+                <Card padding={16} style={{ marginTop: 12 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
+                    RECENT ACTIVITY
+                  </Text>
+                  {(() => {
+                    const memberTxns = groupTxn.filter((t) => t.note?.includes(selectedMember.name));
+                    const display = memberTxns.length > 0 ? memberTxns.slice(0, 3) : groupTxn.slice(0, 3);
+                    if (display.length === 0) {
+                      return (
+                        <Text style={{ color: colors.textMuted, marginTop: 10, fontSize: 13 }}>
+                          No recent activity
+                        </Text>
+                      );
+                    }
+                    return display.map((t) => (
+                      <View
+                        key={t.id}
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          paddingVertical: 8,
+                          borderBottomWidth: 1,
+                          borderBottomColor: colors.border,
+                        }}
+                      >
+                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t.date}</Text>
+                        <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 13 }}>
+                          {formatZMW(t.amount)}
+                        </Text>
+                      </View>
+                    ));
+                  })()}
+                </Card>
+
+                {/* Admin actions */}
+                {group.yourRole !== "Member" && (
+                  <View>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginTop: 20, marginBottom: 8 }}>
+                      ADMIN ACTIONS
+                    </Text>
+                    <Card padding={14} style={{ marginBottom: 10, backgroundColor: colors.surface }}>
+                      <Pressable
+                        style={{ flexDirection: "row", alignItems: "center" }}
+                        onPress={() =>
+                          Alert.alert(
+                            "Coming soon",
+                            "Violation recording will be available when the penalty system is built."
+                          )
+                        }
+                        testID="member-violation-btn"
+                      >
+                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.warning + "20", alignItems: "center", justifyContent: "center" }}>
+                          <AlertTriangle size={20} color={colors.warning} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
+                            Record violation
+                          </Text>
+                          <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                            Issue a manual penalty to this member
+                          </Text>
+                        </View>
+                        <ChevronRight size={18} color={colors.textMuted} />
+                      </Pressable>
+                    </Card>
+                    <Card padding={14} style={{ backgroundColor: colors.surface }}>
+                      <Pressable
+                        style={{ flexDirection: "row", alignItems: "center" }}
+                        onPress={() =>
+                          Alert.alert(
+                            "Remove member",
+                            `Remove ${selectedMember?.name} from ${group.name}?`,
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: "Remove",
+                                style: "destructive",
+                                onPress: () => setSheetVisible(false),
+                              },
+                            ]
+                          )
+                        }
+                        testID="member-remove-btn"
+                      >
+                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.danger + "20", alignItems: "center", justifyContent: "center" }}>
+                          <UserMinus size={20} color={colors.danger} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={{ color: colors.danger, fontWeight: "700", fontSize: 14 }}>
+                            Remove from group
+                          </Text>
+                          <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                            This member will lose access to the group
+                          </Text>
+                        </View>
+                        <ChevronRight size={18} color={colors.danger} />
+                      </Pressable>
+                    </Card>
+                  </View>
+                )}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
