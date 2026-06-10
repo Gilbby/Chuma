@@ -79,6 +79,7 @@ export default function Notifications() {
                 key={n.id}
                 n={n}
                 colors={colors}
+                onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
                 onAccept={() => {
                   setDismissed((d) => [...d, n.id]);
                   Alert.alert("Joined", `You joined ${n.groupName}`);
@@ -96,6 +97,7 @@ export default function Notifications() {
                 key={n.id}
                 n={n}
                 colors={colors}
+                onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
                 onAccept={() => {
                   setDismissed((d) => [...d, n.id]);
                   Alert.alert("Joined", `You joined ${n.groupName}`);
@@ -113,11 +115,13 @@ export default function Notifications() {
 const NotifCard = ({
   n,
   colors,
+  onPress,
   onAccept,
   onDecline,
 }: {
   n: Notice;
   colors: ReturnType<typeof useTheme>["colors"];
+  onPress?: () => void;
   onAccept?: () => void;
   onDecline?: () => void;
 }) => {
@@ -134,7 +138,8 @@ const NotifCard = ({
             ? colors.warning
             : colors.danger;
   return (
-    <Card padding={14} style={{ marginBottom: 10, opacity: n.read ? 0.7 : 1 }}>
+    <Pressable onPress={onPress}>
+  <Card padding={14} style={{ marginBottom: 10, opacity: n.read ? 0.7 : 1 }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
         <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
           <Icon size={18} color={tintColor} />
@@ -188,6 +193,7 @@ const NotifCard = ({
         </View>
       </View>
     </Card>
+  </Pressable>
   );
 };
 
