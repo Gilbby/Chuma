@@ -20,9 +20,9 @@ export type GroupType =
 
 export interface GroupConstitution {
   penaltyRules: {
-    lateContribution: { enabled: boolean; penaltyRate: number };
+    lateContribution: { enabled: boolean; penaltyType: "flat" | "percent"; penaltyRate?: number; penaltyAmount?: number };
     missingMeeting: { enabled: boolean; amount: number };
-    lateRepayment: { enabled: boolean; penaltyRate: number };
+    lateRepayment: { enabled: boolean; penaltyType: "flat" | "percent"; penaltyRate?: number; penaltyAmount?: number };
   };
   gracePeriodDays: number;
   loanMultiplier: number;

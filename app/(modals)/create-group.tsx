@@ -24,6 +24,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { groups } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X } from "lucide-react-native";
+import Slider from "@react-native-community/slider";
 import type { Group, GroupType, GroupConstitution } from "@/src/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -121,6 +122,11 @@ export default function CreateGroup() {
   const [lateRepayEnabled, setLateRepayEnabled] = useState(false);
   const [lateRepaymentPenaltyRate, setLateRepaymentPenaltyRate] = useState("1");
 
+  const [lateContribPenaltyType, setLateContribPenaltyType] = useState<"flat" | "percent">("percent");
+  const [lateContribFlatAmount, setLateContribFlatAmount] = useState("20");
+  const [lateRepayPenaltyType, setLateRepayPenaltyType] = useState<"flat" | "percent">("percent");
+  const [lateRepayFlatAmount, setLateRepayFlatAmount] = useState("100");
+
   // Step 4 — Governance
   const [treasurerPhone, setTreasurerPhone] = useState("");
   const [secretaryPhone, setSecretaryPhone] = useState("");
@@ -165,14 +171,6 @@ export default function CreateGroup() {
     setter(cleaned);
   };
 
-  const handlePenaltyRateInput = (text: string, setter: (v: string) => void) => {
-    const cleaned = text.replace(/[^0-9.]/g, "");
-    const parts = cleaned.split(".");
-    if (parts.length > 2) return;
-    if (parts[1] !== undefined && parts[1].length > 2) return;
-    const val = parseFloat(cleaned);
-    setter(!isNaN(val) && val > 30 ? "30" : cleaned);
-  };
 
   const isValidZambianPhone = (s: string) => /^\d{9}$/.test(s.replace(/\s/g, ""));
 
@@ -276,9 +274,19 @@ export default function CreateGroup() {
       },
       constitution: {
         penaltyRules: {
-          lateContribution: { enabled: lateContribEnabled, penaltyRate: toNum(lateContributionPenaltyRate) || 1 },
+          lateContribution: {
+            enabled: lateContribEnabled,
+            penaltyType: lateContribPenaltyType,
+            penaltyRate: lateContribPenaltyType === "percent" ? toNum(lateContributionPenaltyRate) || 1 : undefined,
+            penaltyAmount: lateContribPenaltyType === "flat" ? toNum(lateContribFlatAmount) || 20 : undefined,
+          },
           missingMeeting: { enabled: false, amount: 0 },
-          lateRepayment: { enabled: lateRepayEnabled, penaltyRate: toNum(lateRepaymentPenaltyRate) || 1 },
+          lateRepayment: {
+            enabled: lateRepayEnabled,
+            penaltyType: lateRepayPenaltyType,
+            penaltyRate: lateRepayPenaltyType === "percent" ? toNum(lateRepaymentPenaltyRate) || 1 : undefined,
+            penaltyAmount: lateRepayPenaltyType === "flat" ? toNum(lateRepayFlatAmount) || 100 : undefined,
+          },
         },
         gracePeriodDays: parseInt(gracePeriod) || 0,
         loanMultiplier: parseInt(loanMultiplier) || 2,
@@ -515,27 +523,62 @@ export default function CreateGroup() {
                 <TR label="Late contribution penalty" value={lateContribEnabled} onToggle={setLateContribEnabled} colors={colors} style={{ marginTop: 20 }} />
                 {lateContribEnabled && (
                   <>
-                    <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
-                      <TextInput
-                        style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
-                        value={lateContributionPenaltyRate}
-                        onChangeText={(t) => handlePenaltyRateInput(t, setLateContributionPenaltyRate)}
-                        keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
-                        placeholder="0.0"
-                        placeholderTextColor={colors.textMuted}
-                        testID="create-group-late-contrib-rate"
-                      />
-                      <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: "600" }}>%</Text>
+                    <View style={[styles.chipsRow, { marginTop: 10, marginBottom: 12 }]}>
+                      {(["Flat fee", "% per day"] as const).map((opt) => {
+                        const t = opt === "Flat fee" ? "flat" : "percent";
+                        const active = lateContribPenaltyType === t;
+                        return (
+                          <Pressable
+                            key={opt}
+                            onPress={() => setLateContribPenaltyType(t)}
+                            style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                          >
+                            <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{opt}</Text>
+                          </Pressable>
+                        );
+                      })}
                     </View>
-                    {toNum(lateContributionPenaltyRate) >= 30 && (
-                      <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
-                        Maximum is 30% of contribution amount per day
-                      </Text>
-                    )}
-                    {toNum(contribAmount) > 0 && toNum(lateContributionPenaltyRate) > 0 && (
-                      <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 4 }]}>
-                        e.g. {formatZMW(toNum(contribAmount))} × {lateContributionPenaltyRate}% × 7 days late = {formatZMW(toNum(contribAmount) * (toNum(lateContributionPenaltyRate) / 100) * 7)}
-                      </Text>
+                    {lateContribPenaltyType === "flat" ? (
+                      <>
+                        <FL text="Penalty amount" colors={colors} />
+                        <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                          <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
+                          <TextInput
+                            style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
+                            value={lateContribFlatAmount}
+                            onChangeText={(t) => setLateContribFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5))}
+                            keyboardType="numeric"
+                            testID="create-group-late-contrib-flat"
+                          />
+                        </View>
+                        <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
+                          Members will be charged a fixed K{lateContribFlatAmount} per violation
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <FL text={`Penalty rate: ${lateContributionPenaltyRate}% per day`} colors={colors} />
+                        <Slider
+                          minimumValue={0.5}
+                          maximumValue={30}
+                          step={0.5}
+                          value={parseFloat(lateContributionPenaltyRate) || 1}
+                          onValueChange={(v) => setLateContributionPenaltyRate(v.toFixed(1))}
+                          minimumTrackTintColor={colors.primary}
+                          maximumTrackTintColor={colors.border}
+                          thumbTintColor={colors.primary}
+                          style={{ marginVertical: 8 }}
+                        />
+                        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                          <Text style={{ color: colors.textMuted, fontSize: 11 }}>0.5%</Text>
+                          <Text style={{ color: colors.textMuted, fontSize: 11 }}>30% max</Text>
+                        </View>
+                        {toNum(contribAmount) > 0 && (
+                          <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
+                            e.g. {formatZMW(toNum(contribAmount))} × {lateContributionPenaltyRate}% × 7 days = {formatZMW(toNum(contribAmount) * (toNum(lateContributionPenaltyRate) / 100) * 7)}
+                          </Text>
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -618,27 +661,62 @@ export default function CreateGroup() {
                     <TR label="Late repayment penalty" value={lateRepayEnabled} onToggle={setLateRepayEnabled} colors={colors} style={{ marginTop: 20 }} />
                     {lateRepayEnabled && (
                       <>
-                        <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
-                          <TextInput
-                            style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
-                            value={lateRepaymentPenaltyRate}
-                            onChangeText={(t) => handlePenaltyRateInput(t, setLateRepaymentPenaltyRate)}
-                            keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
-                            placeholder="0.0"
-                            placeholderTextColor={colors.textMuted}
-                            testID="create-group-late-repay-rate"
-                          />
-                          <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: "600" }}>%</Text>
+                        <View style={[styles.chipsRow, { marginTop: 10, marginBottom: 12 }]}>
+                          {(["Flat fee", "% per day"] as const).map((opt) => {
+                            const t = opt === "Flat fee" ? "flat" : "percent";
+                            const active = lateRepayPenaltyType === t;
+                            return (
+                              <Pressable
+                                key={opt}
+                                onPress={() => setLateRepayPenaltyType(t)}
+                                style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                              >
+                                <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{opt}</Text>
+                              </Pressable>
+                            );
+                          })}
                         </View>
-                        {toNum(lateRepaymentPenaltyRate) >= 30 && (
-                          <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
-                            Maximum is 30% of contribution amount per day
-                          </Text>
-                        )}
-                        {toNum(contribAmount) > 0 && toNum(lateRepaymentPenaltyRate) > 0 && (
-                          <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 4 }]}>
-                            e.g. {formatZMW(toNum(contribAmount) * (parseInt(loanMultiplier) || 2))} × {lateRepaymentPenaltyRate}% × 7 days late = {formatZMW(toNum(contribAmount) * (parseInt(loanMultiplier) || 2) * (toNum(lateRepaymentPenaltyRate) / 100) * 7)}
-                          </Text>
+                        {lateRepayPenaltyType === "flat" ? (
+                          <>
+                            <FL text="Penalty amount" colors={colors} />
+                            <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                              <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
+                              <TextInput
+                                style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
+                                value={lateRepayFlatAmount}
+                                onChangeText={(t) => setLateRepayFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5))}
+                                keyboardType="numeric"
+                                testID="create-group-late-repay-flat"
+                              />
+                            </View>
+                            <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
+                              Members will be charged a fixed K{lateRepayFlatAmount} per violation
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <FL text={`Penalty rate: ${lateRepaymentPenaltyRate}% per day`} colors={colors} />
+                            <Slider
+                              minimumValue={0.5}
+                              maximumValue={30}
+                              step={0.5}
+                              value={parseFloat(lateRepaymentPenaltyRate) || 1}
+                              onValueChange={(v) => setLateRepaymentPenaltyRate(v.toFixed(1))}
+                              minimumTrackTintColor={colors.primary}
+                              maximumTrackTintColor={colors.border}
+                              thumbTintColor={colors.primary}
+                              style={{ marginVertical: 8 }}
+                            />
+                            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                              <Text style={{ color: colors.textMuted, fontSize: 11 }}>0.5%</Text>
+                              <Text style={{ color: colors.textMuted, fontSize: 11 }}>30% max</Text>
+                            </View>
+                            {toNum(contribAmount) > 0 && (
+                              <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
+                                e.g. {formatZMW(toNum(contribAmount) * (parseInt(loanMultiplier) || 2))} × {lateRepaymentPenaltyRate}% × 7 days = {formatZMW(toNum(contribAmount) * (parseInt(loanMultiplier) || 2) * (toNum(lateRepaymentPenaltyRate) / 100) * 7)}
+                              </Text>
+                            )}
+                          </>
                         )}
                       </>
                     )}
@@ -866,7 +944,7 @@ export default function CreateGroup() {
                     value={contribFreq === "Monthly" ? `Day ${deadlineDay} of each month` : deadlineDow}
                     colors={colors}
                   />
-                  <RRow label="Late penalty" value={lateContribEnabled ? `${lateContributionPenaltyRate}% per day (max 30%)` : "None"} colors={colors} last />
+                  <RRow label="Late penalty" value={lateContribEnabled ? lateContribPenaltyType === "flat" ? `K${lateContribFlatAmount} flat fee` : `${lateContributionPenaltyRate}% per day (max 30%)` : "None"} colors={colors} last />
                 </RC>
 
                 <RC title="Loans" onEdit={() => goToStep(3)} colors={colors} style={{ marginTop: 14 }}>
@@ -877,7 +955,7 @@ export default function CreateGroup() {
                       <RRow label="Interest" value={`${loanInterest}% / month`} colors={colors} />
                       <RRow label="Repayment" value={loanRepayment} colors={colors} />
                       <RRow label="Grace period" value={`${gracePeriod} days`} colors={colors} />
-                      <RRow label="Late penalty" value={lateRepayEnabled ? `${lateRepaymentPenaltyRate}% per day (max 30%)` : "None"} colors={colors} last />
+                      <RRow label="Late penalty" value={lateRepayEnabled ? lateRepayPenaltyType === "flat" ? `K${lateRepayFlatAmount} flat fee` : `${lateRepaymentPenaltyRate}% per day (max 30%)` : "None"} colors={colors} last />
                     </>
                   )}
                 </RC>

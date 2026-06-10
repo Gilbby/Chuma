@@ -27,7 +27,6 @@ type Step = "entry" | "confirm" | "success";
 const TYPES = [
   { label: "Cycle contribution", description: "Regular required savings contribution for the active group cycle." },
   { label: "Top-up", description: "Optional extra savings added above the required cycle contribution." },
-  { label: "Penalty payment", description: "Payment for fines or penalties issued by the group." },
 ];
 
 const PAYMENT_METHODS = [
