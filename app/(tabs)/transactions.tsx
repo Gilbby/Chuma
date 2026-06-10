@@ -6,15 +6,22 @@ import {
   FlatList,
   Pressable,
   TextInput,
+  Modal,
+  Alert,
+  Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
+import { Button } from "@/src/components/ui/Button";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { transactions } from "@/src/data/mock";
 import { TxnItem } from "@/src/types";
-import { Search, SlidersHorizontal } from "lucide-react-native";
+import { formatZMW } from "@/src/utils/currency";
+import { Search, SlidersHorizontal, Download, FileText, FileSpreadsheet } from "lucide-react-native";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 
 const DATE_RANGES: { key: "all" | "week" | "month" | "3months"; label: string }[] = [
   { key: "all", label: "All time" },
@@ -51,6 +58,7 @@ export default function TransactionsScreen() {
   const [filter, setFilter] = useState<TxnItem["type"] | "all">("all");
   const [dateRange, setDateRange] = useState<"all" | "week" | "month" | "3months">("all");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   const data = useMemo(() => {
@@ -67,17 +75,77 @@ export default function TransactionsScreen() {
     });
   }, [filter, dateRange, query]);
 
+  async function handleExportPDF() {
+    try {
+      const rows = data.map((t) => `
+        <tr>
+          <td>${t.date}</td>
+          <td style="text-transform:capitalize">${t.type}</td>
+          <td>${t.groupName}</td>
+          <td>${t.amount < 0 ? "-" : "+"}${formatZMW(Math.abs(t.amount))}</td>
+          <td style="text-transform:capitalize">${t.status}</td>
+        </tr>
+      `).join("");
+      const html = `
+        <html><head><style>
+          body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
+          h1 { font-size: 22px; color: #1a5c38; margin-bottom: 4px; }
+          p { font-size: 12px; color: #666; margin: 0 0 24px; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; }
+          th { background: #1a5c38; color: white; padding: 10px 12px; text-align: left; }
+          td { padding: 9px 12px; border-bottom: 1px solid #eee; }
+          tr:nth-child(even) td { background: #f9f9f9; }
+          .footer { margin-top: 24px; font-size: 11px; color: #999; }
+        </style></head>
+        <body>
+          <h1>Chuma — Transaction Statement</h1>
+          <p>Generated on ${new Date().toLocaleDateString("en-ZM", { day: "numeric", month: "long", year: "numeric" })} · ${data.length} transactions</p>
+          <table>
+            <thead><tr><th>Date</th><th>Type</th><th>Group</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <p class="footer">This is an auto-generated statement from the Chuma village banking app.</p>
+        </body></html>
+      `;
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Save or share your statement", UTI: "com.adobe.pdf" });
+    } catch (e) {
+      Alert.alert("Export failed", "Could not generate PDF. Please try again.");
+    }
+  }
+
+  async function handleExportCSV() {
+    try {
+      const header = "Date,Type,Group,Amount,Status,Note\n";
+      const rows = data.map((t) =>
+        [t.date, t.type, `"${t.groupName}"`, t.amount, t.status, `"${t.note ?? ""}"`].join(",")
+      ).join("\n");
+      await Share.share({ title: "Chuma Transaction Export", message: header + rows });
+    } catch (e) {
+      Alert.alert("Export failed", "Could not export CSV. Please try again.");
+    }
+  }
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
       edges={["top"]}
       testID="transactions-screen"
     >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textMain }]}>Transactions</Text>
-        <Text style={[styles.sub, { color: colors.textMuted }]}>
-          All your contributions, loans and share-outs
-        </Text>
+      <View style={[styles.header, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
+        <View>
+          <Text style={[styles.title, { color: colors.textMain }]}>Transactions</Text>
+          <Text style={[styles.sub, { color: colors.textMuted }]}>
+            All your contributions, loans and share-outs
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => setExportOpen(true)}
+          style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" }}
+          testID="transactions-export-btn"
+        >
+          <Download size={18} color={colors.primary} />
+        </Pressable>
       </View>
 
       <View style={styles.searchWrap}>
@@ -204,6 +272,51 @@ export default function TransactionsScreen() {
           </Card>
         )}
       />
+      <Modal
+        visible={exportOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setExportOpen(false)}
+      >
+        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={() => setExportOpen(false)} />
+        <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
+          <Text style={{ color: colors.textMain, fontSize: 18, fontWeight: "700", marginBottom: 4 }}>Export transactions</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 20 }}>Download your transaction history as a file</Text>
+          <Card padding={0}>
+            <Pressable
+              onPress={handleExportPDF}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14 }}
+              testID="export-pdf-btn"
+            >
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.danger + "15", alignItems: "center", justifyContent: "center" }}>
+                <FileText size={20} color={colors.danger} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>Export as PDF</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>Formatted statement, ready to print or share</Text>
+              </View>
+              <Download size={18} color={colors.textMuted} />
+            </Pressable>
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
+            <Pressable
+              onPress={handleExportCSV}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 14 }}
+              testID="export-csv-btn"
+            >
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.success + "15", alignItems: "center", justifyContent: "center" }}>
+                <FileSpreadsheet size={20} color={colors.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>Export as CSV</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>Spreadsheet format, opens in Excel or Sheets</Text>
+              </View>
+              <Download size={18} color={colors.textMuted} />
+            </Pressable>
+          </Card>
+          <Button variant="ghost" fullWidth style={{ marginTop: 16 }} onPress={() => setExportOpen(false)}>Cancel</Button>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
