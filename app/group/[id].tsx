@@ -8,6 +8,7 @@ import {
   Modal,
   Linking,
   Alert,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -21,6 +22,7 @@ import { Button } from "@/src/components/ui/Button";
 import { groups, approvals, transactions, loans } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { Member } from "@/src/types";
+import * as Clipboard from "expo-clipboard";
 import {
   Users,
   Calendar,
@@ -31,10 +33,12 @@ import {
   ClipboardCheck,
   FileBarChart,
   Scale,
-  Coins,
+  CircleDollarSign,
   Phone,
   AlertTriangle,
   UserMinus,
+  UserPlus,
+  Plus,
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
@@ -46,6 +50,9 @@ export default function GroupDetails() {
   const [tab, setTab] = useState<TabKey>("members");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invitePhone, setInvitePhone] = useState("+260 ");
+  const [inviteError, setInviteError] = useState("");
 
   const group = useMemo(() => groups.find((g) => g.id === id) ?? groups[0], [id]);
   const groupApprovals = approvals.filter((a) => a.groupId === group.id);
@@ -58,7 +65,21 @@ export default function GroupDetails() {
       edges={["top"]}
       testID="group-details-screen"
     >
-      <ScreenHeader title={group.name} subtitle={`${group.memberCount} members`} />
+      <ScreenHeader
+        title={group.name}
+        subtitle={`${group.memberCount} members`}
+        rightAction={
+          tab === "members" ? (
+            <Pressable
+              style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}
+              onPress={() => setInviteOpen((v) => !v)}
+              testID="members-invite-btn"
+            >
+              <Plus size={18} color="#fff" strokeWidth={2.4} />
+            </Pressable>
+          ) : undefined
+        }
+      />
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
         {/* Financial overview */}
         <View style={{ paddingHorizontal: 20 }}>
@@ -78,14 +99,12 @@ export default function GroupDetails() {
         {/* Rules summary */}
         <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
           <Card padding={16}>
-            <View style={styles.row}>
-              <RuleRow
-                icon={<Coins size={18} color={colors.primary} />}
-                label="Contribution"
-                value={`${formatZMW(group.contributionAmount)} · ${group.contributionFrequency}`}
-                colors={colors}
-              />
-            </View>
+            <RuleRow
+              icon={<CircleDollarSign size={18} color={colors.primary} />}
+              label="Contribution"
+              value={`${formatZMW(group.contributionAmount)} · ${group.contributionFrequency}`}
+              colors={colors}
+            />
             <View style={[styles.sep, { backgroundColor: colors.border }]} />
             <RuleRow
               icon={<TrendingUp size={18} color={colors.primary} />}
@@ -584,6 +603,78 @@ export default function GroupDetails() {
               </>
             )}
           </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={inviteOpen}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => { setInviteOpen(false); setInvitePhone("+260 "); setInviteError(""); }}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <Pressable
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
+            onPress={() => { setInviteOpen(false); setInvitePhone("+260 "); setInviteError(""); }}
+          />
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
+            <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 18, marginBottom: 4 }}>
+              Invite a member
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24, lineHeight: 18 }}>
+              Enter their Zambian phone number and we'll send them an SMS invitation to join {group.name}.
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 12 }}>
+              PHONE NUMBER
+            </Text>
+            <TextInput
+              placeholder="9XX XXX XXX"
+              keyboardType="phone-pad"
+              value={invitePhone}
+              onChangeText={(v) => { setInvitePhone(v); setInviteError(""); }}
+              style={{
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: inviteError ? colors.danger : colors.border,
+                padding: 14,
+                color: colors.textMain,
+                fontSize: 16,
+                backgroundColor: colors.surface,
+                marginBottom: 6,
+              }}
+              placeholderTextColor={colors.textMuted}
+              autoFocus
+            />
+            {inviteError ? (
+              <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>
+                {inviteError}
+              </Text>
+            ) : (
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 20, lineHeight: 18 }}>
+                The invited person will receive an SMS and see your invitation in their Chuma app.
+              </Text>
+            )}
+            <View style={{ height: inviteError ? 20 : 0 }} />
+            <Button
+              label="Send invite"
+              onPress={() => {
+                const digits = invitePhone.replace(/\D/g, "");
+                if (digits.length < 12) {
+                  setInviteError("Enter a valid Zambian number");
+                  return;
+                }
+                Alert.alert(
+                  "Invite sent",
+                  `An SMS invite has been sent to ${invitePhone.trim()}. They will see the invitation in their notifications and groups screen.`
+                );
+                setInvitePhone("+260 ");
+                setInviteError("");
+                setInviteOpen(false);
+              }}
+              testID="members-invite-send-btn"
+            />
+          </View>
         </View>
       </Modal>
     </SafeAreaView>

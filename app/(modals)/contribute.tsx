@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -50,6 +50,9 @@ export default function Contribute() {
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1]);
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const receiptId = useRef(
+    `CHM-${Math.floor(Math.random() * 90000) + 10000}`
+  );
 
   const handleAmountChange = (text: string) => {
     const cleaned = text.replace(/[^0-9.]/g, "");
@@ -69,7 +72,7 @@ export default function Contribute() {
   const displayError = (submitAttempted && num <= 0 ? "Enter a valid amount" : "") || minError;
 
   if (step === "success") {
-    return <SuccessScreen amount={num} group={selectedGroup.name} colors={colors} router={router} />;
+    return <SuccessScreen amount={num} group={selectedGroup.name} colors={colors} router={router} receiptId={receiptId.current} />;
   }
 
   return (
@@ -357,11 +360,13 @@ const SuccessScreen = ({
   group,
   colors,
   router,
+  receiptId,
 }: {
   amount: number;
   group: string;
   colors: ReturnType<typeof useTheme>["colors"];
   router: ReturnType<typeof useRouter>;
+  receiptId: string;
 }) => (
   <SafeAreaView
     style={{ flex: 1, backgroundColor: colors.background }}
@@ -393,7 +398,7 @@ const SuccessScreen = ({
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Receipt size={18} color={colors.primary} />
               <Text style={{ color: colors.textMain, fontWeight: "600", marginLeft: 8 }}>
-                Receipt CHM-{Math.floor(Math.random() * 90000) + 10000}
+                Receipt {receiptId}
               </Text>
             </View>
             <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>Saved</Text>
@@ -422,7 +427,7 @@ const SuccessScreen = ({
                 note: "Cycle contribution",
                 status: "completed",
                 direction: "out",
-                txnId: `CHM-${Math.floor(Math.random() * 90000) + 10000}`,
+                txnId: receiptId,
               },
             })
           }
