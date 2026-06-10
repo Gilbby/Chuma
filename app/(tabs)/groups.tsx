@@ -1,18 +1,24 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
+import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
-import { groups } from "@/src/data/mock";
+import { groups, notifications } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { Users, Plus, ChevronRight } from "lucide-react-native";
 
 export default function Groups() {
   const { colors } = useTheme();
   const router = useRouter();
+  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  const pendingInvites = notifications.filter(
+    (n) => n.type === "invite" && !n.read && !dismissed.includes(n.id)
+  );
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -36,6 +42,51 @@ export default function Groups() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {pendingInvites.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              PENDING INVITATIONS
+            </Text>
+            {pendingInvites.map((inv) => (
+              <Card key={inv.id} padding={14} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Users size={18} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
+                      {inv.groupName}
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                      Invited by {inv.invitedBy}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <Button
+                      label="Decline"
+                      variant="outline"
+                      size="sm"
+                      fullWidth={false}
+                      onPress={() => setDismissed((d) => [...d, inv.id])}
+                      testID={`invite-decline-${inv.id}`}
+                    />
+                    <Button
+                      label="Accept"
+                      variant="primary"
+                      size="sm"
+                      fullWidth={false}
+                      onPress={() => {
+                        setDismissed((d) => [...d, inv.id]);
+                        Alert.alert("Joined", `You joined ${inv.groupName}`);
+                      }}
+                      testID={`invite-accept-${inv.id}`}
+                    />
+                  </View>
+                </View>
+              </Card>
+            ))}
+          </>
+        )}
         {groups.map((g) => (
           <Pressable
             key={g.id}
@@ -150,4 +201,6 @@ const styles = StyleSheet.create({
   },
   cycleLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.3 },
   cycleValue: { fontSize: 13, fontWeight: "700" },
+  sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 8 },
+  inviteIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
 });

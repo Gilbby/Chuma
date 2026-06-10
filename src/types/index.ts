@@ -110,9 +110,12 @@ export interface Approval {
 
 export interface Notice {
   id: string;
-  type: "loan" | "contribution" | "governance" | "security" | "repayment";
+  type: "loan" | "contribution" | "governance" | "security" | "repayment" | "invite";
   title: string;
   body: string;
   date: string;
   read: boolean;
+  groupId?: string;
+  groupName?: string;
+  invitedBy?: string;
 }
