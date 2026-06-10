@@ -32,12 +32,23 @@ export default function Otp() {
     return () => clearTimeout(t);
   }, [seconds]);
 
+  const onVerify = () => {
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      router.push(mode === "signin" ? "/(tabs)" : "/kyc");
+    }, 700);
+  };
+
   const setAt = (i: number, v: string) => {
     const ch = v.replace(/\D/g, "").slice(-1);
     const next = [...code];
     next[i] = ch;
     setCode(next);
     if (ch && i < LEN - 1) refs.current[i + 1]?.focus();
+    if (next.every((c) => c !== "")) {
+      setTimeout(() => onVerify(), 300);
+    }
   };
 
   const onKey = (i: number, key: string) => {
@@ -47,14 +58,6 @@ export default function Otp() {
   };
 
   const filled = code.every((c) => c !== "");
-
-  const onVerify = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      router.push(mode === "signin" ? "/(tabs)" : "/kyc");
-    }, 700);
-  };
 
   const title = mode === "signin" ? "Enter your code" : "Verify your number";
   const subtitle =

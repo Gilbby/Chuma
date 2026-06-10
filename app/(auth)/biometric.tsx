@@ -34,14 +34,14 @@ export default function Biometric() {
 
         <Button
           label="Enable biometric"
-          onPress={() => router.push("/success")}
+          onPress={() => router.replace("/(tabs)")}
           testID="biometric-enable-btn"
         />
         <View style={{ height: 12 }} />
         <Button
           label="Maybe later"
           variant="ghost"
-          onPress={() => router.push("/success")}
+          onPress={() => router.replace("/(tabs)")}
           testID="biometric-skip-btn"
         />
       </View>
