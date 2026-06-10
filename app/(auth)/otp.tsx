@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
@@ -19,6 +19,8 @@ const LEN = 6;
 export default function Otp() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { mode: rawMode } = useLocalSearchParams<{ mode: "signup" | "signin" }>();
+  const mode = rawMode ?? "signup";
   const [code, setCode] = useState<string[]>(Array(LEN).fill(""));
   const refs = useRef<(TextInput | null)[]>([]);
   const [seconds, setSeconds] = useState(30);
@@ -50,9 +52,15 @@ export default function Otp() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      router.push("/kyc");
+      router.push(mode === "signin" ? "/(tabs)" : "/kyc");
     }, 700);
   };
+
+  const title = mode === "signin" ? "Enter your code" : "Verify your number";
+  const subtitle =
+    mode === "signin"
+      ? "We sent a sign-in code to +260 977 234 567"
+      : "Enter the 6-digit code we sent to +260 977 234 567";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} testID="otp-screen">
@@ -62,10 +70,8 @@ export default function Otp() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.content}>
-          <Text style={[styles.title, { color: colors.textMain }]}>Verify your number</Text>
-          <Text style={[styles.sub, { color: colors.textMuted }]}>
-            We sent a 6-digit code to +260 977 234 567
-          </Text>
+          <Text style={[styles.title, { color: colors.textMain }]}>{title}</Text>
+          <Text style={[styles.sub, { color: colors.textMuted }]}>{subtitle}</Text>
 
           <View style={styles.boxes}>
             {code.map((c, i) => (

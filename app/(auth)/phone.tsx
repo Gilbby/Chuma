@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Input } from "@/src/components/ui/Input";
 import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
@@ -18,6 +18,8 @@ import { Phone } from "lucide-react-native";
 export default function PhoneLogin() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { mode: rawMode } = useLocalSearchParams<{ mode: "signup" | "signin" }>();
+  const mode = rawMode ?? "signup";
   const [phone, setPhone] = useState("977234567");
   const [loading, setLoading] = useState(false);
 
@@ -25,9 +27,15 @@ export default function PhoneLogin() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      router.push("/otp");
+      router.push(`/otp?mode=${mode}`);
     }, 700);
   };
+
+  const title = mode === "signin" ? "Welcome back" : "Create your account";
+  const subtitle =
+    mode === "signin"
+      ? "Enter your phone number to sign in to your account."
+      : "Enter your phone number. We'll send a 6-digit verification code.";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} testID="phone-screen">
@@ -37,10 +45,8 @@ export default function PhoneLogin() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.title, { color: colors.textMain }]}>Welcome to Chuma</Text>
-          <Text style={[styles.sub, { color: colors.textMuted }]}>
-            Enter your phone number to continue. We&apos;ll send you a 6-digit code.
-          </Text>
+          <Text style={[styles.title, { color: colors.textMain }]}>{title}</Text>
+          <Text style={[styles.sub, { color: colors.textMuted }]}>{subtitle}</Text>
 
           <View style={{ height: 40 }} />
 

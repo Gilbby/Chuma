@@ -109,14 +109,14 @@ export default function Welcome() {
         <Button
           label="Create account"
           testID="welcome-signup-btn"
-          onPress={() => router.push("/phone")}
+          onPress={() => router.push("/phone?mode=signup")}
         />
         <View style={{ height: 12 }} />
         <Button
           label="I already have an account"
           variant="ghost"
           testID="welcome-login-btn"
-          onPress={() => router.push("/phone")}
+          onPress={() => router.push("/phone?mode=signin")}
         />
       </View>
     </SafeAreaView>
