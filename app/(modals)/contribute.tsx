@@ -12,7 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
@@ -20,7 +20,7 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { groups } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, ChevronDown, Receipt } from "lucide-react-native";
+import { Check, ChevronDown, Receipt, AlertTriangle, Lock } from "lucide-react-native";
 
 type Step = "entry" | "confirm" | "success";
 
@@ -40,10 +40,23 @@ const PAYMENT_METHODS = [
 export default function Contribute() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { lockedType, lockedAmount, penaltyReason, groupId } = useLocalSearchParams<{
+    lockedType?: string;
+    lockedAmount?: string;
+    penaltyReason?: string;
+    groupId?: string;
+  }>();
+  const isPenalty = lockedType === "penalty";
   const [step, setStep] = useState<Step>("entry");
-  const [amount, setAmount] = useState("500");
-  const [selectedGroup, setSelectedGroup] = useState(groups[0]);
-  const [type, setType] = useState(TYPES[0]);
+  const [amount, setAmount] = useState(lockedAmount ? lockedAmount : "500");
+  const [selectedGroup, setSelectedGroup] = useState(
+    groups.find((g) => g.id === groupId) ?? groups[0]
+  );
+  const [type, setType] = useState(
+    isPenalty
+      ? { label: "Penalty payment", description: "Penalty issued by the group." }
+      : TYPES[0]
+  );
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1]);
@@ -93,7 +106,7 @@ export default function Contribute() {
               <View
                 style={[
                   styles.amountWrap,
-                  { backgroundColor: colors.surface, borderColor: displayError ? colors.danger : colors.border },
+                  { backgroundColor: isPenalty ? colors.surfaceSecondary : colors.surface, borderColor: displayError ? colors.danger : colors.border },
                 ]}
               >
                 <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
@@ -104,7 +117,8 @@ export default function Contribute() {
                   keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
                   placeholder="0"
                   placeholderTextColor={colors.textMuted}
-                  testID="contribute-amount-input"
+                  editable={!isPenalty}
+                  testID={isPenalty ? "contribute-amount-locked" : "contribute-amount-input"}
                 />
               </View>
               {displayError ? (
@@ -165,13 +179,43 @@ export default function Contribute() {
 
               {/* Type picker */}
               <View style={{ height: 14 }} />
+              {isPenalty && (
+                <View style={{ backgroundColor: colors.warning + "15", borderRadius: 12, padding: 12, marginBottom: 16, flexDirection: "column" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <AlertTriangle size={16} color={colors.warning} />
+                    <Text style={{ color: colors.warning, fontWeight: "700", fontSize: 13 }}>
+                      Penalty: {penaltyReason}
+                    </Text>
+                  </View>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                    This amount has been set by your group admin.
+                  </Text>
+                </View>
+              )}
+              {isPenalty ? (
+                <View
+                  style={[styles.picker, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                  testID="contribute-type-locked"
+                >
+                  <View>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 }}>
+                      CONTRIBUTION TYPE
+                    </Text>
+                    <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600", marginTop: 4 }}>
+                      {type.label}
+                    </Text>
+                  </View>
+                  <Lock size={14} color={colors.textMuted} />
+                </View>
+              ) : (
               <Picker
                 label="Contribution type"
                 value={type.label}
                 onPress={() => setShowTypePicker((s) => !s)}
                 colors={colors}
               />
-              {showTypePicker && (
+              )}
+              {!isPenalty && showTypePicker && (
                 <Card padding={4} style={{ marginTop: 8 }}>
                   {TYPES.map((t) => (
                     <Pressable

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
@@ -15,6 +16,7 @@ import {
   RefreshCw,
   Check,
   Users,
+  AlertTriangle,
 } from "lucide-react-native";
 
 const ICONS = {
@@ -24,6 +26,7 @@ const ICONS = {
   security: ShieldAlert,
   repayment: RefreshCw,
   invite: Users,
+  penalty: AlertTriangle,
 };
 
 const TINTS: Record<Notice["type"], "primary" | "info" | "success" | "warning" | "danger"> = {
@@ -33,10 +36,12 @@ const TINTS: Record<Notice["type"], "primary" | "info" | "success" | "warning" |
   security: "warning",
   repayment: "info",
   invite: "primary",
+  penalty: "warning",
 };
 
 export default function Notifications() {
   const { colors } = useTheme();
+  const router = useRouter();
   const [items, setItems] = useState(initial);
   const [dismissed, setDismissed] = useState<string[]>([]);
 
@@ -85,6 +90,10 @@ export default function Notifications() {
                   Alert.alert("Joined", `You joined ${n.groupName}`);
                 }}
                 onDecline={() => setDismissed((d) => [...d, n.id])}
+                onPayPenalty={() => {
+                  setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
+                  router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
+                }}
               />
             ))}
           </>
@@ -103,6 +112,10 @@ export default function Notifications() {
                   Alert.alert("Joined", `You joined ${n.groupName}`);
                 }}
                 onDecline={() => setDismissed((d) => [...d, n.id])}
+                onPayPenalty={() => {
+                  setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
+                  router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
+                }}
               />
             ))}
           </>
@@ -118,12 +131,14 @@ const NotifCard = ({
   onPress,
   onAccept,
   onDecline,
+  onPayPenalty,
 }: {
   n: Notice;
   colors: ReturnType<typeof useTheme>["colors"];
   onPress?: () => void;
   onAccept?: () => void;
   onDecline?: () => void;
+  onPayPenalty?: () => void;
 }) => {
   const Icon = ICONS[n.type] ?? Banknote;
   const tint = TINTS[n.type];
@@ -187,6 +202,17 @@ const NotifCard = ({
                 fullWidth={false}
                 onPress={onAccept}
                 testID={`notif-accept-${n.id}`}
+              />
+            </View>
+          )}
+          {n.type === "penalty" && !n.read && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <Button
+                label={`Pay K${n.penaltyAmount?.toFixed(2)}`}
+                size="sm"
+                fullWidth={false}
+                onPress={onPayPenalty}
+                testID={`penalty-pay-${n.id}`}
               />
             </View>
           )}

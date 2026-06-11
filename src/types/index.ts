@@ -110,7 +110,7 @@ export interface Approval {
 
 export interface Notice {
   id: string;
-  type: "loan" | "contribution" | "governance" | "security" | "repayment" | "invite";
+  type: "loan" | "contribution" | "governance" | "security" | "repayment" | "invite" | "penalty";
   title: string;
   body: string;
   date: string;
@@ -118,4 +118,6 @@ export interface Notice {
   groupId?: string;
   groupName?: string;
   invitedBy?: string;
+  penaltyAmount?: number;
+  penaltyReason?: string;
 }
