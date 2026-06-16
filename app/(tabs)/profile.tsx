@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronRight,
   Users,
+  Pencil,
 } from "lucide-react-native";
 import { currentUser, groups } from "@/src/data/mock";
 import { Role } from "@/src/types";
@@ -41,15 +42,24 @@ export default function Profile() {
 
         <View style={{ paddingHorizontal: 20 }}>
           <Card padding={18}>
-            <View style={styles.profileRow}>
-              <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={[styles.name, { color: colors.textMain }]}>{currentUser.name}</Text>
-                <Text style={[styles.phone, { color: colors.textMuted }]}>{currentUser.phone}</Text>
-                <View style={{ marginTop: 8, flexDirection: "row" }}>
-                  <StatusBadge label={role} variant="primary" testID="profile-role-badge" />
+            <View style={{ position: "relative" }}>
+              <View style={styles.profileRow}>
+                <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={[styles.name, { color: colors.textMain }]}>{currentUser.name}</Text>
+                  <Text style={[styles.phone, { color: colors.textMuted }]}>{currentUser.phone}</Text>
+                  <View style={{ marginTop: 8, flexDirection: "row" }}>
+                    <StatusBadge label={role} variant="primary" testID="profile-role-badge" />
+                  </View>
                 </View>
               </View>
+              <Pressable
+                onPress={() => router.push("/edit-profile")}
+                testID="profile-edit-btn"
+                style={{ position: "absolute", top: 0, right: 0 }}
+              >
+                <Pencil size={18} color={colors.primary} />
+              </Pressable>
             </View>
 
             <View style={[styles.statsRow, { borderTopColor: colors.border }]}>
