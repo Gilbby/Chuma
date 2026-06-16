@@ -30,6 +30,7 @@ import { LineChart } from "@/src/components/charts/Charts";
 import {
   currentUser,
   groups,
+  loans,
   transactions,
   approvals,
   savingsTrend,
@@ -64,10 +65,17 @@ export default function Home() {
     setTimeout(() => setLoading(false), 900);
   };
 
-  const personalSavings = 18450;
-  const groupSavings = groups.reduce((a, g) => a + g.totalSavings, 0);
-  const activeLoans = 8750;
-  const upcomingRepayment = 1250;
+  const myTotalSavings = groups.reduce((sum, g) => sum + (g.members[0]?.savings ?? 0), 0);
+  const groupPoolTotal = groups.reduce((a, g) => a + g.totalSavings, 0);
+
+  const myLoans = loans.filter((l) => l.memberId === "m-0" && l.status === "active");
+  const myActiveLoans = myLoans.reduce((sum, l) => sum + l.outstanding, 0);
+  const myLoanCount = myLoans.length;
+  const nextRepaymentLoan = myLoans
+    .slice()
+    .sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime())[0];
+  const upcomingRepayment = nextRepaymentLoan?.installmentAmount ?? 0;
+  const upcomingRepaymentDate = nextRepaymentLoan?.nextDueDate ?? "—";
 
   const pendingApprovals = approvals.filter((a) => a.status === "pending").length;
   const unread = notifications.filter((n) => !n.read).length;
@@ -149,17 +157,14 @@ export default function Home() {
           <View style={styles.heroBgCircle2} />
           <Text style={styles.heroLabel}>Total balance</Text>
           <Text style={styles.heroAmount}>
-            {formatZMW(personalSavings + groupSavings)}
+            {formatZMW(myTotalSavings)}
           </Text>
           <View style={styles.heroRow}>
             <View>
-              <Text style={styles.heroSubLabel}>Personal</Text>
-              <Text style={styles.heroSubValue}>{formatZMW(personalSavings)}</Text>
-            </View>
-            <View style={styles.heroDivider} />
-            <View>
-              <Text style={styles.heroSubLabel}>In groups</Text>
-              <Text style={styles.heroSubValue}>{formatZMW(groupSavings)}</Text>
+              <Text style={styles.heroSubLabel}>Active groups</Text>
+              <Text style={styles.heroSubValue}>
+                {groups.length} {groups.length === 1 ? "group" : "groups"}
+              </Text>
             </View>
           </View>
         </View>
@@ -200,21 +205,21 @@ export default function Home() {
         >
           <OverviewCard
             label="Active loans"
-            value={formatZMW(activeLoans)}
-            sub="2 loans"
+            value={myLoanCount > 0 ? formatZMW(myActiveLoans) : formatZMW(0)}
+            sub={myLoanCount > 0 ? `${myLoanCount} ${myLoanCount === 1 ? "loan" : "loans"}` : "No active loans"}
             tint={colors.warning}
             mode={mode}
           />
           <OverviewCard
             label="Next repayment"
-            value={formatZMW(upcomingRepayment)}
-            sub="Mar 04, 2026"
+            value={myLoanCount > 0 ? formatZMW(upcomingRepayment) : "—"}
+            sub={myLoanCount > 0 ? upcomingRepaymentDate : "Nothing due"}
             tint={colors.info}
             mode={mode}
           />
           <OverviewCard
             label="Group savings"
-            value={formatZMW(groupSavings, { compact: true })}
+            value={formatZMW(groupPoolTotal, { compact: true })}
             sub={`${groups.length} groups`}
             tint={colors.success}
             mode={mode}
