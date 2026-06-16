@@ -138,43 +138,45 @@ export default function Profile() {
           />
         </Section>
 
-        <Section title="Demo role" colors={colors}>
-          <View style={{ padding: 14 }}>
-            <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>
-              {description}
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {(["Chairperson", "Treasurer", "Secretary", "Member"] as Role[]).map((r) => {
-                const active = r === role;
-                return (
-                  <Pressable
-                    key={r}
-                    onPress={() => setRole(r)}
-                    testID={`profile-role-${r.toLowerCase()}`}
-                    style={[
-                      {
-                        paddingHorizontal: 14,
-                        height: 36,
-                        borderRadius: 999,
-                        borderWidth: 1,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        marginRight: 6,
-                        marginBottom: 6,
-                        backgroundColor: active ? colors.primary : colors.surface,
-                        borderColor: active ? colors.primary : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>
-                      {r}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+        {__DEV__ && (
+          <Section title="Demo role" colors={colors}>
+            <View style={{ padding: 14 }}>
+              <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>
+                {description}
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {(["Chairperson", "Treasurer", "Secretary", "Member"] as Role[]).map((r) => {
+                  const active = r === role;
+                  return (
+                    <Pressable
+                      key={r}
+                      onPress={() => setRole(r)}
+                      testID={`profile-role-${r.toLowerCase()}`}
+                      style={[
+                        {
+                          paddingHorizontal: 14,
+                          height: 36,
+                          borderRadius: 999,
+                          borderWidth: 1,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginRight: 6,
+                          marginBottom: 6,
+                          backgroundColor: active ? colors.primary : colors.surface,
+                          borderColor: active ? colors.primary : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>
+                        {r}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        </Section>
+          </Section>
+        )}
 
         <Section title="Activity" colors={colors}>
           <Row
@@ -187,6 +189,8 @@ export default function Profile() {
             icon={<HelpCircle size={20} color={colors.primary} />}
             label="Help & support"
             colors={colors}
+            onPress={() => router.push("/help")}
+            testID="profile-help-row"
           />
         </Section>
 
