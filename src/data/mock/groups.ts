@@ -50,6 +50,10 @@ export const groups: Group[] = [
     loanMaxMultiplier: 3,
     members: makeMembers("Chairperson", 50),
     yourRole: "Chairperson",
+    healthScore: 92,
+    savingsGrowth: 18,
+    repaymentRate: 94,
+    defaults: 0,
   },
   {
     id: "g2",
@@ -67,6 +71,10 @@ export const groups: Group[] = [
     loanMaxMultiplier: 2.5,
     members: makeMembers("Treasurer", 32),
     yourRole: "Treasurer",
+    healthScore: 86,
+    savingsGrowth: 12,
+    repaymentRate: 89,
+    defaults: 1,
   },
   {
     id: "g3",
@@ -84,5 +92,9 @@ export const groups: Group[] = [
     loanMaxMultiplier: 2,
     members: makeMembers("Member", 24),
     yourRole: "Member",
+    healthScore: 78,
+    savingsGrowth: 9,
+    repaymentRate: 82,
+    defaults: 2,
   },
 ];

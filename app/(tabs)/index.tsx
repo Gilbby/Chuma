@@ -16,31 +16,22 @@ import {
   HandCoins,
   RefreshCw,
   CheckSquare,
-  TrendingUp,
-  ChevronRight,
-  Users,
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Skeleton, SkeletonGroup } from "@/src/components/ui";
-import { ErrorState } from "@/src/components/common";
+import { ErrorState, GroupHealthStack } from "@/src/components/common";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
-import { ProgressBar } from "@/src/components/ui/ProgressBar";
-import { LineChart } from "@/src/components/charts/Charts";
 import {
   currentUser,
   groups,
   loans,
   transactions,
   approvals,
-  savingsTrend,
   notifications,
 } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
-import { Dimensions } from "react-native";
-
-const { width } = Dimensions.get("window");
 
 export default function Home() {
   const { colors, mode } = useTheme();
@@ -226,36 +217,11 @@ export default function Home() {
           />
         </ScrollView>
 
-        {/* Group Health Widget */}
-        <View style={{ paddingHorizontal: 20, marginTop: 8 }}>
-          <Card padding={18}>
-            <View style={styles.rowBetween}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.overline, { color: colors.textMuted }]}>GROUP HEALTH</Text>
-                <Text style={[styles.healthTitle, { color: colors.textMain }]}>
-                  Lusaka Market Sisters
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.scoreBadge,
-                  { backgroundColor: colors.primarySoft, borderColor: colors.primary },
-                ]}
-              >
-                <TrendingUp size={14} color={colors.primary} />
-                <Text style={[styles.scoreText, { color: colors.primary }]}>92</Text>
-              </View>
-            </View>
-            <View style={{ marginVertical: 14 }}>
-              <LineChart data={savingsTrend} width={width - 80} height={120} />
-            </View>
-            <View style={styles.healthMetrics}>
-              <HealthStat label="Savings ↑" value="+18%" color={colors.success} muted={colors.textMuted} />
-              <HealthStat label="Repayment" value="94%" color={colors.success} muted={colors.textMuted} />
-              <HealthStat label="Defaults" value="0" color={colors.textMain} muted={colors.textMuted} />
-            </View>
-          </Card>
-        </View>
+        {/* Group Health Stack */}
+        <GroupHealthStack
+          groups={groups}
+          onCardPress={(id) => router.push(`/group/${id}`)}
+        />
 
         {/* Recent Activity */}
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
@@ -362,25 +328,6 @@ const OverviewCard = ({
     </View>
   );
 };
-
-const HealthStat = ({
-  label,
-  value,
-  color,
-  muted,
-}: {
-  label: string;
-  value: string;
-  color: string;
-  muted: string;
-}) => (
-  <View style={{ flex: 1 }}>
-    <Text style={{ fontSize: 11, color: muted, fontWeight: "600", letterSpacing: 0.4 }}>
-      {label}
-    </Text>
-    <Text style={{ fontSize: 16, color, fontWeight: "700", marginTop: 4 }}>{value}</Text>
-  </View>
-);
 
 const styles = StyleSheet.create({
   header: {

@@ -60,6 +60,10 @@ export interface Group {
   loanMaxMultiplier: number; // x of savings
   members: Member[];
   yourRole: Role;
+  healthScore?: number;
+  savingsGrowth?: number;
+  repaymentRate?: number;
+  defaults?: number;
 }
 
 export interface TxnItem {
