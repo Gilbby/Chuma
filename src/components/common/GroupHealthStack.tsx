@@ -14,12 +14,18 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { LineChart } from "@/src/components/charts/Charts";
 import { TrendingUp } from "lucide-react-native";
-import { savingsTrend } from "@/src/data/mock";
+import { savingsTrend, loans } from "@/src/data/mock";
 import type { Group } from "@/src/types";
+import {
+  getSavingsGrowth,
+  getRepaymentRate,
+  getDefaults,
+  getHealthScore,
+} from "@/src/services/groupStats";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH - 40;
-const CARD_HEIGHT = 320;
+const CARD_HEIGHT = 285;
 const SWIPE_THRESHOLD = 120;
 
 interface Props {
@@ -134,7 +140,7 @@ export function GroupHealthStack({ groups, onCardPress }: Props) {
       </View>
 
       {/* Dots */}
-      <View style={{ flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 12 }}>
+      <View style={{ flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 6 }}>
         {groups.map((_, i) => (
           <View
             key={i}
@@ -173,6 +179,16 @@ function HealthCardContent({
   colors: ReturnType<typeof useTheme>["colors"];
   onPress: () => void;
 }) {
+  const growth = getSavingsGrowth(group);
+  const repayment = getRepaymentRate(group, loans);
+  const defaults = getDefaults(group, loans);
+  const score = getHealthScore(group, loans);
+
+  const growthColor = growth >= 0 ? colors.success : colors.danger;
+  const repaymentColor =
+    repayment >= 80 ? colors.success : repayment >= 50 ? colors.warning : colors.danger;
+  const defaultsColor = defaults === 0 ? colors.success : colors.danger;
+
   return (
     <Pressable
       onPress={onPress}
@@ -219,7 +235,7 @@ function HealthCardContent({
           >
             <TrendingUp size={14} color={colors.primary} />
             <Text style={{ fontSize: 13, fontWeight: "700", marginLeft: 4, color: colors.primary }}>
-              {group.healthScore ?? "—"}
+              {score}
             </Text>
           </View>
         </View>
@@ -231,20 +247,20 @@ function HealthCardContent({
         <View style={{ flexDirection: "row" }}>
           <HealthStat
             label="Savings ↑"
-            value={`+${group.savingsGrowth ?? 0}%`}
-            color={colors.success}
+            value={`${growth >= 0 ? "+" : ""}${growth}%`}
+            color={growthColor}
             muted={colors.textMuted}
           />
           <HealthStat
             label="Repayment"
-            value={`${group.repaymentRate ?? 0}%`}
-            color={colors.success}
+            value={`${repayment}%`}
+            color={repaymentColor}
             muted={colors.textMuted}
           />
           <HealthStat
             label="Defaults"
-            value={`${group.defaults ?? 0}`}
-            color={(group.defaults ?? 0) === 0 ? colors.success : colors.textMain}
+            value={`${defaults}`}
+            color={defaultsColor}
             muted={colors.textMuted}
           />
         </View>

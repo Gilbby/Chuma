@@ -253,43 +253,6 @@ export default function Home() {
           </Card>
         </View>
 
-        {/* Notifications preview */}
-        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textMain }]}>Notifications</Text>
-          <Pressable onPress={() => router.push("/notifications")}>
-            <Text style={[styles.linkText, { color: colors.primary }]}>See all</Text>
-          </Pressable>
-        </View>
-        <View style={{ paddingHorizontal: 20 }}>
-          {notifications.slice(0, 2).map((n) => (
-            <Pressable
-              key={n.id}
-              onPress={() => router.push("/notifications")}
-              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Card padding={14} style={{ marginBottom: 10 }}>
-                <View style={styles.rowBetween}>
-                  <View
-                    style={[
-                      styles.notifDot,
-                      { backgroundColor: n.read ? colors.border : colors.primary },
-                    ]}
-                  />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[styles.notifTitle, { color: colors.textMain }]}>{n.title}</Text>
-                    <Text
-                      style={[styles.notifBody, { color: colors.textMuted }]}
-                      numberOfLines={1}
-                    >
-                      {n.body}
-                    </Text>
-                  </View>
-                  <Text style={[styles.notifDate, { color: colors.textMuted }]}>{n.date}</Text>
-                </View>
-              </Card>
-            </Pressable>
-          ))}
-        </View>
           </>
         )}
       </ScrollView>
@@ -472,8 +435,4 @@ const styles = StyleSheet.create({
   scoreText: { fontSize: 13, fontWeight: "700", marginLeft: 4 },
   healthMetrics: { flexDirection: "row", marginTop: 6 },
   separator: { height: 1, marginHorizontal: 16 },
-  notifDot: { width: 8, height: 8, borderRadius: 4 },
-  notifTitle: { fontSize: 14, fontWeight: "600" },
-  notifBody: { fontSize: 12, marginTop: 2 },
-  notifDate: { fontSize: 11, marginLeft: 8 },
 });
