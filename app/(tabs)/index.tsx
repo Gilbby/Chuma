@@ -22,6 +22,7 @@ import {
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Skeleton, SkeletonGroup } from "@/src/components/ui";
+import { ErrorState } from "@/src/components/common";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
@@ -46,10 +47,22 @@ export default function Home() {
   const { role } = useRole();
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 900);
+    setError(false);
+    const t = setTimeout(() => {
+      setLoading(false);
+      // Temporary: real fetch will set error on catch.
+      // Keep error false by default so screens work normally.
+      setError(false);
+    }, 900);
     return () => clearTimeout(t);
   }, []);
+  const handleRetry = () => {
+    setLoading(true);
+    setError(false);
+    setTimeout(() => setLoading(false), 900);
+  };
 
   const personalSavings = 18450;
   const groupSavings = groups.reduce((a, g) => a + g.totalSavings, 0);
@@ -121,6 +134,8 @@ export default function Home() {
               <SkeletonGroup count={3} height={64} />
             </View>
           </>
+        ) : error ? (
+          <ErrorState onRetry={handleRetry} />
         ) : (
           <>
             {/* Hero Balance Card */}

@@ -16,6 +16,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
+import { ErrorState } from "@/src/components/common";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { transactions } from "@/src/data/mock";
 import { TxnItem } from "@/src/types";
@@ -57,10 +58,22 @@ export default function TransactionsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 900);
+    setError(false);
+    const t = setTimeout(() => {
+      setLoading(false);
+      // Temporary: real fetch will set error on catch.
+      // Keep error false by default so screens work normally.
+      setError(false);
+    }, 900);
     return () => clearTimeout(t);
   }, []);
+  const handleRetry = () => {
+    setLoading(true);
+    setError(false);
+    setTimeout(() => setLoading(false), 900);
+  };
 
   const [filter, setFilter] = useState<TxnItem["type"] | "all">("all");
   const [dateRange, setDateRange] = useState<"all" | "week" | "month" | "3months">("all");
@@ -260,6 +273,8 @@ export default function TransactionsScreen() {
         <View style={{ marginHorizontal: 20, marginTop: 12 }}>
           <SkeletonGroup count={6} height={72} />
         </View>
+      ) : error ? (
+        <ErrorState onRetry={handleRetry} />
       ) : (
       <FlatList
         data={data}

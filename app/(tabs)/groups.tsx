@@ -6,6 +6,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
+import { ErrorState } from "@/src/components/common";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { groups, notifications } from "@/src/data/mock";
@@ -17,10 +18,22 @@ export default function Groups() {
   const router = useRouter();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 900);
+    setError(false);
+    const t = setTimeout(() => {
+      setLoading(false);
+      // Temporary: real fetch will set error on catch.
+      // Keep error false by default so screens work normally.
+      setError(false);
+    }, 900);
     return () => clearTimeout(t);
   }, []);
+  const handleRetry = () => {
+    setLoading(true);
+    setError(false);
+    setTimeout(() => setLoading(false), 900);
+  };
 
   const pendingInvites = notifications.filter(
     (n) => n.type === "invite" && !n.read && !dismissed.includes(n.id)
@@ -51,6 +64,8 @@ export default function Groups() {
         <View style={{ marginHorizontal: 20, marginTop: 12 }}>
           <SkeletonGroup count={4} height={120} />
         </View>
+      ) : error ? (
+        <ErrorState onRetry={handleRetry} />
       ) : (
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {pendingInvites.length > 0 && (
