@@ -1,9 +1,11 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Switch } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Switch, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
+import { Button } from "@/src/components/ui/Button";
+import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import {
   Moon,
@@ -17,6 +19,9 @@ import {
   ChevronRight,
   Users,
   Pencil,
+  Info,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react-native";
 import { currentUser, groups } from "@/src/data/mock";
 import { Role } from "@/src/types";
@@ -28,6 +33,7 @@ export default function Profile() {
   const { role, setRole, description } = useRole();
   const [bio, setBio] = React.useState(true);
   const [notif, setNotif] = React.useState(true);
+  const [trustOpen, setTrustOpen] = useState(false);
 
   return (
     <SafeAreaView
@@ -67,7 +73,14 @@ export default function Profile() {
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
               <Stat label="Member since" value="Jan 2024" muted={colors.textMuted} main={colors.textMain} />
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-              <Stat label="Trust score" value="92" muted={colors.textMuted} main={colors.textMain} />
+              <Stat
+                label="Trust score"
+                value="92"
+                muted={colors.textMuted}
+                main={colors.textMain}
+                onPress={() => setTrustOpen(true)}
+                icon={<Info size={12} color={colors.textMuted} />}
+              />
             </View>
           </Card>
         </View>
@@ -210,6 +223,106 @@ export default function Profile() {
 
         <Text style={[styles.version, { color: colors.textMuted }]}>Chuma v1.0 · Built with care</Text>
       </ScrollView>
+
+      <Modal
+        visible={trustOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTrustOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}>
+          <Pressable style={{ flex: 1 }} onPress={() => setTrustOpen(false)} />
+          <View style={{
+            backgroundColor: colors.background,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            padding: 24,
+            maxHeight: "85%",
+          }}>
+            <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Score display */}
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ fontSize: 48, fontWeight: "800", color: colors.primary }}>92</Text>
+                <Text style={{ color: colors.success, fontWeight: "700", fontSize: 15 }}>Excellent</Text>
+                <View style={{ width: "100%", marginTop: 12 }}>
+                  <ProgressBar progress={0.92} />
+                </View>
+              </View>
+
+              {/* What it means */}
+              <Text style={{ fontSize: 18, fontWeight: "700", color: colors.textMain, marginTop: 24, marginBottom: 8 }}>
+                What is a trust score?
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}>
+                Your trust score reflects how reliable you are as a village banking member. It is based on your history of contributing on time and repaying loans. A higher score builds confidence with your group and can improve your borrowing power.
+              </Text>
+
+              {/* What raises it */}
+              <Text style={[styles.sheetLabel, { color: colors.textMuted, marginTop: 20 }]}>
+                WHAT RAISES YOUR SCORE
+              </Text>
+              {[
+                "Contributing on time every cycle",
+                "Repaying loans on or before the due date",
+                "Staying active in your groups",
+              ].map((text) => (
+                <View key={text} style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <TrendingUp size={18} color={colors.success} />
+                  <Text style={{ color: colors.textMain, fontSize: 14, flex: 1 }}>{text}</Text>
+                </View>
+              ))}
+
+              {/* What lowers it */}
+              <Text style={[styles.sheetLabel, { color: colors.textMuted, marginTop: 20 }]}>
+                WHAT LOWERS YOUR SCORE
+              </Text>
+              {[
+                "Missing or paying contributions late",
+                "Late or missed loan repayments",
+                "Incurring penalties from your group",
+              ].map((text) => (
+                <View key={text} style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <TrendingDown size={18} color={colors.danger} />
+                  <Text style={{ color: colors.textMain, fontSize: 14, flex: 1 }}>{text}</Text>
+                </View>
+              ))}
+
+              {/* Score bands */}
+              <Text style={[styles.sheetLabel, { color: colors.textMuted, marginTop: 20 }]}>
+                SCORE BANDS
+              </Text>
+              <Card padding={14}>
+                {[
+                  { dot: colors.success, range: "80–100", label: "Excellent" },
+                  { dot: colors.primary, range: "60–79", label: "Good" },
+                  { dot: colors.warning, range: "40–59", label: "Fair" },
+                  { dot: colors.danger, range: "Below 40", label: "Needs improvement" },
+                ].map((band, i, arr) => (
+                  <View
+                    key={band.range}
+                    style={[
+                      { flexDirection: "row", alignItems: "center", paddingVertical: 10, gap: 10 },
+                      i < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                    ]}
+                  >
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: band.dot }} />
+                    <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14, minWidth: 76 }}>{band.range}</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 14 }}>{band.label}</Text>
+                  </View>
+                ))}
+              </Card>
+
+              <Button
+                label="Got it"
+                onPress={() => setTrustOpen(false)}
+                testID="trust-score-close-btn"
+                style={{ marginTop: 24 }}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -219,17 +332,33 @@ const Stat = ({
   value,
   main,
   muted,
+  onPress,
+  icon,
 }: {
   label: string;
   value: string;
   main: string;
   muted: string;
-}) => (
-  <View style={{ alignItems: "center", flex: 1 }}>
-    <Text style={{ fontSize: 18, fontWeight: "700", color: main }}>{value}</Text>
-    <Text style={{ fontSize: 11, color: muted, marginTop: 2, fontWeight: "500" }}>{label}</Text>
-  </View>
-);
+  onPress?: () => void;
+  icon?: React.ReactNode;
+}) => {
+  const inner = (
+    <>
+      <Text style={{ fontSize: 18, fontWeight: "700", color: main }}>{value}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2, gap: 3 }}>
+        <Text style={{ fontSize: 11, color: muted, fontWeight: "500" }}>{label}</Text>
+        {icon}
+      </View>
+    </>
+  );
+  return onPress ? (
+    <Pressable onPress={onPress} style={{ alignItems: "center", flex: 1 }}>
+      {inner}
+    </Pressable>
+  ) : (
+    <View style={{ alignItems: "center", flex: 1 }}>{inner}</View>
+  );
+};
 
 const Section = ({
   title,
@@ -323,4 +452,5 @@ const styles = StyleSheet.create({
   },
   logoutText: { fontSize: 15, fontWeight: "700", marginLeft: 8 },
   version: { fontSize: 11, textAlign: "center", marginTop: 24 },
+  sheetLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 10 },
 });
