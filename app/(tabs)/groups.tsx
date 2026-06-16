@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
+import { SkeletonGroup } from "@/src/components/ui";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { groups, notifications } from "@/src/data/mock";
@@ -15,6 +16,11 @@ export default function Groups() {
   const { colors } = useTheme();
   const router = useRouter();
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 900);
+    return () => clearTimeout(t);
+  }, []);
 
   const pendingInvites = notifications.filter(
     (n) => n.type === "invite" && !n.read && !dismissed.includes(n.id)
@@ -41,6 +47,11 @@ export default function Groups() {
         </Pressable>
       </View>
 
+      {loading ? (
+        <View style={{ marginHorizontal: 20, marginTop: 12 }}>
+          <SkeletonGroup count={4} height={120} />
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {pendingInvites.length > 0 && (
           <>
@@ -152,6 +163,7 @@ export default function Groups() {
         ))}
 
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   Users,
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
+import { Skeleton, SkeletonGroup } from "@/src/components/ui";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
@@ -43,6 +44,12 @@ export default function Home() {
   const { colors, mode } = useTheme();
   const router = useRouter();
   const { role } = useRole();
+
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 900);
+    return () => clearTimeout(t);
+  }, []);
 
   const personalSavings = 18450;
   const groupSavings = groups.reduce((a, g) => a + g.totalSavings, 0);
@@ -102,7 +109,21 @@ export default function Home() {
           </Text>
         </View>
 
-        {/* Hero Balance Card */}
+        {loading ? (
+          <>
+            <Skeleton height={150} borderRadius={24} style={{ marginHorizontal: 20, marginBottom: 20 }} />
+            <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 20 }}>
+              <Skeleton width={130} height={90} borderRadius={16} />
+              <Skeleton width={130} height={90} borderRadius={16} />
+              <Skeleton width={130} height={90} borderRadius={16} />
+            </View>
+            <View style={{ marginHorizontal: 20, marginTop: 20 }}>
+              <SkeletonGroup count={3} height={64} />
+            </View>
+          </>
+        ) : (
+          <>
+            {/* Hero Balance Card */}
         <View
           style={[
             styles.heroCard,
@@ -283,6 +304,8 @@ export default function Home() {
             </Pressable>
           ))}
         </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
+import { SkeletonGroup } from "@/src/components/ui";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { transactions } from "@/src/data/mock";
 import { TxnItem } from "@/src/types";
@@ -55,6 +56,12 @@ const FILTERS: { key: TxnItem["type"] | "all"; label: string }[] = [
 export default function TransactionsScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setLoading(false), 900);
+    return () => clearTimeout(t);
+  }, []);
+
   const [filter, setFilter] = useState<TxnItem["type"] | "all">("all");
   const [dateRange, setDateRange] = useState<"all" | "week" | "month" | "3months">("all");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -249,6 +256,11 @@ export default function TransactionsScreen() {
         />
       </View>
 
+      {loading ? (
+        <View style={{ marginHorizontal: 20, marginTop: 12 }}>
+          <SkeletonGroup count={6} height={72} />
+        </View>
+      ) : (
       <FlatList
         data={data}
         keyExtractor={(item) => item.id}
@@ -272,6 +284,7 @@ export default function TransactionsScreen() {
           </Card>
         )}
       />
+      )}
       <Modal
         visible={exportOpen}
         transparent
