@@ -54,6 +54,8 @@ export const groups: Group[] = [
     savingsGrowth: 18,
     repaymentRate: 94,
     defaults: 0,
+    nextContributionDate: "2026-06-18",
+    nextContributionAmount: 500,
   },
   {
     id: "g2",
@@ -75,6 +77,8 @@ export const groups: Group[] = [
     savingsGrowth: 12,
     repaymentRate: 89,
     defaults: 1,
+    nextContributionDate: "2026-06-30",
+    nextContributionAmount: 800,
   },
   {
     id: "g3",
@@ -96,5 +100,7 @@ export const groups: Group[] = [
     savingsGrowth: 9,
     repaymentRate: 82,
     defaults: 2,
+    nextContributionDate: "2026-06-20",
+    nextContributionAmount: 1200,
   },
 ];

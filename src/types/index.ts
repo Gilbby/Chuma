@@ -64,6 +64,8 @@ export interface Group {
   savingsGrowth?: number;
   repaymentRate?: number;
   defaults?: number;
+  nextContributionDate?: string;
+  nextContributionAmount?: number;
 }
 
 export interface TxnItem {

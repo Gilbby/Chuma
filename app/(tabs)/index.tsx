@@ -16,6 +16,7 @@ import {
   HandCoins,
   RefreshCw,
   CheckSquare,
+  Gift,
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Skeleton, SkeletonGroup } from "@/src/components/ui";
@@ -26,12 +27,23 @@ import {
   currentUser,
   groups,
   loans,
+  shareOut,
   transactions,
   approvals,
   notifications,
 } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
+
+function formatDueDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function Home() {
   const { colors, mode } = useTheme();
@@ -66,7 +78,30 @@ export default function Home() {
     .slice()
     .sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime())[0];
   const upcomingRepayment = nextRepaymentLoan?.installmentAmount ?? 0;
-  const upcomingRepaymentDate = nextRepaymentLoan?.nextDueDate ?? "—";
+  const upcomingRepaymentDate = nextRepaymentLoan?.nextDueDate
+    ? formatDueDate(nextRepaymentLoan.nextDueDate)
+    : "—";
+
+  const upcomingContribution = groups
+    .filter((g) => g.nextContributionDate)
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.nextContributionDate!).getTime() -
+        new Date(b.nextContributionDate!).getTime()
+    )[0];
+
+  const dueDateObj = upcomingContribution?.nextContributionDate
+    ? new Date(upcomingContribution.nextContributionDate)
+    : null;
+
+  const daysUntilDue =
+    dueDateObj && !isNaN(dueDateObj.getTime())
+      ? Math.ceil(
+          (dueDateObj.getTime() - new Date().getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+      : null;
 
   const pendingApprovals = approvals.filter((a) => a.status === "pending").length;
   const unread = notifications.filter((n) => !n.read).length;
@@ -195,6 +230,22 @@ export default function Home() {
           contentContainerStyle={styles.overviewRow}
         >
           <OverviewCard
+            label="Contribution due"
+            value={upcomingContribution ? formatZMW(upcomingContribution.nextContributionAmount!) : "—"}
+            sub={
+              daysUntilDue === null
+                ? "Nothing due"
+                : daysUntilDue <= 0
+                ? "Due today"
+                : daysUntilDue === 1
+                ? "Due tomorrow"
+                : `In ${daysUntilDue} days`
+            }
+            tint={colors.warning}
+            mode={mode}
+            testID="home-contribution-due"
+          />
+          <OverviewCard
             label="Active loans"
             value={myLoanCount > 0 ? formatZMW(myActiveLoans) : formatZMW(0)}
             sub={myLoanCount > 0 ? `${myLoanCount} ${myLoanCount === 1 ? "loan" : "loans"}` : "No active loans"}
@@ -253,6 +304,71 @@ export default function Home() {
           </Card>
         </View>
 
+        {/* Next payout card */}
+        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+          <Pressable
+            onPress={() => router.push("/share-out")}
+            style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+            testID="home-next-payout"
+          >
+            <Card padding={16} style={{ backgroundColor: colors.primarySoft }}>
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: "700",
+                  letterSpacing: 1.3,
+                  color: colors.textMuted,
+                  marginBottom: 12,
+                }}
+              >
+                NEXT PAYOUT
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    backgroundColor: colors.primary + "20",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 12,
+                  }}
+                >
+                  <Gift size={22} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 22,
+                      fontWeight: "800",
+                      color: colors.textMain,
+                      letterSpacing: -0.5,
+                    }}
+                  >
+                    {formatZMW(shareOut.yourShare)}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                    Your share · {shareOut.groupName}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: colors.primary + "18",
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 999,
+                  }}
+                >
+                  <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>
+                    {shareOut.date}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          </Pressable>
+        </View>
+
           </>
         )}
       </ScrollView>
@@ -266,12 +382,14 @@ const OverviewCard = ({
   sub,
   tint,
   mode,
+  testID,
 }: {
   label: string;
   value: string;
   sub: string;
   tint: string;
   mode: "light" | "dark";
+  testID?: string;
 }) => {
   const surface = mode === "light" ? "#FFFFFF" : "#0C1410";
   const border = mode === "light" ? "#E5E7EB" : "#1E3328";
@@ -281,6 +399,7 @@ const OverviewCard = ({
         styles.overviewCard,
         { backgroundColor: surface, borderColor: border },
       ]}
+      testID={testID}
     >
       <View style={[styles.overviewDot, { backgroundColor: tint }]} />
       <Text style={[styles.overviewLabel, { color: "#6B7280" }]}>{label}</Text>
