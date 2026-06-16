@@ -30,6 +30,7 @@ export interface GroupConstitution {
   loanRepaymentMonths: number;
   internalLendingEnabled: boolean;
   approvalThreshold: "2-of-3" | "majority" | "all";
+  penaltyFundsDestination?: "group-pool" | "emergency-fund" | "welfare-account";
 }
 
 export interface GroupGovernance {
@@ -106,6 +107,21 @@ export interface Approval {
   totalVoters: number;
   timestamp: string;
   status: "pending" | "approved" | "rejected";
+}
+
+export interface Penalty {
+  id: string;
+  groupId: string;
+  groupName: string;
+  memberId: string;
+  memberName: string;
+  violationType: "lateContribution" | "missingMeeting" | "lateRepayment";
+  reason: string;
+  amount: number;
+  fundsDestination: "group-pool" | "emergency-fund" | "welfare-account";
+  status: "pending" | "paid";
+  createdAt: string;
+  dueContext?: string;
 }
 
 export interface Notice {

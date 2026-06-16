@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { useRole } from "@/src/hooks/useRole";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
@@ -54,10 +55,25 @@ export default function GroupDetails() {
   const [invitePhone, setInvitePhone] = useState("+260 ");
   const [inviteError, setInviteError] = useState("");
 
+  const { role } = useRole();
+
   const group = useMemo(() => groups.find((g) => g.id === id) ?? groups[0], [id]);
   const groupApprovals = approvals.filter((a) => a.groupId === group.id);
   const groupTxn = transactions.filter((t) => t.groupId === group.id);
   const groupLoans = loans.filter((l) => l.groupId === group.id);
+
+  const cycleStatus = useMemo(() =>
+    group.members.map((m, i) => {
+      const seed = (i * 7) % 10;
+      const status: "paid" | "overdue" | "pending" =
+        seed < 6 ? "paid" : seed < 8 ? "overdue" : "pending";
+      return { member: m, status };
+    }),
+    [group.members]
+  );
+  const paidCount = cycleStatus.filter((c) => c.status === "paid").length;
+  const overdueCount = cycleStatus.filter((c) => c.status === "overdue").length;
+  const pendingCount = cycleStatus.filter((c) => c.status === "pending").length;
 
   return (
     <SafeAreaView
@@ -212,6 +228,94 @@ export default function GroupDetails() {
               testID="group-contribute-btn"
             />
             <View style={{ height: 16 }} />
+
+            {/* Cycle status summary */}
+            <Card padding={16} style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
+                <StatusSummaryCol count={paidCount} label="Paid" color={colors.success} />
+                <View style={{ width: 1, backgroundColor: colors.border }} />
+                <StatusSummaryCol count={overdueCount} label="Overdue" color={colors.danger} />
+                <View style={{ width: 1, backgroundColor: colors.border }} />
+                <StatusSummaryCol count={pendingCount} label="Pending" color={colors.warning} />
+              </View>
+            </Card>
+
+            {/* Member grid */}
+            <Card padding={16} style={{ marginBottom: 12 }}>
+              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+                CONTRIBUTION STATUS THIS CYCLE
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {cycleStatus.map(({ member, status }) => {
+                  const bg =
+                    status === "paid"
+                      ? colors.success
+                      : status === "overdue"
+                      ? colors.danger
+                      : colors.warning;
+                  const initials = member.name
+                    .split(" ")
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase();
+                  const firstName = member.name.split(" ")[0];
+                  return (
+                    <View
+                      key={member.id}
+                      style={{ width: 48, alignItems: "center" }}
+                      testID={`contrib-chip-${member.id}`}
+                    >
+                      <View
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          backgroundColor: bg,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                          {initials}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          color: colors.textMuted,
+                          fontSize: 10,
+                          marginTop: 4,
+                          textAlign: "center",
+                        }}
+                        numberOfLines={1}
+                      >
+                        {firstName}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+              {/* Legend */}
+              <View style={{ flexDirection: "row", gap: 14, marginTop: 14 }}>
+                <LegendDot color={colors.success} label="Paid" colors={colors} />
+                <LegendDot color={colors.danger} label="Overdue" colors={colors} />
+                <LegendDot color={colors.warning} label="Pending" colors={colors} />
+              </View>
+              {role !== "Member" && (
+                <Text
+                  style={{
+                    color: colors.textMuted,
+                    fontSize: 12,
+                    fontStyle: "italic",
+                    marginTop: 10,
+                    lineHeight: 17,
+                  }}
+                >
+                  Overdue members will be automatically flagged for a penalty at cycle end.
+                </Text>
+              )}
+            </Card>
+
             <Card padding={16}>
               <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
                 THIS CYCLE
@@ -680,6 +784,36 @@ export default function GroupDetails() {
     </SafeAreaView>
   );
 }
+
+const StatusSummaryCol = ({
+  count,
+  label,
+  color,
+}: {
+  count: number;
+  label: string;
+  color: string;
+}) => (
+  <View style={{ alignItems: "center", flex: 1 }}>
+    <Text style={{ color, fontSize: 24, fontWeight: "700" }}>{count}</Text>
+    <Text style={{ color, fontSize: 12, fontWeight: "600", marginTop: 2 }}>{label}</Text>
+  </View>
+);
+
+const LegendDot = ({
+  color,
+  label,
+  colors,
+}: {
+  color: string;
+  label: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) => (
+  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>{label}</Text>
+  </View>
+);
 
 const HeroStat = ({ label, value }: { label: string; value: string }) => (
   <View>
