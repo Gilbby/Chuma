@@ -15,13 +15,20 @@ import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
 
-const timeline = [
-  { date: "Sep 12, 2026", title: "Final cycle contributions due", done: true },
-  { date: "Sep 30, 2026", title: "Outstanding loans recovered", done: true },
-  { date: "Oct 10, 2026", title: "Group audit & report", done: false },
-  { date: "Oct 25, 2026", title: "Share-out approval vote", done: false },
-  { date: "Oct 30, 2026", title: "Distribution to members", done: false },
-];
+function addDays(iso: string, days: number): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  d.setDate(d.getDate() + days);
+  return d.toISOString();
+}
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+}
 
 export default function ShareOutScreen() {
   const { colors } = useTheme();
@@ -76,6 +83,26 @@ export default function ShareOutScreen() {
     ? formatShareOutDate(group.shareOutDate)
     : shareOut.date;
   const displayName = group?.name ?? shareOut.groupName;
+
+  const shareOutISO = group?.shareOutDate ?? shareOut.date;
+  const now = new Date();
+  const stageDates = {
+    finalContrib: addDays(shareOutISO, -48),
+    loansRecovered: addDays(shareOutISO, -30),
+    audit: addDays(shareOutISO, -20),
+    approvalVote: addDays(shareOutISO, -5),
+    distribution: shareOutISO,
+  };
+  const timeline = [
+    { date: stageDates.finalContrib, title: "Final cycle contributions due" },
+    { date: stageDates.loansRecovered, title: "Outstanding loans recovered" },
+    { date: stageDates.audit, title: "Group audit & report" },
+    { date: stageDates.approvalVote, title: "Share-out approval vote" },
+    { date: stageDates.distribution, title: "Distribution to members" },
+  ].map((stage) => ({
+    ...stage,
+    done: new Date(stage.date).getTime() < now.getTime(),
+  }));
 
   return (
     <SafeAreaView
@@ -191,7 +218,7 @@ export default function ShareOutScreen() {
                 >
                   {t.title}
                 </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{t.date}</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{fmtDate(t.date)}</Text>
               </View>
             </View>
           ))}
