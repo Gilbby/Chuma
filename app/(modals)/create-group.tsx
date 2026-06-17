@@ -29,14 +29,13 @@ import type { Group, GroupType, GroupConstitution } from "@/src/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 7;
 
 const STEP_TITLES = [
   "Group basics",
   "Contribution setup",
   "Loan rules",
   "Governance",
-  "Invite members",
   "Review & confirm",
   "Payment",
 ];
@@ -96,7 +95,6 @@ export default function CreateGroup() {
   const { colors } = useTheme();
   const router = useRouter();
   const inviteCode = useRef(Math.random().toString(36).slice(2, 8).toUpperCase());
-
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -141,21 +139,22 @@ export default function CreateGroup() {
     shareOutApprovals: true,
   });
 
-  // Step 5 — Invites
+  // Post-creation invite state (used on invite screen after success)
   const [phoneInput, setPhoneInput] = useState("");
   const [aliasInput, setAliasInput] = useState("");
   const [aliasResult, setAliasResult] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
 
-  // Step 6 — Review
+  // Step 5 — Review
   const [termsAccepted, setTermsAccepted] = useState(false);
 
-  // Step 7 — Payment
+  // Step 6 — Payment
   const [payMethod, setPayMethod] = useState("Airtel Money");
   const [paying, setPaying] = useState(false);
 
-  // Step 8 — new group id after creation
+  // new group id after creation
   const [newGroupId, setNewGroupId] = useState("");
 
   //  Helpers 
@@ -266,7 +265,7 @@ export default function CreateGroup() {
         totalSavings: 0,
         walletBalance: 0,
         loanCirculation: 0,
-        memberCount: invites.length,
+        memberCount: 0,
         cycleProgress: 0,
         shareOutDate,
         contributionAmount: toNum(contribAmount),
@@ -313,13 +312,146 @@ export default function CreateGroup() {
       groups.push(newGroup);
       setNewGroupId(newId);
       setPaying(false);
-      setStep(8);
+      setStep(7);
     }, 1200);
   };
 
-  // ─── Step 8 — Success ───────────────────────────────────────────────────────
+  // ─── Post-creation invite screen ────────────────────────────────────────────
 
-  if (step === 8) {
+  if (showInvite) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-invite-screen">
+        <ScreenHeader title="Invite members" onBack={() => setShowInvite(false)} />
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 24 }}>
+                Invite people to {groupName} by phone number. They'll get an SMS and see the invite in their app.
+              </Text>
+
+              {/* TODO: send real invites to created group via backend */}
+              <FL text="Invite by phone" colors={colors} />
+              <View style={styles.inputActionRow}>
+                <TextInput
+                  style={[styles.inputField, { flex: 1, color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
+                  value={phoneInput}
+                  onChangeText={setPhoneInput}
+                  placeholder="+260 97X XXX XXX"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="phone-pad"
+                  testID="invite-phone-input"
+                />
+                <Pressable
+                  onPress={addPhoneInvite}
+                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                  testID="invite-phone-send"
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Send</Text>
+                </Pressable>
+              </View>
+
+              <FL text="Invite by username" colors={colors} style={{ marginTop: 16 }} />
+              <View style={styles.inputActionRow}>
+                <TextInput
+                  style={[styles.inputField, { flex: 1, color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
+                  value={aliasInput}
+                  onChangeText={(t) => { setAliasInput(t); setAliasResult(null); }}
+                  placeholder="@username"
+                  placeholderTextColor={colors.textMuted}
+                  testID="invite-alias-input"
+                />
+                <Pressable
+                  onPress={() => { if (aliasInput.trim()) setAliasResult(aliasInput.trim()); }}
+                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                  testID="invite-alias-search"
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Search</Text>
+                </Pressable>
+              </View>
+              {aliasResult && (
+                <Card padding={12} style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={[styles.aliasAvatar, { backgroundColor: colors.primarySoft }]}>
+                      <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 14 }}>
+                        {aliasResult.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={{ color: colors.textMain, fontWeight: "600", flex: 1, marginLeft: 10 }}>{aliasResult}</Text>
+                    <Pressable onPress={addAliasInvite} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
+                      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Add</Text>
+                    </Pressable>
+                  </View>
+                </Card>
+              )}
+
+              <Pressable onPress={handleCopyLink} style={{ marginTop: 20 }} testID="invite-copy-link">
+                <Card padding={14}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View>
+                      <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>Share invite link</Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>CHUMA-{inviteCode.current}</Text>
+                    </View>
+                    <Text style={{ color: linkCopied ? colors.success : colors.primary, fontWeight: "700", fontSize: 13 }}>
+                      {linkCopied ? "Copied!" : "Copy"}
+                    </Text>
+                  </View>
+                </Card>
+              </Pressable>
+
+              {invites.length > 0 && (
+                <>
+                  <FL text="Pending invitations" colors={colors} style={{ marginTop: 20 }} />
+                  <Card padding={4}>
+                    {invites.map((inv, i) => (
+                      <View
+                        key={inv.id}
+                        style={[
+                          styles.optionRow,
+                          i < invites.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                        ]}
+                      >
+                        <Text style={{ color: colors.textMain, fontWeight: "500", flex: 1 }}>{inv.contact}</Text>
+                        <View style={[styles.statusPill, { backgroundColor: colors.primarySoft }]}>
+                          <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>{inv.status}</Text>
+                        </View>
+                        <Pressable onPress={() => removeInvite(inv.id)} style={{ marginLeft: 10 }} testID={`remove-invite-${inv.id}`}>
+                          <X size={16} color={colors.textMuted} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </Card>
+                </>
+              )}
+
+              <View style={[styles.infoNote, { backgroundColor: colors.primarySoft }]}>
+                <Text style={{ color: colors.primary, fontSize: 13, lineHeight: 20 }}>
+                  Members will receive an SMS invite to join Chuma and this group.
+                </Text>
+              </View>
+
+              <View style={{ flex: 1, minHeight: 24 }} />
+              <Button
+                label="Done — go to dashboard"
+                onPress={() => router.replace(`/group/${newGroupId}`)}
+                testID="invite-done-btn"
+              />
+              <View style={{ height: 10 }} />
+              <Button
+                label="Skip for now"
+                variant="ghost"
+                onPress={() => router.replace(`/group/${newGroupId}`)}
+                testID="invite-skip-btn"
+              />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── Step 7 — Success ───────────────────────────────────────────────────────
+
+  if (step === 7) {
     const typeLabel = GROUP_TYPES.find((t) => t.value === groupType)?.label ?? "";
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-success">
@@ -335,7 +467,6 @@ export default function CreateGroup() {
               <RRow label="Name" value={groupName} colors={colors} />
               <RRow label="Type" value={typeLabel} colors={colors} />
               <RRow label="Cycle" value={cycleDuration} colors={colors} />
-              <RRow label="Members invited" value={String(invites.length)} colors={colors} />
               <RRow label="Registration fee" value={`K250.00 paid · ${payMethod}`} colors={colors} last />
             </Card>
           </View>
@@ -343,16 +474,16 @@ export default function CreateGroup() {
           <View style={{ flex: 1 }} />
           <View style={{ width: "100%", paddingHorizontal: 24 }}>
             <Button
-              label="Open group dashboard"
-              onPress={() => router.replace(`/group/${newGroupId}`)}
-              testID="create-group-open-btn"
+              label="Invite members"
+              onPress={() => setShowInvite(true)}
+              testID="create-group-invite-btn"
             />
             <View style={{ height: 10 }} />
             <Button
-              label="Invite more members"
+              label="Go to group dashboard"
               variant="ghost"
               onPress={() => router.replace(`/group/${newGroupId}`)}
-              testID="create-group-invite-btn"
+              testID="create-group-open-btn"
             />
           </View>
         </View>
@@ -822,128 +953,8 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* ─── STEP 5 — Invite Members ────────────────────────────────────── */}
+            {/* ─── STEP 5 — Review & Confirm ──────────────────────────────────── */}
             {step === 5 && (
-              <>
-                <FL text="Invite by phone" colors={colors} />
-                <View style={styles.inputActionRow}>
-                  <TextInput
-                    style={[styles.inputField, { flex: 1, color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
-                    value={phoneInput}
-                    onChangeText={setPhoneInput}
-                    placeholder="+260 97X XXX XXX"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="phone-pad"
-                    testID="create-group-phone-input"
-                  />
-                  <Pressable
-                    onPress={addPhoneInvite}
-                    style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                    testID="create-group-phone-send"
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Send</Text>
-                  </Pressable>
-                </View>
-
-                <FL text="Invite by username" colors={colors} style={{ marginTop: 16 }} />
-                <View style={styles.inputActionRow}>
-                  <TextInput
-                    style={[styles.inputField, { flex: 1, color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
-                    value={aliasInput}
-                    onChangeText={(t) => { setAliasInput(t); setAliasResult(null); }}
-                    placeholder="@username"
-                    placeholderTextColor={colors.textMuted}
-                    testID="create-group-alias-input"
-                  />
-                  <Pressable
-                    onPress={() => { if (aliasInput.trim()) setAliasResult(aliasInput.trim()); }}
-                    style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                    testID="create-group-alias-search"
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Search</Text>
-                  </Pressable>
-                </View>
-                {aliasResult && (
-                  <Card padding={12} style={{ marginTop: 8 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <View style={[styles.aliasAvatar, { backgroundColor: colors.primarySoft }]}>
-                        <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 14 }}>
-                          {aliasResult.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={{ color: colors.textMain, fontWeight: "600", flex: 1, marginLeft: 10 }}>{aliasResult}</Text>
-                      <Pressable onPress={addAliasInvite} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
-                        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Add</Text>
-                      </Pressable>
-                    </View>
-                  </Card>
-                )}
-
-                <Pressable onPress={handleCopyLink} style={{ marginTop: 20 }} testID="create-group-copy-link">
-                  <Card padding={14}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                      <View>
-                        <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>Share invite link</Text>
-                        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                          CHUMA-{inviteCode.current}
-                        </Text>
-                      </View>
-                      <Text style={{ color: linkCopied ? colors.success : colors.primary, fontWeight: "700", fontSize: 13 }}>
-                        {linkCopied ? "Copied!" : "Copy"}
-                      </Text>
-                    </View>
-                  </Card>
-                </Pressable>
-
-                {invites.length > 0 && (
-                  <>
-                    <FL text="Pending invitations" colors={colors} style={{ marginTop: 20 }} />
-                    <Card padding={4}>
-                      {invites.map((inv, i) => (
-                        <View
-                          key={inv.id}
-                          style={[
-                            styles.optionRow,
-                            i < invites.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                          ]}
-                        >
-                          <Text style={{ color: colors.textMain, fontWeight: "500", flex: 1 }}>{inv.contact}</Text>
-                          <View style={[styles.statusPill, { backgroundColor: colors.primarySoft }]}>
-                            <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>{inv.status}</Text>
-                          </View>
-                          <Pressable onPress={() => removeInvite(inv.id)} style={{ marginLeft: 10 }} testID={`remove-invite-${inv.id}`}>
-                            <X size={16} color={colors.textMuted} />
-                          </Pressable>
-                        </View>
-                      ))}
-                    </Card>
-                  </>
-                )}
-
-                <View style={[styles.infoNote, { backgroundColor: colors.primarySoft }]}>
-                  <Text style={{ color: colors.primary, fontSize: 13, lineHeight: 20 }}>
-                    Members will receive an SMS invite to join Chuma and this group.
-                  </Text>
-                </View>
-
-                <View style={{ flex: 1, minHeight: 24 }} />
-                <Button
-                  label="Continue"
-                  onPress={() => goToStep(6)}
-                  testID="create-group-step5-continue"
-                />
-                <View style={{ height: 10 }} />
-                <Button
-                  label="Skip for now"
-                  variant="ghost"
-                  onPress={() => goToStep(6)}
-                  testID="create-group-step5-skip"
-                />
-              </>
-            )}
-
-            {/* ─── STEP 6 — Review & Confirm ──────────────────────────────────── */}
-            {step === 6 && (
               <>
                 <RC title="Group" onEdit={() => goToStep(1)} colors={colors}>
                   <RRow label="Name" value={groupName} colors={colors} />
@@ -985,10 +996,6 @@ export default function CreateGroup() {
                   <RRow label="Permissions" value={`${activePermCount} active`} colors={colors} last />
                 </RC>
 
-                <RC title="Members" onEdit={() => goToStep(5)} colors={colors} style={{ marginTop: 14 }}>
-                  <RRow label="Pending invites" value={String(invites.length)} colors={colors} last />
-                </RC>
-
                 <Pressable
                   onPress={() => setTermsAccepted((v) => !v)}
                   style={[styles.termsRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -1006,14 +1013,14 @@ export default function CreateGroup() {
                 <Button
                   label="Continue to payment"
                   disabled={!termsAccepted}
-                  onPress={() => goToStep(7)}
-                  testID="create-group-step6-continue"
+                  onPress={() => goToStep(6)}
+                  testID="create-group-step5-continue"
                 />
               </>
             )}
 
-            {/* ─── STEP 7 — Payment ───────────────────────────────────────── */}
-            {step === 7 && (
+            {/* ─── STEP 6 — Payment ───────────────────────────────────────── */}
+            {step === 6 && (
               <>
                 {/* Fee summary */}
                 <Card padding={18} style={{ marginBottom: 16 }}>
