@@ -20,6 +20,7 @@ import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { groups } from "@/src/data/mock";
+import { getMaxLoan, getLoanBreakdown, checkEligibility } from "@/src/services/loans";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, ChevronDown, Clock, Info } from "lucide-react-native";
 
@@ -31,8 +32,6 @@ const DURATIONS = [
   { months: 9, label: "9 months" },
   { months: 12, label: "12 months" },
 ];
-
-const personalSavings = 18450;
 
 export default function Loan() {
   const { colors } = useTheme();
@@ -54,13 +53,13 @@ export default function Loan() {
     if (submitAttempted && parseFloat(cleaned) > 0) setSubmitAttempted(false);
   };
 
+  const mySavings = grp.members?.[0]?.savings ?? 0;
   const num = parseFloat(amount) || 0;
-  const maxLoan = personalSavings * grp.loanMaxMultiplier;
-  const eligible = num <= maxLoan && num > 0;
-  const totalInterest = num * (grp.loanInterestRate / 100) * duration.months;
-  const totalRepay = num + totalInterest;
-  const installment = totalRepay / duration.months;
-  const savingsLoanRatio = num > 0 ? personalSavings / num : 0;
+  const maxLoan = getMaxLoan(mySavings, grp.loanMaxMultiplier);
+  const breakdown = getLoanBreakdown(num, grp.loanInterestRate, duration.months);
+  const eligibility = checkEligibility(num, maxLoan);
+  const eligible = eligibility.eligible;
+  const savingsLoanRatio = num > 0 ? mySavings / num : 0;
 
   if (step === "success") {
     return (
@@ -170,6 +169,14 @@ export default function Loan() {
               {submitAttempted && num <= 0 && (
                 <Text style={[styles.errText, { color: colors.danger }]}>Enter a valid amount</Text>
               )}
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 6 }}>
+                {`You can borrow up to ${formatZMW(maxLoan)} (${grp.loanMaxMultiplier}× your ${formatZMW(mySavings)} savings)`}
+              </Text>
+              {num > maxLoan && (
+                <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4, fontWeight: "500" }}>
+                  {eligibility.reason}
+                </Text>
+              )}
 
               <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
                 PURPOSE (OPTIONAL)
@@ -225,7 +232,7 @@ export default function Loan() {
                 </View>
                 <Text style={{ color: colors.textMain, fontSize: 14, marginTop: 10 }}>
                   You can borrow up to{" "}
-                  <Text style={{ fontWeight: "700" }}>{formatZMW(maxLoan, { compact: true })}</Text> ({grp.loanMaxMultiplier}× your savings of {formatZMW(personalSavings)}).
+                  <Text style={{ fontWeight: "700" }}>{formatZMW(maxLoan, { compact: true })}</Text> ({grp.loanMaxMultiplier}× your savings of {formatZMW(mySavings)}).
                 </Text>
                 <View style={{ marginTop: 12 }}>
                   <ProgressBar progress={Math.min(1, num / maxLoan)} />
@@ -323,15 +330,15 @@ export default function Loan() {
                   You&apos;ll repay
                 </Text>
                 <Text style={{ color: colors.textMain, fontSize: 36, fontWeight: "700", letterSpacing: -0.6, marginTop: 4 }}>
-                  {formatZMW(totalRepay)}
+                  {formatZMW(breakdown.totalRepay)}
                 </Text>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 <Row label="Principal" value={formatZMW(num)} colors={colors} />
-                <Row label={`Interest (${grp.loanInterestRate}%/mo)`} value={formatZMW(totalInterest)} colors={colors} />
+                <Row label={`Interest (${grp.loanInterestRate}%/mo)`} value={formatZMW(breakdown.interest)} colors={colors} />
                 <Row label="Duration" value={duration.label} colors={colors} />
                 <Row
                   label="Monthly installment"
-                  value={formatZMW(installment)}
+                  value={formatZMW(breakdown.monthlyInstallment)}
                   colors={colors}
                   highlight
                 />
