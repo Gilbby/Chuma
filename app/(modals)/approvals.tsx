@@ -10,13 +10,14 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { approvals as initial } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
-import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info } from "lucide-react-native";
+import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles } from "lucide-react-native";
 
 const TYPE_ICONS = {
   loan: Banknote,
   withdrawal: Wallet,
   "rule-change": Scale,
   "admin-action": ShieldCheck,
+  "share-out": Sparkles,
 };
 
 export default function Approvals() {

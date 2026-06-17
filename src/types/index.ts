@@ -105,7 +105,7 @@ export interface Loan {
 
 export interface Approval {
   id: string;
-  type: "loan" | "withdrawal" | "rule-change" | "admin-action";
+  type: "loan" | "withdrawal" | "rule-change" | "admin-action" | "share-out";
   title: string;
   description: string;
   requestedBy: string;

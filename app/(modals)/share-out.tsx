@@ -9,7 +9,7 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { shareOut, groups, penalties } from "@/src/data/mock";
+import { shareOut, groups, penalties, approvals as approvalsList, notifications } from "@/src/data/mock";
 import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { getRequiredApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
@@ -116,15 +116,57 @@ export default function ShareOutScreen() {
   const requiredApprovals = getRequiredApprovals(threshold, adminCount);
 
   const handleApprove = () => {
+    // Simulates multi-admin approval on one device: approve as
+    // Chairperson, then switch role (Treasurer/Secretary) to
+    // see the pending approval + notification. Real cross-device
+    // push notifications require the backend.
     const next = approvals + 1;
     setApprovals(next);
+
+    const approvalId = `shareout-${activeGroupId}`;
+
     if (next >= requiredApprovals) {
       setApproved(true);
+      const existing = approvalsList.find((a) => a.id === approvalId);
+      if (existing) {
+        existing.status = "approved";
+        existing.votesFor = next;
+      }
       Alert.alert(
         "Distribution approved",
         "The share-out plan has been approved. Members will be paid on the distribution date."
       );
     } else {
+      const exists = approvalsList.some((a) => a.id === approvalId);
+      if (!exists) {
+        approvalsList.unshift({
+          id: approvalId,
+          type: "share-out",
+          title: `Share-out distribution — ${displayName}`,
+          description: `Approve the end-of-cycle distribution of ${formatZMW(result.totalToDistribute)} to members.`,
+          requestedBy: "Chairperson",
+          requestedById: group?.members?.[0]?.id ?? "",
+          amount: result.totalToDistribute,
+          groupId: activeGroupId,
+          groupName: displayName,
+          votesFor: next,
+          votesAgainst: 0,
+          totalVoters: requiredApprovals,
+          timestamp: "Just now",
+          status: "pending",
+        });
+
+        notifications.unshift({
+          id: `n-shareout-${activeGroupId}`,
+          type: "governance",
+          title: "Share-out approval needed",
+          body: `${displayName} share-out plan needs your approval to proceed.`,
+          date: "Just now",
+          read: false,
+          groupId: activeGroupId,
+          groupName: displayName,
+        });
+      }
       Alert.alert(
         "Vote recorded",
         `Your approval is recorded. ${requiredApprovals - next} more admin approval(s) needed.`
