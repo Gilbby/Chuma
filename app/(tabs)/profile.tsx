@@ -23,8 +23,9 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react-native";
-import { currentUser, groups } from "@/src/data/mock";
+import { currentUser, groups, penalties } from "@/src/data/mock";
 import { Role } from "@/src/types";
+import { getTrustScore, getTrustBand } from "@/src/services/trustScore";
 import { useRole } from "@/src/contexts/RoleContext";
 
 export default function Profile() {
@@ -34,6 +35,29 @@ export default function Profile() {
   const [bio, setBio] = React.useState(true);
   const [notif, setNotif] = React.useState(true);
   const [trustOpen, setTrustOpen] = useState(false);
+
+  const myContributions = groups.reduce(
+    (sum, g) => sum + (g.members?.[0]?.contributions ?? 0), 0
+  );
+  const myActiveLoan = groups.reduce(
+    (sum, g) => sum + (g.members?.[0]?.loanActive ?? 0), 0
+  );
+  const myPenaltyCount = penalties.filter(
+    (p) => p.memberId === "m-0" && p.status === "pending"
+  ).length;
+
+  const trustScore = getTrustScore(
+    { contributions: myContributions, loanActive: myActiveLoan },
+    myPenaltyCount
+  );
+  const trustBand = getTrustBand(trustScore);
+
+  const bandColor = {
+    excellent: colors.success,
+    good: colors.primary,
+    fair: colors.warning,
+    low: colors.danger,
+  }[trustBand.band];
 
   return (
     <SafeAreaView
@@ -75,7 +99,7 @@ export default function Profile() {
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
               <Stat
                 label="Trust score"
-                value="92"
+                value={String(trustScore)}
                 muted={colors.textMuted}
                 main={colors.textMain}
                 onPress={() => setTrustOpen(true)}
@@ -243,10 +267,10 @@ export default function Profile() {
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Score display */}
               <View style={{ alignItems: "center" }}>
-                <Text style={{ fontSize: 48, fontWeight: "800", color: colors.primary }}>92</Text>
-                <Text style={{ color: colors.success, fontWeight: "700", fontSize: 15 }}>Excellent</Text>
+                <Text style={{ fontSize: 48, fontWeight: "800", color: bandColor }}>{trustScore}</Text>
+                <Text style={{ color: bandColor, fontWeight: "700", fontSize: 15 }}>{trustBand.label}</Text>
                 <View style={{ width: "100%", marginTop: 12 }}>
-                  <ProgressBar progress={0.92} />
+                  <ProgressBar progress={trustScore / 100} />
                 </View>
               </View>
 
