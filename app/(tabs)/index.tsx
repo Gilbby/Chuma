@@ -27,15 +27,26 @@ import {
   currentUser,
   groups,
   loans,
-  shareOut,
+  penalties,
   transactions,
   approvals,
   notifications,
 } from "@/src/data/mock";
+import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 
 function formatDueDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatPayoutDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-GB", {
@@ -102,6 +113,50 @@ export default function Home() {
             (1000 * 60 * 60 * 24)
         )
       : null;
+
+  const payoutsByGroup = groups
+    .filter((g) => g.shareOutDate)
+    .map((g) => {
+      const penaltyIncome = penalties
+        .filter(
+          (p) =>
+            p.groupId === g.id &&
+            p.status === "paid" &&
+            p.fundsDestination === "group-pool"
+        )
+        .reduce((s, p) => s + p.amount, 0);
+
+      const cycleMonths = g.constitution?.loanRepaymentMonths ?? 12;
+      const profit = estimateGroupProfit(
+        g.loanCirculation ?? 0,
+        g.loanInterestRate ?? 0,
+        cycleMonths,
+        penaltyIncome
+      );
+
+      const result = computeShareOut(
+        (g.members ?? []).map((m) => ({
+          id: m.id,
+          name: m.name,
+          contribution: m.savings,
+        })),
+        profit
+      );
+
+      const myId = g.members?.[0]?.id ?? "";
+      const myShare = getMyShare(result.members, myId);
+
+      return {
+        groupId: g.id,
+        groupName: g.name,
+        date: g.shareOutDate,
+        myShare,
+      };
+    });
+
+  const nextPayout = payoutsByGroup
+    .slice()
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
 
   const pendingApprovals = approvals.filter((a) => a.status === "pending").length;
   const unread = notifications.filter((n) => !n.read).length;
@@ -305,69 +360,71 @@ export default function Home() {
         </View>
 
         {/* Next payout card */}
-        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
-          <Pressable
-            onPress={() => router.push("/share-out")}
-            style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            testID="home-next-payout"
-          >
-            <Card padding={16} style={{ backgroundColor: colors.primarySoft }}>
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: "700",
-                  letterSpacing: 1.3,
-                  color: colors.textMuted,
-                  marginBottom: 12,
-                }}
-              >
-                NEXT PAYOUT
-              </Text>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <View
+        {nextPayout && (
+          <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+            <Pressable
+              onPress={() => router.push("/share-out")}
+              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+              testID="home-next-payout"
+            >
+              <Card padding={16} style={{ backgroundColor: colors.primarySoft }}>
+                <Text
                   style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 14,
-                    backgroundColor: colors.primary + "20",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginRight: 12,
+                    fontSize: 10,
+                    fontWeight: "700",
+                    letterSpacing: 1.3,
+                    color: colors.textMuted,
+                    marginBottom: 12,
                   }}
                 >
-                  <Gift size={22} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
+                  NEXT PAYOUT
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
                     style={{
-                      fontSize: 22,
-                      fontWeight: "800",
-                      color: colors.textMain,
-                      letterSpacing: -0.5,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      backgroundColor: colors.primary + "20",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 12,
                     }}
                   >
-                    {formatZMW(shareOut.yourShare)}
-                  </Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                    Your share · {shareOut.groupName}
-                  </Text>
+                    <Gift size={22} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 22,
+                        fontWeight: "800",
+                        color: colors.textMain,
+                        letterSpacing: -0.5,
+                      }}
+                    >
+                      {formatZMW(nextPayout.myShare)}
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                      Your share · {nextPayout.groupName}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      backgroundColor: colors.primary + "18",
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>
+                      {formatPayoutDate(nextPayout.date)}
+                    </Text>
+                  </View>
                 </View>
-                <View
-                  style={{
-                    backgroundColor: colors.primary + "18",
-                    paddingHorizontal: 10,
-                    paddingVertical: 6,
-                    borderRadius: 999,
-                  }}
-                >
-                  <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>
-                    {shareOut.date}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          </Pressable>
-        </View>
+              </Card>
+            </Pressable>
+          </View>
+        )}
 
           </>
         )}
