@@ -59,6 +59,12 @@ export default function Profile() {
     low: colors.danger,
   }[trustBand.band];
 
+  const memberSince = (() => {
+    const d = new Date(currentUser.joinedDate);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  })();
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -95,7 +101,7 @@ export default function Profile() {
             <View style={[styles.statsRow, { borderTopColor: colors.border }]}>
               <Stat label="Groups" value={String(groups.length)} muted={colors.textMuted} main={colors.textMain} />
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-              <Stat label="Member since" value="Jan 2024" muted={colors.textMuted} main={colors.textMain} />
+              <Stat label="Member since" value={memberSince} muted={colors.textMuted} main={colors.textMain} />
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
               <Stat
                 label="Trust score"
