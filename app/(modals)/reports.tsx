@@ -6,7 +6,8 @@ import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { LineChart, BarChart } from "@/src/components/charts/Charts";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { savingsTrend, repaymentRate, groups, transactions } from "@/src/data/mock";
+import { savingsTrend, groups, loans, transactions } from "@/src/data/mock";
+import { getRepaymentRate, getSavingsGrowth } from "@/src/services/groupStats";
 import { formatZMW } from "@/src/utils/currency";
 import { TrendingUp, TrendingDown, Users, Banknote, Download, FileText, FileSpreadsheet } from "lucide-react-native";
 import * as Print from "expo-print";
@@ -19,6 +20,33 @@ export default function Reports() {
   const chartW = width - 40 - 32;
   const [exportOpen, setExportOpen] = useState(false);
   const data = transactions;
+
+  const primaryGroup = groups[0];
+  const trendData =
+    (primaryGroup as typeof primaryGroup & { trend?: typeof savingsTrend })?.trend ??
+    savingsTrend;
+
+  const repaymentByGroup = groups.map((g) => ({
+    name: g.name,
+    value: getRepaymentRate(g, loans),
+  }));
+
+  const avgRepayment = Math.round(
+    repaymentByGroup.reduce((s, r) => s + r.value, 0) /
+    (repaymentByGroup.length || 1)
+  );
+
+  const savingsGrowthPct = getSavingsGrowth(primaryGroup);
+
+  // TODO: when backend tracks on-time contribution history,
+  // replace the derived rate with the real consistency %
+  const topMembers = [...(primaryGroup?.members ?? [])]
+    .sort((a, b) => (b.contributions ?? 0) - (a.contributions ?? 0))
+    .slice(0, 5)
+    .map((m) => ({
+      name: m.name,
+      rate: Math.min(100, 70 + (m.contributions ?? 0)),
+    }));
 
   async function handleExportPDF() {
     try {
@@ -103,11 +131,12 @@ export default function Reports() {
           <KpiCard
             icon={<TrendingUp size={18} color={colors.success} />}
             label="Savings growth"
-            value="+18.4%"
-            sub="vs last quarter"
+            value={`${savingsGrowthPct >= 0 ? "+" : ""}${savingsGrowthPct}%`}
+            sub="vs last month"
             colors={colors}
           />
           <View style={{ width: 12 }} />
+          {/* TODO: backend — derive from disbursed loans this quarter */}
           <KpiCard
             icon={<Banknote size={18} color={colors.primary} />}
             label="Loans issued"
@@ -117,6 +146,7 @@ export default function Reports() {
           />
         </View>
         <View style={[styles.kpiRow, { marginTop: 12 }]}>
+          {/* TODO: backend — derive default rate from overdue loans */}
           <KpiCard
             icon={<TrendingDown size={18} color={colors.danger} />}
             label="Default rate"
@@ -125,6 +155,7 @@ export default function Reports() {
             colors={colors}
           />
           <View style={{ width: 12 }} />
+          {/* TODO: backend — derive from membership churn data */}
           <KpiCard
             icon={<Users size={18} color={colors.info} />}
             label="Member retention"
@@ -138,14 +169,14 @@ export default function Reports() {
         <Card padding={20} style={{ marginTop: 18 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Savings trend</Text>
           <Text style={[styles.cardSub, { color: colors.textMuted }]}>
-            Monthly group savings (K thousands)
+            {`Monthly savings · ${primaryGroup?.name ?? ""} (K'000)`}
           </Text>
           <View style={{ marginTop: 14 }}>
-            <LineChart data={savingsTrend} width={chartW} height={170} />
+            <LineChart data={trendData} width={chartW} height={170} />
           </View>
         </Card>
 
-        {/* Loan analytics */}
+        {/* Loan analytics — TODO: backend, quarterly issuance isn't derivable from current mock */}
         <Card padding={20} style={{ marginTop: 14 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Loans issued</Text>
           <Text style={[styles.cardSub, { color: colors.textMuted }]}>By quarter (K thousands)</Text>
@@ -157,14 +188,14 @@ export default function Reports() {
         {/* Repayment rate by group */}
         <Card padding={20} style={{ marginTop: 14 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Repayment rate</Text>
-          <Text style={[styles.cardSub, { color: colors.textMuted }]}>By group (% on-time)</Text>
+          <Text style={[styles.cardSub, { color: colors.textMuted }]}>
+            {`By group (% on-time) · avg ${avgRepayment}%`}
+          </Text>
           <View style={{ marginTop: 18 }}>
-            {repaymentRate.map((r, i) => (
+            {repaymentByGroup.map((r, i) => (
               <View key={i} style={{ marginBottom: 14 }}>
                 <View style={styles.rowBetween}>
-                  <Text style={{ color: colors.textMain, fontWeight: "600" }}>
-                    {groups[i]?.name ?? r.label}
-                  </Text>
+                  <Text style={{ color: colors.textMain, fontWeight: "600" }}>{r.name}</Text>
                   <Text style={{ color: colors.textMain, fontWeight: "700" }}>{r.value}%</Text>
                 </View>
                 <View style={{ marginTop: 6, height: 8, borderRadius: 999, backgroundColor: colors.surfaceSecondary, overflow: "hidden" }}>
@@ -188,13 +219,7 @@ export default function Reports() {
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Contribution consistency</Text>
           <Text style={[styles.cardSub, { color: colors.textMuted }]}>Top performing members</Text>
           <View style={{ marginTop: 14 }}>
-            {[
-              { name: "Gilbert (you)", rate: 100 },
-              { name: "Chisomo Banda", rate: 98 },
-              { name: "Natasha Phiri", rate: 96 },
-              { name: "John Mwale", rate: 91 },
-              { name: "Mwansa Tembo", rate: 86 },
-            ].map((p, i) => (
+            {topMembers.map((p, i) => (
               <View key={i} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <Text style={{ color: colors.textMuted, fontWeight: "700", width: 24 }}>#{i + 1}</Text>
                 <Text style={{ color: colors.textMain, fontWeight: "600", flex: 1 }}>{p.name}</Text>
