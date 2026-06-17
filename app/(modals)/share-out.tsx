@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
@@ -33,6 +33,7 @@ function fmtDate(iso: string): string {
 
 export default function ShareOutScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { role, can } = useRole();
   const canApprove = can("approve.shareout");
 
@@ -345,7 +346,12 @@ export default function ShareOutScreen() {
           </View>
         )}
         <View style={{ height: 10 }} />
-        <Button label="View detailed report" variant="outline" />
+        <Button
+          label="View detailed report"
+          variant="outline"
+          onPress={() => router.push(`/reports?groupId=${activeGroupId}` as never)}
+          testID="shareout-report-btn"
+        />
       </ScrollView>
     </SafeAreaView>
   );
