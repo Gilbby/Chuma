@@ -363,7 +363,7 @@ export default function Home() {
         {nextPayout && (
           <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
             <Pressable
-              onPress={() => router.push("/share-out")}
+              onPress={() => router.push(`/share-out?groupId=${nextPayout.groupId}` as never)}
               style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
               testID="home-next-payout"
             >

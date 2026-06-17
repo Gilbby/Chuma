@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
@@ -27,12 +28,14 @@ export default function ShareOutScreen() {
   const { role, can } = useRole();
   const canApprove = can("approve.shareout");
 
-  const group = groups.find((g) => g.id === shareOut.groupId);
+  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const activeGroupId = groupId ?? shareOut.groupId;
+  const group = groups.find((g) => g.id === activeGroupId);
 
   const penaltyIncome = penalties
     .filter(
       (p) =>
-        p.groupId === shareOut.groupId &&
+        p.groupId === activeGroupId &&
         p.status === "paid" &&
         p.fundsDestination === "group-pool"
     )
@@ -49,12 +52,30 @@ export default function ShareOutScreen() {
       )
     : shareOut.profit;
 
-  const result = computeShareOut(
-    shareOut.members.map((m) => ({
-      id: m.id, name: m.name, contribution: m.contribution,
-    })),
-    computedProfit
-  );
+  const members = group
+    ? (group.members ?? []).map((m) => ({
+        id: m.id, name: m.name, contribution: m.savings,
+      }))
+    : shareOut.members.map((m) => ({
+        id: m.id, name: m.name, contribution: m.contribution,
+      }));
+
+  const result = computeShareOut(members, computedProfit);
+
+  const myId = group?.members?.[0]?.id ?? "m-gilbert";
+
+  function formatShareOutDate(iso: string): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString("en-GB", {
+      day: "numeric", month: "short", year: "numeric",
+    });
+  }
+
+  const displayDate = group?.shareOutDate
+    ? formatShareOutDate(group.shareOutDate)
+    : shareOut.date;
+  const displayName = group?.name ?? shareOut.groupName;
 
   return (
     <SafeAreaView
@@ -62,7 +83,7 @@ export default function ShareOutScreen() {
       edges={["top"]}
       testID="shareout-screen"
     >
-      <ScreenHeader title="Share-out" subtitle={shareOut.groupName} />
+      <ScreenHeader title="Share-out" subtitle={displayName} />
       <ScrollView contentContainerStyle={styles.content}>
         {/* Hero */}
         <Card
@@ -79,7 +100,7 @@ export default function ShareOutScreen() {
             {formatZMW(result.totalToDistribute)}
           </Text>
           <Text style={{ color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
-            Distribution on {shareOut.date}
+            Distribution on {displayDate}
           </Text>
           <View style={styles.heroStats}>
             <View>
@@ -94,7 +115,7 @@ export default function ShareOutScreen() {
             <View style={styles.heroDivider} />
             <View>
               <Text style={styles.heroStatLabel}>Your share</Text>
-              <Text style={styles.heroStatVal}>{formatZMW(getMyShare(result.members, "m-gilbert"), { compact: true })}</Text>
+              <Text style={styles.heroStatVal}>{formatZMW(getMyShare(result.members, myId), { compact: true })}</Text>
             </View>
           </View>
         </Card>
