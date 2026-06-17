@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
@@ -11,6 +11,7 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { shareOut, groups, penalties } from "@/src/data/mock";
 import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
+import { getRequiredApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
@@ -34,6 +35,10 @@ export default function ShareOutScreen() {
   const { colors } = useTheme();
   const { role, can } = useRole();
   const canApprove = can("approve.shareout");
+
+  // TODO: persist approval votes to backend via services/approvals when wired
+  const [approvals, setApprovals] = useState(0);
+  const [approved, setApproved] = useState(false);
 
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const activeGroupId = groupId ?? shareOut.groupId;
@@ -103,6 +108,29 @@ export default function ShareOutScreen() {
     ...stage,
     done: new Date(stage.date).getTime() < now.getTime(),
   }));
+
+  const adminCount = (group?.members ?? []).filter((m) =>
+    ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
+  ).length;
+  const threshold = group?.constitution?.approvalThreshold ?? "majority";
+  const requiredApprovals = getRequiredApprovals(threshold, adminCount);
+
+  const handleApprove = () => {
+    const next = approvals + 1;
+    setApprovals(next);
+    if (next >= requiredApprovals) {
+      setApproved(true);
+      Alert.alert(
+        "Distribution approved",
+        "The share-out plan has been approved. Members will be paid on the distribution date."
+      );
+    } else {
+      Alert.alert(
+        "Vote recorded",
+        `Your approval is recorded. ${requiredApprovals - next} more admin approval(s) needed.`
+      );
+    }
+  };
 
   return (
     <SafeAreaView
@@ -225,8 +253,36 @@ export default function ShareOutScreen() {
         </Card>
 
         <View style={{ height: 24 }} />
-        {canApprove ? (
-          <Button label="Approve distribution plan" testID="shareout-approve-btn" />
+        {approved ? (
+          <Card
+            padding={16}
+            style={{ backgroundColor: colors.success + "15", flexDirection: "row", alignItems: "center", gap: 12 }}
+            testID="shareout-approved"
+          >
+            <Check size={22} color={colors.success} strokeWidth={2.5} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.success, fontWeight: "700", fontSize: 15 }}>
+                Distribution plan approved
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                {`${approvals} of ${adminCount} admins approved`}
+              </Text>
+            </View>
+          </Card>
+        ) : canApprove ? (
+          <>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 6 }}>
+              {`${approvals} of ${requiredApprovals} required approvals`}
+            </Text>
+            <ProgressBar progress={requiredApprovals > 0 ? approvals / requiredApprovals : 0} />
+            <View style={{ height: 12 }} />
+            <Button
+              label={approvals > 0 ? "Approval recorded" : "Approve distribution plan"}
+              disabled={approvals > 0}
+              onPress={handleApprove}
+              testID="shareout-approve-btn"
+            />
+          </>
         ) : (
           <View
             style={{
@@ -241,7 +297,7 @@ export default function ShareOutScreen() {
           >
             <Lock size={18} color={colors.textMuted} />
             <Text style={{ flex: 1, color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
-              Only the Chairperson can approve the distribution plan. Your current role is{" "}
+              Only group admins can approve the distribution plan. Your current role is{" "}
               <Text style={{ fontWeight: "700", color: colors.textMain }}>{role}</Text>.
             </Text>
           </View>
