@@ -21,6 +21,7 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { groups } from "@/src/data/mock";
 import { getMaxLoan, getLoanBreakdown, checkEligibility } from "@/src/services/loans";
+import { getRequiredApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, ChevronDown, Clock, Info } from "lucide-react-native";
 
@@ -54,6 +55,12 @@ export default function Loan() {
   };
 
   const mySavings = grp.members?.[0]?.savings ?? 0;
+  const adminCount = (grp.members ?? []).filter((m) =>
+    ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
+  ).length;
+  const threshold = grp.constitution?.approvalThreshold ?? "majority";
+  const requiredApprovals = getRequiredApprovals(threshold, adminCount);
+
   const num = parseFloat(amount) || 0;
   const maxLoan = getMaxLoan(mySavings, grp.loanMaxMultiplier);
   const breakdown = getLoanBreakdown(num, grp.loanInterestRate, duration.months);
@@ -99,8 +106,12 @@ export default function Loan() {
               </View>
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>Voting required</Text>
-                <Text style={{ color: colors.textMain, fontWeight: "700" }}>6 of 10 members</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>Admin approvals required</Text>
+                <Text style={{ color: colors.textMain, fontWeight: "700" }}>
+                  {adminCount === 0
+                    ? "Pending admin setup"
+                    : `${requiredApprovals} of ${adminCount} admins`}
+                </Text>
               </View>
             </Card>
           </View>
