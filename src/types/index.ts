@@ -66,6 +66,10 @@ export interface Group {
   defaults?: number;
   nextContributionDate?: string;
   nextContributionAmount?: number;
+  registrationFee?: number;
+  registrationPaid?: boolean;
+  registrationPaidAt?: string;
+  registrationMethod?: string;
 }
 
 export interface TxnItem {
