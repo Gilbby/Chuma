@@ -66,6 +66,7 @@ export interface Group {
   defaults?: number;
   nextContributionDate?: string;
   nextContributionAmount?: number;
+  memberRetention?: number;
   registrationFee?: number;
   registrationPaid?: boolean;
   registrationPaidAt?: string;

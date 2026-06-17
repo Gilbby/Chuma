@@ -38,6 +38,12 @@ export default function Reports() {
 
   const savingsGrowthPct = getSavingsGrowth(primaryGroup);
 
+  const avgRetention = groups.length
+    ? Math.round(
+        groups.reduce((s, g) => s + (g.memberRetention ?? 0), 0) / groups.length
+      )
+    : 0;
+
   // TODO: when backend tracks on-time contribution history,
   // replace the derived rate with the real consistency %
   const topMembers = [...(primaryGroup?.members ?? [])]
@@ -155,11 +161,11 @@ export default function Reports() {
             colors={colors}
           />
           <View style={{ width: 12 }} />
-          {/* TODO: backend — derive from membership churn data */}
+          {/* Retention per group; backend will compute from real join/leave events */}
           <KpiCard
             icon={<Users size={18} color={colors.info} />}
             label="Member retention"
-            value="96%"
+            value={`${avgRetention}%`}
             sub="last 12 months"
             colors={colors}
           />

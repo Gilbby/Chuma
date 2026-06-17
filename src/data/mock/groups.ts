@@ -56,6 +56,7 @@ export const groups: Group[] = [
     defaults: 0,
     nextContributionDate: "2026-06-18",
     nextContributionAmount: 500,
+    memberRetention: 96,
   },
   {
     id: "g2",
@@ -79,6 +80,7 @@ export const groups: Group[] = [
     defaults: 1,
     nextContributionDate: "2026-06-30",
     nextContributionAmount: 800,
+    memberRetention: 91,
   },
   {
     id: "g3",
@@ -102,5 +104,6 @@ export const groups: Group[] = [
     defaults: 2,
     nextContributionDate: "2026-06-20",
     nextContributionAmount: 1200,
+    memberRetention: 88,
   },
 ];
