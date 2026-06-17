@@ -8,7 +8,8 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { shareOut } from "@/src/data/mock";
+import { shareOut, groups, penalties } from "@/src/data/mock";
+import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
@@ -25,6 +26,36 @@ export default function ShareOutScreen() {
   const { colors } = useTheme();
   const { role, can } = useRole();
   const canApprove = can("approve.shareout");
+
+  const group = groups.find((g) => g.id === shareOut.groupId);
+
+  const penaltyIncome = penalties
+    .filter(
+      (p) =>
+        p.groupId === shareOut.groupId &&
+        p.status === "paid" &&
+        p.fundsDestination === "group-pool"
+    )
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const cycleMonths = group?.constitution?.loanRepaymentMonths ?? 12;
+
+  const computedProfit = group
+    ? estimateGroupProfit(
+        group.loanCirculation ?? 0,
+        group.loanInterestRate ?? 0,
+        cycleMonths,
+        penaltyIncome
+      )
+    : shareOut.profit;
+
+  const result = computeShareOut(
+    shareOut.members.map((m) => ({
+      id: m.id, name: m.name, contribution: m.contribution,
+    })),
+    computedProfit
+  );
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -45,7 +76,7 @@ export default function ShareOutScreen() {
             </Text>
           </View>
           <Text style={{ color: "#fff", fontSize: 32, fontWeight: "700", marginTop: 12, letterSpacing: -0.5 }}>
-            {formatZMW(shareOut.totalToDistribute)}
+            {formatZMW(result.totalToDistribute)}
           </Text>
           <Text style={{ color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
             Distribution on {shareOut.date}
@@ -53,30 +84,33 @@ export default function ShareOutScreen() {
           <View style={styles.heroStats}>
             <View>
               <Text style={styles.heroStatLabel}>Savings</Text>
-              <Text style={styles.heroStatVal}>{formatZMW(shareOut.totalSavings, { compact: true })}</Text>
+              <Text style={styles.heroStatVal}>{formatZMW(result.totalSavings, { compact: true })}</Text>
             </View>
             <View style={styles.heroDivider} />
             <View>
               <Text style={styles.heroStatLabel}>Profit</Text>
-              <Text style={styles.heroStatVal}>{formatZMW(shareOut.profit, { compact: true })}</Text>
+              <Text style={styles.heroStatVal}>{formatZMW(result.profit, { compact: true })}</Text>
             </View>
             <View style={styles.heroDivider} />
             <View>
               <Text style={styles.heroStatLabel}>Your share</Text>
-              <Text style={styles.heroStatVal}>{formatZMW(shareOut.yourShare, { compact: true })}</Text>
+              <Text style={styles.heroStatVal}>{formatZMW(getMyShare(result.members, "m-gilbert"), { compact: true })}</Text>
             </View>
           </View>
         </Card>
 
         {/* Allocations */}
         <Text style={[styles.label, { color: colors.textMuted }]}>MEMBER ALLOCATIONS</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8 }}>
+          {`Profit from loan interest${penaltyIncome > 0 ? " + penalty income" : ""} this cycle`}
+        </Text>
         <Card padding={0}>
-          {shareOut.members.map((m, i) => (
+          {result.members.map((m, i) => (
             <View
               key={m.id}
               style={[
                 styles.allocRow,
-                i < shareOut.members.length - 1 && {
+                i < result.members.length - 1 && {
                   borderBottomWidth: 1,
                   borderBottomColor: colors.border,
                 },
@@ -96,7 +130,7 @@ export default function ShareOutScreen() {
                   {formatZMW(m.share)}
                 </Text>
                 <Text style={{ color: colors.success, fontSize: 11, fontWeight: "600", marginTop: 2 }}>
-                  +{(((m.share - m.contribution) / m.contribution) * 100).toFixed(1)}%
+                  +{m.growthPct}%
                 </Text>
               </View>
             </View>
