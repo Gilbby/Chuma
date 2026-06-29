@@ -1,35 +1,51 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, Alert, ScrollView } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useNavigation } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
-import { groups } from "@/src/data/mock";
+import { groups, currentUser } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import { getMonthsOwed, getAmountOwed, advancePaidThrough } from "@/src/services/groupFees";
-import { Check, ChevronDown, CalendarClock } from "lucide-react-native";
+import { detectNetwork } from "@/src/services/mobileMoney";
+import { Check, CalendarClock } from "lucide-react-native";
 
-const PAYMENT_METHODS = [
-  { label: "MTN MoMo", description: "Pay via MTN Mobile Money wallet" },
-  { label: "Airtel Money", description: "Pay via Airtel Money wallet" },
-  { label: "Zamtel Kwacha", description: "Pay via Zamtel Kwacha wallet" },
-  { label: "Bank Transfer", description: "Pay via direct bank transfer" },
-];
+type Receipt = {
+  amount: number;
+  months: number;
+  network: string;
+  networkColor: string;
+  phone: string;
+  groupName: string;
+  paidThrough: string;
+  date: string;
+};
 
 export default function GroupFeeScreen() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
+  const navigation = useNavigation();
 
   const group = groups.find((g) => g.id === groupId);
 
   const monthsOwed = group ? getMonthsOwed(group) : 0;
   const amountOwed = group ? getAmountOwed(group) : 0;
-  const [payMethod, setPayMethod] = useState("Airtel Money");
-  const [methodOpen, setMethodOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const receiptRef = useRef(`CHF-${Math.floor(Math.random() * 90000) + 10000}`);
+
+  const account = detectNetwork(currentUser.phone);
+
+  // Prevent back gesture once payment is complete
+  useEffect(() => {
+    if (paid) {
+      navigation.setOptions({ gestureEnabled: false });
+    }
+  }, [paid, navigation]);
 
   if (!group) {
     return (
@@ -40,6 +56,116 @@ export default function GroupFeeScreen() {
           <View style={{ marginTop: 24 }}>
             <Button label="Go back" onPress={() => router.back()} />
           </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Success screen — replaces the payment form after paying
+  if (paid && receipt) {
+    const [y, m, d] = receipt.paidThrough.split("-").map(Number);
+    const paidUntilLabel = new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+        <ScreenHeader title="Receipt" hideBack />
+        <ScrollView
+          contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Success check */}
+          <View style={{ alignItems: "center", paddingTop: 16, paddingBottom: 8 }}>
+            <View
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                backgroundColor: colors.success + "20",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Check size={40} color={colors.success} strokeWidth={2.5} />
+            </View>
+            <Text
+              style={{
+                color: colors.textMain,
+                fontSize: 22,
+                fontWeight: "800",
+                textAlign: "center",
+                marginTop: 16,
+              }}
+            >
+              Payment successful
+            </Text>
+            <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 4 }}>
+              {receipt.groupName} reactivated
+            </Text>
+          </View>
+
+          {/* Receipt card */}
+          <Card padding={16} style={{ marginTop: 20 }}>
+            <ReceiptRow label="Receipt no." value={receiptRef.current} colors={colors} />
+            <ReceiptRow label="Amount paid" value={formatZMW(receipt.amount)} colors={colors} />
+            <ReceiptRow
+              label="Months cleared"
+              value={`${receipt.months} month${receipt.months === 1 ? "" : "s"}`}
+              colors={colors}
+            />
+            <ReceiptRow
+              label="Paid from"
+              colors={colors}
+              valueNode={
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: receipt.networkColor,
+                    }}
+                  />
+                  <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>
+                    {receipt.network}
+                  </Text>
+                </View>
+              }
+            />
+            <ReceiptRow label="Number" value={receipt.phone} colors={colors} />
+            <ReceiptRow label="Paid until" value={paidUntilLabel} colors={colors} />
+            <ReceiptRow label="Date" value={receipt.date} colors={colors} />
+            <ReceiptRow
+              label="Status"
+              colors={colors}
+              last
+              valueNode={
+                <View
+                  style={{
+                    backgroundColor: colors.success + "20",
+                    borderRadius: 999,
+                    paddingHorizontal: 10,
+                    paddingVertical: 3,
+                  }}
+                >
+                  <Text style={{ color: colors.success, fontSize: 12, fontWeight: "700" }}>
+                    Active
+                  </Text>
+                </View>
+              }
+            />
+          </Card>
+        </ScrollView>
+
+        <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+          <Button
+            label="Go to group"
+            onPress={() => router.replace("/(tabs)/groups")}
+            testID="fee-success-group-btn"
+          />
         </View>
       </SafeAreaView>
     );
@@ -67,7 +193,7 @@ export default function GroupFeeScreen() {
             This group's fee is fully paid.
           </Text>
           <View style={{ marginTop: 24, width: "100%" }}>
-            <Button label="Go back" onPress={() => router.back()} />
+            <Button label="Go to groups" onPress={() => router.replace("/(tabs)/groups")} />
           </View>
         </View>
       </SafeAreaView>
@@ -84,13 +210,24 @@ export default function GroupFeeScreen() {
   const handlePay = () => {
     setPaying(true);
     setTimeout(() => {
-      group.feePaidThrough = advancePaidThrough(group, monthsOwed);
+      const newPaidThrough = advancePaidThrough(group, monthsOwed);
+      setReceipt({
+        amount: amountOwed,
+        months: monthsOwed,
+        network: account.network,
+        networkColor: account.color,
+        phone: currentUser.phone,
+        groupName: group.name,
+        paidThrough: newPaidThrough,
+        date: new Date().toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+      });
+      group.feePaidThrough = newPaidThrough;
       setPaying(false);
-      Alert.alert(
-        "Payment successful",
-        `${group.name} has been reactivated.`,
-        [{ text: "OK", onPress: () => router.back() }]
-      );
+      setPaid(true);
     }, 1200);
   };
 
@@ -141,49 +278,37 @@ export default function GroupFeeScreen() {
           </Card>
         )}
 
-        {/* Payment method picker */}
-        <Pressable
-          onPress={() => setMethodOpen((s) => !s)}
-          testID="group-fee-method-picker"
-          style={({ pressed }) => [
-            styles.picker,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <View>
-            <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 }}>
-              PAY WITH
-            </Text>
-            <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600", marginTop: 4 }}>
-              {payMethod}
-            </Text>
+        {/* Paying from — auto-detected registered wallet */}
+        <Text style={[styles.overline, { color: colors.textMuted, marginTop: 20, marginBottom: 8 }]}>
+          PAYING FROM
+        </Text>
+        <Card padding={16}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: account.color,
+                marginRight: 10,
+              }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
+                {account.network === "Unknown" ? "Mobile money" : account.network}
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                {currentUser.phone}
+              </Text>
+            </View>
+            {account.network !== "Unknown" && (
+              <Check size={16} color={colors.success} strokeWidth={2.5} />
+            )}
           </View>
-          <ChevronDown size={20} color={colors.textMuted} />
-        </Pressable>
-        {methodOpen && (
-          <Card padding={4} style={{ marginTop: 8 }}>
-            {PAYMENT_METHODS.map((m) => (
-              <Pressable
-                key={m.label}
-                onPress={() => { setPayMethod(m.label); setMethodOpen(false); }}
-                style={({ pressed }) => [
-                  styles.option,
-                  { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textMain, fontWeight: "500" }}>{m.label}</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.description}</Text>
-                </View>
-                {m.label === payMethod && <Check size={18} color={colors.primary} />}
-              </Pressable>
-            ))}
-          </Card>
-        )}
+        </Card>
+        <Text style={[styles.caption, { color: colors.textMuted }]}>
+          Payments are made from your registered mobile money account.
+        </Text>
 
         <Text style={[styles.infoNote, { color: colors.textMuted }]}>
           Paying clears the outstanding balance and reactivates the group immediately for all members.
@@ -199,6 +324,34 @@ export default function GroupFeeScreen() {
         />
       </View>
     </SafeAreaView>
+  );
+}
+
+function ReceiptRow({
+  label,
+  value,
+  valueNode,
+  colors,
+  last,
+}: {
+  label: string;
+  value?: string;
+  valueNode?: React.ReactNode;
+  colors: ReturnType<typeof useTheme>["colors"];
+  last?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.receiptRow,
+        !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
+      ]}
+    >
+      <Text style={{ color: colors.textMuted, fontSize: 13 }}>{label}</Text>
+      {valueNode ?? (
+        <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>{value}</Text>
+      )}
+    </View>
   );
 }
 
@@ -220,23 +373,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 12,
   },
-  picker: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderRadius: 14,
-    marginTop: 18,
-  },
-  option: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderRadius: 12,
+  caption: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 6,
   },
   infoNote: {
     fontSize: 12,
@@ -244,6 +384,12 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: "center",
     paddingHorizontal: 8,
+  },
+  receiptRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
   },
   footer: {
     position: "absolute",

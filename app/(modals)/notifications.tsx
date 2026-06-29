@@ -6,8 +6,11 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { notifications as initial } from "@/src/data/mock";
+import { notifications as initial, groups } from "@/src/data/mock";
 import { Notice } from "@/src/types";
+import { getGraceInfo, getAmountOwed, getMonthsOwed } from "@/src/services/groupFees";
+import { useRole } from "@/src/hooks/useRole";
+import { formatZMW } from "@/src/utils/currency";
 import {
   Banknote,
   PiggyBank,
@@ -45,7 +48,39 @@ export default function Notifications() {
   const [items, setItems] = useState(initial);
   const [dismissed, setDismissed] = useState<string[]>([]);
 
-  const activeItems = items.filter((n) => !dismissed.includes(n.id));
+  const { role } = useRole();
+  const isAdmin = role === "Chairperson" || role === "Treasurer";
+
+  // In-app grace reminder derived from live fee status. The
+  // backend will additionally PUSH this daily (day 1–5
+  // countdown) to chairperson + treasurer via SMS/push — see
+  // Phase 8 AfricasTalking. This in-app version shows the
+  // current state whenever the user opens notifications.
+  const feeNotices: Notice[] = [];
+  const feeUrgency: Record<string, number> = {};
+  if (isAdmin) {
+    groups.forEach((g) => {
+      const grace = getGraceInfo(g);
+      if (grace.status !== "grace") return;
+      const left = grace.daysLeft;
+      feeUrgency[g.id] = left;
+      feeNotices.push({
+        id: `n-fee-${g.id}`,
+        type: "security",
+        title: "Group fee overdue",
+        body: `${g.name}: monthly fee unpaid. Day ${grace.daysIntoGrace} of 5 — ${left} day${left === 1 ? "" : "s"} left before the group is locked. Pay ${formatZMW(getAmountOwed(g))} to keep it active.`,
+        date: "Today",
+        read: false,
+        groupId: g.id,
+        groupName: g.name,
+      });
+    });
+  }
+
+  const activeItems = [
+    ...feeNotices.filter((n) => !dismissed.includes(n.id)),
+    ...items.filter((n) => !dismissed.includes(n.id)),
+  ];
 
   const grouped = useMemo(() => {
     const today: Notice[] = [];
@@ -94,6 +129,8 @@ export default function Notifications() {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
                   router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
                 }}
+                onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
+                tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
               />
             ))}
           </>
@@ -116,6 +153,8 @@ export default function Notifications() {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
                   router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
                 }}
+                onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
+                tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
               />
             ))}
           </>
@@ -132,6 +171,8 @@ const NotifCard = ({
   onAccept,
   onDecline,
   onPayPenalty,
+  onPayFee,
+  tintOverride,
 }: {
   n: Notice;
   colors: ReturnType<typeof useTheme>["colors"];
@@ -139,10 +180,12 @@ const NotifCard = ({
   onAccept?: () => void;
   onDecline?: () => void;
   onPayPenalty?: () => void;
+  onPayFee?: () => void;
+  tintOverride?: string;
 }) => {
   const Icon = ICONS[n.type] ?? Banknote;
   const tint = TINTS[n.type];
-  const tintColor =
+  const tintColor = tintOverride ?? (
     tint === "primary"
       ? colors.primary
       : tint === "success"
@@ -151,7 +194,8 @@ const NotifCard = ({
           ? colors.info
           : tint === "warning"
             ? colors.warning
-            : colors.danger;
+            : colors.danger
+  );
   return (
     <Pressable onPress={onPress}>
   <Card padding={14} style={{ marginBottom: 10, opacity: n.read ? 0.7 : 1 }}>
@@ -213,6 +257,17 @@ const NotifCard = ({
                 fullWidth={false}
                 onPress={onPayPenalty}
                 testID={`penalty-pay-${n.id}`}
+              />
+            </View>
+          )}
+          {n.id.startsWith("n-fee-") && !n.read && (
+            <View style={{ marginTop: 12 }}>
+              <Button
+                label="Pay now"
+                size="sm"
+                fullWidth={false}
+                onPress={onPayFee}
+                testID={`fee-pay-${n.groupId}`}
               />
             </View>
           )}
