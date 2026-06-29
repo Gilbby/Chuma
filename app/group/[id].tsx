@@ -43,6 +43,7 @@ import {
   UserPlus,
   Plus,
   Lock,
+  ArrowLeft,
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
@@ -799,69 +800,73 @@ export default function GroupDetails() {
       {locked && (
         <View style={StyleSheet.absoluteFillObject}>
           <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFillObject} />
-          <View
-            style={[
-              StyleSheet.absoluteFillObject,
-              {
-                backgroundColor: "rgba(0,0,0,0.65)",
-                alignItems: "center",
-                justifyContent: "center",
-                paddingTop: insets.top,
-                paddingBottom: insets.bottom,
-              },
-            ]}
-          >
-            <View
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: "rgba(0,0,0,0.65)" }]}>
+            {/* Back icon — top left, respects status bar */}
+            <Pressable
+              onPress={() => router.back()}
+              testID="group-locked-back-btn"
               style={{
-                width: 72,
-                height: 72,
-                borderRadius: 36,
-                backgroundColor: colors.surface,
+                position: "absolute",
+                top: insets.top + 12,
+                left: 16,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: "rgba(255,255,255,0.15)",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Lock size={32} color={colors.textMuted} />
-            </View>
-            <Text
-              style={{
-                color: "#fff",
-                fontSize: 20,
-                fontWeight: "800",
-                marginTop: 16,
-              }}
-            >
-              Group locked
-            </Text>
-            <Text
-              style={{
-                color: "rgba(255,255,255,0.9)",
-                fontSize: 14,
-                textAlign: "center",
-                marginTop: 8,
-                paddingHorizontal: 32,
-                lineHeight: 21,
-              }}
-            >
-              {canPayFee
-                ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
-                : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}
-            </Text>
-            {canPayFee && (
-              <View style={{ marginTop: 24 }}>
-                <Button
-                  label={`Pay ${formatZMW(amountOwed)} now`}
-                  onPress={() => router.push(`/group-fee?groupId=${group.id}`)}
-                  testID="group-pay-fee-btn"
-                />
+              <ArrowLeft size={22} color="#fff" strokeWidth={2.2} />
+            </Pressable>
+
+            {/* Centered lock content */}
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: insets.bottom }}>
+              <View
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  backgroundColor: colors.surface,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Lock size={32} color={colors.textMuted} />
               </View>
-            )}
-            <View style={{ marginTop: canPayFee ? 12 : 24 }}>
-              <Button
-                label="Go back"
-                onPress={() => router.back()}
-                testID="group-locked-back-btn"
-              />
+              <Text
+                style={{
+                  color: "#fff",
+                  fontSize: 20,
+                  fontWeight: "800",
+                  marginTop: 16,
+                }}
+              >
+                Group locked
+              </Text>
+              <Text
+                style={{
+                  color: "rgba(255,255,255,0.9)",
+                  fontSize: 14,
+                  textAlign: "center",
+                  marginTop: 8,
+                  paddingHorizontal: 32,
+                  lineHeight: 21,
+                }}
+              >
+                {canPayFee
+                  ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
+                  : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}
+              </Text>
+              {canPayFee && (
+                <View style={{ marginTop: 24 }}>
+                  <Button
+                    label={`Pay ${formatZMW(amountOwed)} now`}
+                    onPress={() => router.push(`/group-fee?groupId=${group.id}`)}
+                    testID="group-pay-fee-btn"
+                  />
+                </View>
+              )}
             </View>
           </View>
         </View>
