@@ -71,6 +71,10 @@ export interface Group {
   registrationPaid?: boolean;
   registrationPaidAt?: string;
   registrationMethod?: string;
+  monthlyFee?: number;
+  feeDueDay?: number;
+  feePaidThrough?: string;
+  createdAt?: string;
 }
 
 export interface TxnItem {

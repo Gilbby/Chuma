@@ -57,6 +57,10 @@ export const groups: Group[] = [
     nextContributionDate: "2026-06-18",
     nextContributionAmount: 500,
     memberRetention: 96,
+    monthlyFee: 100,
+    feeDueDay: 15,
+    createdAt: "2026-01-15",
+    feePaidThrough: "2026-07-15",
   },
   {
     id: "g2",
@@ -81,6 +85,10 @@ export const groups: Group[] = [
     nextContributionDate: "2026-06-30",
     nextContributionAmount: 800,
     memberRetention: 91,
+    monthlyFee: 100,
+    feeDueDay: 10,
+    createdAt: "2026-02-10",
+    feePaidThrough: "2026-05-10",
   },
   {
     id: "g3",
@@ -105,5 +113,9 @@ export const groups: Group[] = [
     nextContributionDate: "2026-06-20",
     nextContributionAmount: 1200,
     memberRetention: 88,
+    monthlyFee: 100,
+    feeDueDay: 20,
+    createdAt: "2025-11-20",
+    feePaidThrough: "2026-03-20",
   },
 ];

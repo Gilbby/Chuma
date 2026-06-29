@@ -10,7 +10,8 @@ import {
   Alert,
   TextInput,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { useRole } from "@/src/hooks/useRole";
@@ -22,6 +23,7 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
 import { groups, approvals, transactions, loans } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
+import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { Member } from "@/src/types";
 import * as Clipboard from "expo-clipboard";
 import {
@@ -40,6 +42,7 @@ import {
   UserMinus,
   UserPlus,
   Plus,
+  Lock,
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
@@ -56,11 +59,19 @@ export default function GroupDetails() {
   const [inviteError, setInviteError] = useState("");
 
   const { role } = useRole();
+  const insets = useSafeAreaInsets();
 
   const group = useMemo(() => groups.find((g) => g.id === id) ?? groups[0], [id]);
   const groupApprovals = approvals.filter((a) => a.groupId === group.id);
   const groupTxn = transactions.filter((t) => t.groupId === group.id);
   const groupLoans = loans.filter((l) => l.groupId === group.id);
+
+  const locked = group ? isGroupLocked(group) : false;
+  const monthsOwed = group ? getMonthsOwed(group) : 0;
+  const amountOwed = group ? getAmountOwed(group) : 0;
+  const canPayFee =
+    group?.yourRole === "Chairperson" ||
+    group?.yourRole === "Treasurer";
 
   const cycleStatus = useMemo(() =>
     group.members.map((m, i) => {
@@ -96,6 +107,7 @@ export default function GroupDetails() {
           ) : undefined
         }
       />
+      <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
         {/* Financial overview */}
         <View style={{ paddingHorizontal: 20 }}>
@@ -492,6 +504,7 @@ export default function GroupDetails() {
           </View>
         )}
       </ScrollView>
+      </View>
 
       <Modal
         visible={sheetVisible}
@@ -781,6 +794,77 @@ export default function GroupDetails() {
           </View>
         </View>
       </Modal>
+
+      {locked && (
+        <View style={StyleSheet.absoluteFillObject}>
+          <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFillObject} />
+          <View
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                backgroundColor: "rgba(0,0,0,0.65)",
+                alignItems: "center",
+                justifyContent: "center",
+                paddingTop: insets.top,
+                paddingBottom: insets.bottom,
+              },
+            ]}
+          >
+            <View
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                backgroundColor: colors.surface,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Lock size={32} color={colors.textMuted} />
+            </View>
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 20,
+                fontWeight: "800",
+                marginTop: 16,
+              }}
+            >
+              Group locked
+            </Text>
+            <Text
+              style={{
+                color: "rgba(255,255,255,0.9)",
+                fontSize: 14,
+                textAlign: "center",
+                marginTop: 8,
+                paddingHorizontal: 32,
+                lineHeight: 21,
+              }}
+            >
+              {canPayFee
+                ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
+                : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}
+            </Text>
+            {canPayFee && (
+              <View style={{ marginTop: 24 }}>
+                <Button
+                  label={`Pay ${formatZMW(amountOwed)} now`}
+                  onPress={() => router.push(`/group-fee?groupId=${group.id}`)}
+                  testID="group-pay-fee-btn"
+                />
+              </View>
+            )}
+            <View style={{ marginTop: canPayFee ? 12 : 24 }}>
+              <Button
+                label="Go back"
+                onPress={() => router.back()}
+                testID="group-locked-back-btn"
+              />
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
