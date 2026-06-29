@@ -69,9 +69,10 @@ export default function GroupDetails() {
   const locked = group ? isGroupLocked(group) : false;
   const monthsOwed = group ? getMonthsOwed(group) : 0;
   const amountOwed = group ? getAmountOwed(group) : 0;
+  const effectiveRole = role ?? group?.yourRole;
   const canPayFee =
-    group?.yourRole === "Chairperson" ||
-    group?.yourRole === "Treasurer";
+    effectiveRole === "Chairperson" ||
+    effectiveRole === "Treasurer";
 
   const cycleStatus = useMemo(() =>
     group.members.map((m, i) => {
