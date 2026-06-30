@@ -14,6 +14,7 @@ import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Phone } from "lucide-react-native";
+import { requestOtp } from "@/src/services/auth";
 
 export default function PhoneLogin() {
   const { colors } = useTheme();
@@ -22,13 +23,21 @@ export default function PhoneLogin() {
   const mode = rawMode ?? "signup";
   const [phone, setPhone] = useState("977234567");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const onContinue = () => {
+  const onContinue = async () => {
+    const fullPhone = "+260" + phone.replace(/\D/g, "");
     setLoading(true);
-    setTimeout(() => {
+    setError("");
+    try {
+      const res = await requestOtp(fullPhone, mode);
+      if (res.devCode) console.log("DEV OTP:", res.devCode);
+      router.push(`/otp?phone=${encodeURIComponent(fullPhone)}&mode=${mode}`);
+    } catch (e: any) {
+      setError(e.message || "Could not send code. Please try again.");
+    } finally {
       setLoading(false);
-      router.push(`/otp?mode=${mode}`);
-    }, 700);
+    }
   };
 
   const title = mode === "signin" ? "Welcome back" : "Create your account";
@@ -74,6 +83,9 @@ export default function PhoneLogin() {
             disabled={phone.replace(/\D/g, "").length < 9}
             testID="phone-continue-btn"
           />
+          {error ? (
+            <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+          ) : null}
           <Text style={[styles.legal, { color: colors.textMuted }]}>
             By continuing you agree to Chuma&apos;s Terms & Privacy.
           </Text>
@@ -90,4 +102,5 @@ const styles = StyleSheet.create({
   prefix: { flexDirection: "row", alignItems: "center", gap: 6 },
   prefixText: { fontSize: 16, fontWeight: "600", marginLeft: 6 },
   legal: { fontSize: 11, textAlign: "center", marginTop: 14 },
+  errorText: { fontSize: 13, textAlign: "center", marginTop: 10, fontWeight: "500" },
 });

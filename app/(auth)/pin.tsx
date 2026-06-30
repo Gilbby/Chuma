@@ -6,6 +6,7 @@ import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Delete } from "lucide-react-native";
+import { setPin as savePin } from "@/src/services/auth";
 
 const LEN = 4;
 
@@ -16,8 +17,10 @@ export default function Pin() {
   const [pin, setPin] = useState("");
   const [first, setFirst] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const onKey = (k: string) => {
+    if (loading) return;
     setError("");
     if (k === "del") {
       setPin((p) => p.slice(0, -1));
@@ -27,14 +30,22 @@ export default function Pin() {
     const next = pin + k;
     setPin(next);
     if (next.length === LEN) {
-      setTimeout(() => {
+      setTimeout(async () => {
         if (step === "create") {
           setFirst(next);
           setPin("");
           setStep("confirm");
         } else {
           if (next === first) {
-            router.push("/biometric");
+            setLoading(true);
+            try {
+              await savePin(next);
+              router.replace("/biometric");
+            } catch (e: any) {
+              setError(e.message || "Failed to save PIN. Please try again.");
+              setPin("");
+              setLoading(false);
+            }
           } else {
             setError("PINs don't match. Try again.");
             setPin("");

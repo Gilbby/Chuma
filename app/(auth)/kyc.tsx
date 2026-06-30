@@ -20,6 +20,7 @@ import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { storage } from "@/src/utils/storage";
+import { submitKyc } from "@/src/services/auth";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,8 @@ export default function Kyc() {
   const [dob, setDob] = useState("");
   const [nrcPhoto, setNrcPhoto] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   const handleNrcChange = (text: string) => {
     setNrc(formatNrc(text));
@@ -112,8 +115,24 @@ export default function Kyc() {
 
   const handleContinue = async () => {
     if (!validate()) return;
-    await saveDraft();
-    router.push("/pin");
+    setLoading(true);
+    setApiError("");
+    try {
+      const dobDate = parseDob(dob)!;
+      const dateOfBirth = `${dobDate.getFullYear()}-${String(dobDate.getMonth() + 1).padStart(2, "0")}-${String(dobDate.getDate()).padStart(2, "0")}`;
+      await submitKyc({
+        nrcNumber: nrc,
+        fullName: fullName.trim(),
+        dateOfBirth,
+        photoUrl: nrcPhoto ?? undefined,
+      });
+      await saveDraft();
+      router.replace("/pin");
+    } catch (e: any) {
+      setApiError(e.message || "KYC submission failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSkip = async () => {
@@ -249,9 +268,15 @@ export default function Kyc() {
 
             <View style={{ flex: 1, minHeight: 32 }} />
 
+            {apiError ? (
+              <Text style={[styles.errText, { color: colors.danger, textAlign: "center", marginBottom: 8 }]}>
+                {apiError}
+              </Text>
+            ) : null}
             <Button
               label="Continue"
               onPress={handleContinue}
+              loading={loading}
               testID="kyc-continue-btn"
             />
             <View style={{ height: 10 }} />

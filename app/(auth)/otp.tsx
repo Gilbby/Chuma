@@ -13,18 +13,24 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { verifyOtp } from "@/src/services/auth";
 
 const LEN = 6;
 
 export default function Otp() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { mode: rawMode } = useLocalSearchParams<{ mode: "signup" | "signin" }>();
+  const { mode: rawMode, phone: rawPhone } = useLocalSearchParams<{
+    mode: "signup" | "signin";
+    phone: string;
+  }>();
   const mode = rawMode ?? "signup";
+  const phone = rawPhone ?? "";
   const [code, setCode] = useState<string[]>(Array(LEN).fill(""));
   const refs = useRef<(TextInput | null)[]>([]);
   const [seconds, setSeconds] = useState(30);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -32,12 +38,20 @@ export default function Otp() {
     return () => clearTimeout(t);
   }, [seconds]);
 
-  const onVerify = () => {
+  const onVerify = async () => {
+    const codeStr = code.join("");
     setLoading(true);
-    setTimeout(() => {
+    setError("");
+    try {
+      const res = await verifyOtp(phone, codeStr, mode);
+      router.replace(res.next === "tabs" ? "/(tabs)" : "/kyc");
+    } catch (e: any) {
+      setError("Incorrect or expired code");
+      setCode(Array(LEN).fill(""));
+      refs.current[0]?.focus();
+    } finally {
       setLoading(false);
-      router.push(mode === "signin" ? "/(tabs)" : "/kyc");
-    }, 700);
+    }
   };
 
   const setAt = (i: number, v: string) => {
@@ -60,10 +74,7 @@ export default function Otp() {
   const filled = code.every((c) => c !== "");
 
   const title = mode === "signin" ? "Enter your code" : "Verify your number";
-  const subtitle =
-    mode === "signin"
-      ? "We sent a sign-in code to +260 977 234 567"
-      : "Enter the 6-digit code we sent to +260 977 234 567";
+  const subtitle = `We sent a ${mode === "signin" ? "sign-in" : "verification"} code to ${phone}`;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} testID="otp-screen">
@@ -88,6 +99,7 @@ export default function Otp() {
                 onKeyPress={({ nativeEvent }) => onKey(i, nativeEvent.key)}
                 keyboardType="number-pad"
                 maxLength={1}
+                editable={!loading}
                 testID={`otp-input-${i}`}
                 style={[
                   styles.box,
@@ -114,6 +126,10 @@ export default function Otp() {
               </Pressable>
             )}
           </View>
+
+          {error ? (
+            <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+          ) : null}
 
           <View style={{ flex: 1 }} />
 
@@ -146,4 +162,5 @@ const styles = StyleSheet.create({
   },
   resend: { marginTop: 20, alignItems: "center" },
   resendText: { fontSize: 13 },
+  errorText: { fontSize: 13, textAlign: "center", marginTop: 14, fontWeight: "500" },
 });
