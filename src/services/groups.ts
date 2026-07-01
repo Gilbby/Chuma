@@ -36,3 +36,10 @@ export async function acceptInvite(groupId: string): Promise<void> {
 export async function createGroup(payload: any): Promise<{ group: any; transaction?: any }> {
   return api("/groups", { method: "POST", body: payload });
 }
+
+export async function payGroupFee(groupId: string, payerPhone?: string): Promise<any> {
+  return api(`/groups/${groupId}/fee/pay`, {
+    method: "POST",
+    body: payerPhone ? { payerPhone } : {},
+  });
+}

@@ -1,14 +1,16 @@
-import React, { useState, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, useNavigation } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
-import { groups, currentUser } from "@/src/data/mock";
+import { getGroupById, payGroupFee } from "@/src/services/groups";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { Group } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
-import { getMonthsOwed, getAmountOwed, advancePaidThrough } from "@/src/services/groupFees";
+import { getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { Check, CalendarClock } from "lucide-react-native";
 
@@ -29,16 +31,32 @@ export default function GroupFeeScreen() {
   const router = useRouter();
   const navigation = useNavigation();
 
-  const group = groups.find((g) => g.id === groupId);
-
-  const monthsOwed = group ? getMonthsOwed(group) : 0;
-  const amountOwed = group ? getAmountOwed(group) : 0;
+  const [group, setGroup] = useState<Group | null>(null);
+  const [me, setMe] = useState<{ phone?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [paid, setPaid] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [payError, setPayError] = useState("");
   const receiptRef = useRef(`CHF-${Math.floor(Math.random() * 90000) + 10000}`);
 
-  const account = detectNetwork(currentUser.phone);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [g, user] = await Promise.all([
+        groupId ? getGroupById(groupId) : Promise.resolve(undefined),
+        getCurrentUser<{ phone?: string }>(),
+      ]);
+      setGroup(g ?? null);
+      setMe(user);
+    } finally {
+      setLoading(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Prevent back gesture once payment is complete
   useEffect(() => {
@@ -46,6 +64,21 @@ export default function GroupFeeScreen() {
       navigation.setOptions({ gestureEnabled: false });
     }
   }, [paid, navigation]);
+
+  const monthsOwed = group?.feeStatus?.monthsOwed ?? (group ? getMonthsOwed(group) : 0);
+  const amountOwed = group?.feeStatus?.amountOwed ?? (group ? getAmountOwed(group) : 0);
+  const account = detectNetwork(me?.phone ?? "");
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="group-fee-screen">
+        <ScreenHeader title="Pay group fee" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!group) {
     return (
@@ -206,29 +239,34 @@ export default function GroupFeeScreen() {
     return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
   });
 
-  // TODO: replace simulated payment with PawaPay charge when wired
-  const handlePay = () => {
+  const handlePay = async () => {
     setPaying(true);
-    setTimeout(() => {
-      const newPaidThrough = advancePaidThrough(group, monthsOwed);
+    setPayError("");
+    try {
+      const res = await payGroupFee(group.id, me?.phone);
+      const r = res?.receipt ?? {};
+      const paidThrough =
+        r.paidThrough ?? res?.group?.feePaidThrough ?? group.feePaidThrough ?? new Date().toISOString().split("T")[0];
       setReceipt({
-        amount: amountOwed,
-        months: monthsOwed,
+        amount: r.amount ?? amountOwed,
+        months: r.months ?? monthsOwed,
         network: account.network,
         networkColor: account.color,
-        phone: currentUser.phone,
+        phone: me?.phone ?? "",
         groupName: group.name,
-        paidThrough: newPaidThrough,
+        paidThrough,
         date: new Date().toLocaleDateString("en-GB", {
           day: "numeric",
           month: "short",
           year: "numeric",
         }),
       });
-      group.feePaidThrough = newPaidThrough;
-      setPaying(false);
       setPaid(true);
-    }, 1200);
+    } catch (e: any) {
+      setPayError(e?.message || "Fee payment failed. Please try again.");
+    } finally {
+      setPaying(false);
+    }
   };
 
   return (
@@ -298,7 +336,7 @@ export default function GroupFeeScreen() {
                 {account.network === "Unknown" ? "Mobile money" : account.network}
               </Text>
               <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                {currentUser.phone}
+                {me?.phone ?? ""}
               </Text>
             </View>
             {account.network !== "Unknown" && (
@@ -316,10 +354,16 @@ export default function GroupFeeScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
+        {payError ? (
+          <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 10, fontWeight: "500" }}>
+            {payError}
+          </Text>
+        ) : null}
         <Button
           label={paying ? "Processing…" : `Pay ${formatZMW(amountOwed)}`}
           onPress={handlePay}
           disabled={paying}
+          loading={paying}
           testID="group-fee-pay-btn"
         />
       </View>
