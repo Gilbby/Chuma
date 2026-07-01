@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,19 +10,26 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { groups } from "@/src/data/mock";
-import { getMaxLoan, getLoanBreakdown, checkEligibility } from "@/src/services/loans";
+import { getGroups } from "@/src/services/groups";
+import {
+  getLoanBreakdown,
+  checkEligibility,
+  getLoanEligibility,
+  requestLoan,
+} from "@/src/services/loans";
 import { getRequiredApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
+import { Group } from "@/src/types";
 import { Check, ChevronDown, Clock, Info } from "lucide-react-native";
 
 type Step = "request" | "breakdown" | "confirm" | "success";
@@ -37,13 +44,50 @@ const DURATIONS = [
 export default function Loan() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+
   const [step, setStep] = useState<Step>("request");
   const [amount, setAmount] = useState("5000");
   const [duration, setDuration] = useState(DURATIONS[1]);
-  const [grp, setGrp] = useState(groups[0]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [grp, setGrp] = useState<Group | null>(null);
   const [showGroup, setShowGroup] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [reason, setReason] = useState("");
+  const [elig, setElig] = useState<{
+    savings: number;
+    maxLoan: number;
+    multiplier: number;
+    interestRate: number;
+  } | null>(null);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [eligLoading, setEligLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const loadGroups = useCallback(async () => {
+    setGroupsLoading(true);
+    try {
+      const g = await getGroups();
+      setGroups(g);
+      setGrp((groupId ? g.find((x) => x.id === groupId) ?? g[0] : g[0]) ?? null);
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    loadGroups();
+  }, [loadGroups]);
+
+  useEffect(() => {
+    if (!grp?.id) return;
+    setEligLoading(true);
+    getLoanEligibility(grp.id)
+      .then(setElig)
+      .catch(() => setElig(null))
+      .finally(() => setEligLoading(false));
+  }, [grp?.id]);
 
   const handleAmountChange = (text: string) => {
     const cleaned = text.replace(/[^0-9.]/g, "");
@@ -54,7 +98,19 @@ export default function Loan() {
     if (submitAttempted && parseFloat(cleaned) > 0) setSubmitAttempted(false);
   };
 
-  const mySavings = grp.members?.[0]?.savings ?? 0;
+  if (groupsLoading || eligLoading || !grp) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="loan-screen">
+        <ScreenHeader title="Request loan" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const mySavings = elig?.savings ?? 0;
+  const maxLoan = elig?.maxLoan ?? 0;
   const adminCount = (grp.members ?? []).filter((m) =>
     ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
   ).length;
@@ -62,7 +118,6 @@ export default function Loan() {
   const requiredApprovals = getRequiredApprovals(threshold, adminCount);
 
   const num = parseFloat(amount) || 0;
-  const maxLoan = getMaxLoan(mySavings, grp.loanMaxMultiplier);
   const breakdown = getLoanBreakdown(num, grp.loanInterestRate, duration.months);
   const eligibility = checkEligibility(num, maxLoan);
   const eligible = eligibility.eligible;
@@ -389,10 +444,32 @@ export default function Loan() {
                 )}
               </Card>
 
+              {submitError ? (
+                <Text style={[styles.errText, { color: colors.danger, marginTop: 12 }]}>{submitError}</Text>
+              ) : null}
+
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button
                 label="Submit for approval"
-                onPress={() => setTimeout(() => setStep("success"), 600)}
+                loading={submitting}
+                disabled={submitting}
+                onPress={async () => {
+                  setSubmitting(true);
+                  setSubmitError("");
+                  try {
+                    await requestLoan({
+                      groupId: grp.id,
+                      amount: num,
+                      durationMonths: duration.months,
+                      reason: reason.trim() || undefined,
+                    });
+                    setStep("success");
+                  } catch (e: any) {
+                    setSubmitError(e?.message || "Could not submit request. Please try again.");
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
                 testID="loan-submit-btn"
               />
             </>
