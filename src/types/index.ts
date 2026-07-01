@@ -89,7 +89,7 @@ export interface Group {
 
 export interface TxnItem {
   id: string;
-  type: "contribution" | "loan" | "repayment" | "share-out" | "withdrawal";
+  type: "contribution" | "loan" | "repayment" | "share-out" | "withdrawal" | "penalty" | "fee";
   amount: number;
   status: "completed" | "pending" | "failed";
   groupId: string;

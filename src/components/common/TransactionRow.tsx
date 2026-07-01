@@ -12,6 +12,8 @@ import {
   RefreshCw,
   Gift,
   Wallet,
+  AlertTriangle,
+  Receipt,
 } from "lucide-react-native";
 
 interface Props {
@@ -26,11 +28,13 @@ const ICONS = {
   repayment: RefreshCw,
   "share-out": Gift,
   withdrawal: Wallet,
+  penalty: AlertTriangle,
+  fee: Receipt,
 };
 
 export const TransactionRow: React.FC<Props> = ({ txn, onPress, testID }) => {
   const { colors, mode } = useTheme();
-  const Icon = ICONS[txn.type];
+  const Icon = ICONS[txn.type] ?? Wallet;
   const isIn = txn.direction === "in";
   const amountColor = txn.status === "failed" ? colors.textMuted : isIn ? colors.success : colors.textMain;
 
