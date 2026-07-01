@@ -5,6 +5,8 @@
 // the exact pool. When a backend is connected, feed real
 // contributions and profit to the same functions.
 
+import { api } from "./apiClient";
+
 export interface ShareOutMember {
   id: string;
   name: string;
@@ -106,4 +108,8 @@ export function getMyShare(
   members: ShareOutMember[], myId: string
 ): number {
   return members.find((m) => m.id === myId)?.share ?? 0;
+}
+
+export async function proposeShareOut(groupId: string): Promise<{ approval: any }> {
+  return api(`/shareout/${groupId}/propose`, { method: "POST" });
 }

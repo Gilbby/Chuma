@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
@@ -9,13 +9,13 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { shareOut, approvals as approvalsList, notifications } from "@/src/data/mock";
-import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
-import { getRequiredApprovals } from "@/src/services/approvals";
+import { shareOut } from "@/src/data/mock";
+import { computeShareOut, estimateGroupProfit, getMyShare, proposeShareOut } from "@/src/services/shareOut";
+import { getApprovals, getRequiredApprovals, voteOnApproval } from "@/src/services/approvals";
 import { getGroups } from "@/src/services/groups";
 import { getPenalties } from "@/src/services/penalties";
 import { getCurrentUser } from "@/src/utils/currentUser";
-import { Group, Penalty } from "@/src/types";
+import { Group, Penalty, Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
@@ -41,10 +41,6 @@ export default function ShareOutScreen() {
   const { role, can } = useRole();
   const canApprove = can("approve.shareout");
 
-  // TODO: persist approval votes to backend via services/approvals when wired
-  const [approvals, setApprovals] = useState(0);
-  const [approved, setApproved] = useState(false);
-
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const activeGroupId = groupId ?? shareOut.groupId;
 
@@ -53,17 +49,25 @@ export default function ShareOutScreen() {
   const [myUserId, setMyUserId] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const [shareOutApproval, setShareOutApproval] = useState<Approval | null>(null);
+  const [voting, setVoting] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
+  const [justApproved, setJustApproved] = useState(false);
+  const [hasVoted, setHasVoted] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [g, p, user] = await Promise.all([
+      const [g, p, user, approvalsForGroup] = await Promise.all([
         getGroups(),
         getPenalties({ groupId: activeGroupId }),
         getCurrentUser<{ _id: string }>(),
+        getApprovals({ groupId: activeGroupId }),
       ]);
       setGroups(g);
       setPenalties(p);
       setMyUserId(user?._id ? String(user._id) : "");
+      setShareOutApproval(approvalsForGroup.find((a) => a.type === "share-out") ?? null);
     } finally {
       setLoading(false);
     }
@@ -146,62 +150,58 @@ export default function ShareOutScreen() {
   const threshold = group?.constitution?.approvalThreshold ?? "majority";
   const requiredApprovals = getRequiredApprovals(threshold, adminCount);
 
-  const handleApprove = () => {
-    // Simulates multi-admin approval on one device: approve as
-    // Chairperson, then switch role (Treasurer/Secretary) to
-    // see the pending approval + notification. Real cross-device
-    // push notifications require the backend.
-    const next = approvals + 1;
-    setApprovals(next);
+  const votesFor = shareOutApproval?.votesFor ?? 0;
+  const required = shareOutApproval?.totalVoters ?? requiredApprovals;
+  const approved = shareOutApproval?.status === "approved" || justApproved;
 
-    const approvalId = `shareout-${activeGroupId}`;
+  const handleApprove = async () => {
+    setVoting(true);
+    setApprovalError("");
+    try {
+      let approval = shareOutApproval;
+      let approvalId = approval?.id;
 
-    if (next >= requiredApprovals) {
-      setApproved(true);
-      const existing = approvalsList.find((a) => a.id === approvalId);
-      if (existing) {
-        existing.status = "approved";
-        existing.votesFor = next;
+      if (!approvalId) {
+        // no pending approval yet — propose one, then re-fetch to get its id
+        try {
+          await proposeShareOut(activeGroupId);
+        } catch (e: any) {
+          // "Share-out already pending" is fine — it means one exists; fall through to re-fetch
+          if (!String(e?.message || "").toLowerCase().includes("already pending")) throw e;
+        }
+        const list = await getApprovals({ groupId: activeGroupId });
+        approval = list.find((a) => a.type === "share-out") ?? null;
+        setShareOutApproval(approval);
+        approvalId = approval?.id;
       }
-      Alert.alert(
-        "Distribution approved",
-        "The share-out plan has been approved. Members will be paid on the distribution date."
-      );
-    } else {
-      const exists = approvalsList.some((a) => a.id === approvalId);
-      if (!exists) {
-        approvalsList.unshift({
-          id: approvalId,
-          type: "share-out",
-          title: `Share-out distribution — ${displayName}`,
-          description: `Approve the end-of-cycle distribution of ${formatZMW(result.totalToDistribute)} to members.`,
-          requestedBy: "Chairperson",
-          requestedById: group?.members?.[0]?.id ?? "",
-          amount: result.totalToDistribute,
-          groupId: activeGroupId,
-          groupName: displayName,
-          votesFor: next,
-          votesAgainst: 0,
-          totalVoters: requiredApprovals,
-          timestamp: "Just now",
-          status: "pending",
-        });
+      if (!approvalId) throw new Error("Could not create share-out approval.");
 
-        notifications.unshift({
-          id: `n-shareout-${activeGroupId}`,
-          type: "governance",
-          title: "Share-out approval needed",
-          body: `${displayName} share-out plan needs your approval to proceed.`,
-          date: "Just now",
-          read: false,
-          groupId: activeGroupId,
-          groupName: displayName,
-        });
+      const priorVotesFor = approval?.votesFor ?? 0;
+      const priorRequired = approval?.totalVoters ?? requiredApprovals;
+
+      await voteOnApproval(approvalId, "approve");
+      setHasVoted(true);
+
+      // re-fetch to reflect new vote count / possible approval+execution
+      const refreshed = await getApprovals({ groupId: activeGroupId });
+      const updated = refreshed.find((a) => a.type === "share-out") ?? null;
+
+      if (updated) {
+        setShareOutApproval(updated);
+      } else if (priorVotesFor + 1 >= priorRequired) {
+        // Backend GET /approvals returns pending only — a missing result right
+        // after our deciding vote means it was approved and executed.
+        setJustApproved(true);
+        setShareOutApproval(
+          approval ? { ...approval, votesFor: priorVotesFor + 1, status: "approved" } : approval
+        );
+      } else {
+        setShareOutApproval(null);
       }
-      Alert.alert(
-        "Vote recorded",
-        `Your approval is recorded. ${requiredApprovals - next} more admin approval(s) needed.`
-      );
+    } catch (e: any) {
+      setApprovalError(e?.message || "Could not record approval. Please try again.");
+    } finally {
+      setVoting(false);
     }
   };
 
@@ -349,20 +349,25 @@ export default function ShareOutScreen() {
                 Distribution plan approved
               </Text>
               <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                {`${approvals} of ${adminCount} admins approved`}
+                {`${votesFor} of ${required} approvals`}
               </Text>
             </View>
           </Card>
         ) : canApprove ? (
           <>
             <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 6 }}>
-              {`${approvals} of ${requiredApprovals} required approvals`}
+              {`${votesFor} of ${required} required approvals`}
             </Text>
-            <ProgressBar progress={requiredApprovals > 0 ? approvals / requiredApprovals : 0} />
+            <ProgressBar progress={required > 0 ? votesFor / required : 0} />
             <View style={{ height: 12 }} />
+            {approvalError ? (
+              <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }} testID="shareout-approve-error">
+                {approvalError}
+              </Text>
+            ) : null}
             <Button
-              label={approvals > 0 ? "Approval recorded" : "Approve distribution plan"}
-              disabled={approvals > 0}
+              label={voting ? "Recording…" : hasVoted ? "Approval recorded" : "Approve distribution plan"}
+              disabled={voting || hasVoted}
               onPress={handleApprove}
               testID="shareout-approve-btn"
             />
