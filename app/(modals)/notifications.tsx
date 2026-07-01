@@ -33,6 +33,19 @@ const ICONS = {
   penalty: AlertTriangle,
 };
 
+function isToday(dateStr: string): boolean {
+  if (!dateStr) return false;
+  if (dateStr.toLowerCase().includes("today")) return true; // keeps fee-notice "Today"
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 const TINTS: Record<Notice["type"], "primary" | "info" | "success" | "warning" | "danger"> = {
   loan: "success",
   contribution: "primary",
