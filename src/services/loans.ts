@@ -3,8 +3,8 @@
 // backend is connected, pass real member savings and group
 // rules to the same functions — no UI changes.
 
-import { loans as mockLoans } from "@/src/data/mock";
 import { Loan } from "@/src/types";
+import { api } from "./apiClient";
 
 // Max a member can borrow = their savings × group multiplier
 export function getMaxLoan(
@@ -52,8 +52,25 @@ export function checkEligibility(
   return { eligible: true };
 }
 
-export async function getLoans(): Promise<Loan[]> {
-  return mockLoans;
+function mapLoan(raw: any): Loan {
+  return {
+    ...raw,
+    id: String(raw._id),
+    nextDueDate: raw.nextDueDate,
+    history: raw.history ?? [],
+  };
+}
+
+export async function getLoans(opts?: {
+  mine?: boolean;
+  groupId?: string;
+}): Promise<Loan[]> {
+  const params = new URLSearchParams();
+  if (opts?.mine) params.set("mine", "true");
+  if (opts?.groupId) params.set("groupId", opts.groupId);
+  const qs = params.toString();
+  const res = await api<{ loans: any[] }>(`/loans${qs ? `?${qs}` : ""}`);
+  return (res.loans ?? []).map(mapLoan);
 }
 
 export async function requestLoan(payload: {

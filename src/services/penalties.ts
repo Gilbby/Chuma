@@ -1,4 +1,5 @@
 import type { Group, Penalty, Loan } from "@/src/types";
+import { api } from "./apiClient";
 
 export function computePenaltyAmount(
   rule: {
@@ -133,4 +134,23 @@ export function isPastGracePeriod(dueDate: string, gracePeriodDays: number): boo
   const now = new Date();
   const graceMs = gracePeriodDays * 24 * 60 * 60 * 1000;
   return now.getTime() > due.getTime() + graceMs;
+}
+
+function mapPenalty(raw: any): Penalty {
+  return {
+    ...raw,
+    id: String(raw._id),
+  };
+}
+
+export async function getPenalties(opts?: {
+  mine?: boolean;
+  groupId?: string;
+}): Promise<Penalty[]> {
+  const params = new URLSearchParams();
+  if (opts?.mine) params.set("mine", "true");
+  if (opts?.groupId) params.set("groupId", opts.groupId);
+  const qs = params.toString();
+  const res = await api<{ penalties: any[] }>(`/penalties${qs ? `?${qs}` : ""}`);
+  return (res.penalties ?? []).map(mapPenalty);
 }
