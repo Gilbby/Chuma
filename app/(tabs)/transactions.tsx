@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
-import { transactions } from "@/src/data/mock";
+import { getTransactions } from "@/src/services/transactions";
 import { TxnItem } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { Search, SlidersHorizontal, Download, FileText, FileSpreadsheet } from "lucide-react-native";
@@ -59,20 +59,26 @@ export default function TransactionsScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  useEffect(() => {
-    setError(false);
-    const t = setTimeout(() => {
-      setLoading(false);
-      // Temporary: real fetch will set error on catch.
-      // Keep error false by default so screens work normally.
-      setError(false);
-    }, 900);
-    return () => clearTimeout(t);
-  }, []);
-  const handleRetry = () => {
+  const [transactions, setTransactions] = useState<TxnItem[]>([]);
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError(false);
-    setTimeout(() => setLoading(false), 900);
+    try {
+      setTransactions(await getTransactions());
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleRetry = () => {
+    load();
   };
 
   const [filter, setFilter] = useState<TxnItem["type"] | "all">("all");
@@ -93,7 +99,7 @@ export default function TransactionsScreen() {
         (t.note ?? "").toLowerCase().includes(q);
       return matchType && matchDate && matchQ;
     });
-  }, [filter, dateRange, query]);
+  }, [transactions, filter, dateRange, query]);
 
   async function handleExportPDF() {
     try {
