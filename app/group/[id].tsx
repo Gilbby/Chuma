@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -21,10 +21,13 @@ import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { Avatar } from "@/src/components/ui/Avatar";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
-import { groups, approvals, transactions, loans } from "@/src/data/mock";
+import { SkeletonGroup } from "@/src/components/ui";
+import { ErrorState } from "@/src/components/common";
+import { approvals, transactions, loans } from "@/src/data/mock";
+import { getGroupById } from "@/src/services/groups";
 import { formatZMW } from "@/src/utils/currency";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
-import { Member } from "@/src/types";
+import { Member, Group } from "@/src/types";
 import * as Clipboard from "expo-clipboard";
 import {
   Users,
@@ -62,28 +65,65 @@ export default function GroupDetails() {
   const { role } = useRole();
   const insets = useSafeAreaInsets();
 
-  const group = useMemo(() => groups.find((g) => g.id === id) ?? groups[0], [id]);
-  const groupApprovals = approvals.filter((a) => a.groupId === group.id);
-  const groupTxn = transactions.filter((t) => t.groupId === group.id);
-  const groupLoans = loans.filter((l) => l.groupId === group.id);
+  const [group, setGroup] = useState<Group | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const locked = group ? isGroupLocked(group) : false;
-  const monthsOwed = group ? getMonthsOwed(group) : 0;
-  const amountOwed = group ? getAmountOwed(group) : 0;
-  const effectiveRole = role ?? group?.yourRole;
-  const canPayFee =
-    effectiveRole === "Chairperson" ||
-    effectiveRole === "Treasurer";
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const g = await getGroupById(id);
+      if (g) setGroup(g); else setError(true);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
 
   const cycleStatus = useMemo(() =>
-    group.members.map((m, i) => {
+    (group?.members ?? []).map((m, i) => {
       const seed = (i * 7) % 10;
       const status: "paid" | "overdue" | "pending" =
         seed < 6 ? "paid" : seed < 8 ? "overdue" : "pending";
       return { member: m, status };
     }),
-    [group.members]
+    [group]
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+        <View style={{ marginHorizontal: 20, marginTop: 12 }}>
+          <SkeletonGroup count={5} height={80} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+  if (error || !group) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+        <ErrorState onRetry={load} />
+      </SafeAreaView>
+    );
+  }
+
+  const groupApprovals = approvals.filter((a) => a.groupId === group.id);
+  const groupTxn = transactions.filter((t) => t.groupId === group.id);
+  const groupLoans = loans.filter((l) => l.groupId === group.id);
+
+  const locked = group.feeStatus?.locked ?? isGroupLocked(group);
+  const monthsOwed = group.feeStatus?.monthsOwed ?? getMonthsOwed(group);
+  const amountOwed = group.feeStatus?.amountOwed ?? getAmountOwed(group);
+  const effectiveRole = role ?? group.yourRole;
+  const canPayFee =
+    effectiveRole === "Chairperson" ||
+    effectiveRole === "Treasurer";
+
   const paidCount = cycleStatus.filter((c) => c.status === "paid").length;
   const overdueCount = cycleStatus.filter((c) => c.status === "overdue").length;
   const pendingCount = cycleStatus.filter((c) => c.status === "pending").length;
