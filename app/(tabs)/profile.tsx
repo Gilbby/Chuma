@@ -18,6 +18,7 @@ import {
   LogOut,
   ChevronRight,
   Users,
+  AlertTriangle,
   Pencil,
   Info,
   TrendingUp,
@@ -268,6 +269,21 @@ export default function Profile() {
             label="My groups"
             colors={colors}
             onPress={() => router.push("/(tabs)/groups")}
+          />
+          <Row
+            icon={<AlertTriangle size={20} color={colors.primary} />}
+            label="Penalties"
+            colors={colors}
+            onPress={() => router.push("/penalties")}
+            testID="profile-penalties-row"
+            right={
+              myPenaltyCount > 0 ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <StatusBadge label={String(myPenaltyCount)} variant="warning" testID="profile-penalties-badge" />
+                  <ChevronRight size={18} color={colors.textMuted} />
+                </View>
+              ) : undefined
+            }
           />
           <Row
             icon={<HelpCircle size={20} color={colors.primary} />}
