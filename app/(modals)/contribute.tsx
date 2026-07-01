@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
+  ActivityIndicator,
+  Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -18,7 +20,11 @@ import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { groups } from "@/src/data/mock";
+import { getGroups } from "@/src/services/groups";
+import { submitContribution } from "@/src/services/transactions";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { detectNetwork } from "@/src/services/mobileMoney";
+import { Group } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, ChevronDown, Receipt, AlertTriangle, Lock } from "lucide-react-native";
 
@@ -27,14 +33,6 @@ type Step = "entry" | "confirm" | "success";
 const TYPES = [
   { label: "Cycle contribution", description: "Regular required savings contribution for the active group cycle." },
   { label: "Top-up", description: "Optional extra savings added above the required cycle contribution." },
-];
-
-const PAYMENT_METHODS = [
-  { label: "MTN MoMo", description: "Pay via MTN Mobile Money wallet" },
-  { label: "Airtel Money", description: "Pay via Airtel Money wallet" },
-  { label: "Zamtel Kwacha", description: "Pay via Zamtel Kwacha wallet" },
-  { label: "Bank Transfer", description: "Pay via direct bank transfer" },
-  { label: "Cash", description: "Recorded by a group admin on your behalf" },
 ];
 
 export default function Contribute() {
@@ -49,9 +47,9 @@ export default function Contribute() {
   const isPenalty = lockedType === "penalty";
   const [step, setStep] = useState<Step>("entry");
   const [amount, setAmount] = useState(lockedAmount ? lockedAmount : "500");
-  const [selectedGroup, setSelectedGroup] = useState(
-    groups.find((g) => g.id === groupId) ?? groups[0]
-  );
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [type, setType] = useState(
     isPenalty
       ? { label: "Penalty payment", description: "Penalty issued by the group." }
@@ -59,12 +57,36 @@ export default function Contribute() {
   );
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1]);
-  const [showPaymentPicker, setShowPaymentPicker] = useState(false);
+  const [payerPhone, setPayerPhone] = useState("");
+  const [payCash, setPayCash] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const receiptId = useRef(
     `CHM-${Math.floor(Math.random() * 90000) + 10000}`
   );
+
+  const load = useCallback(async () => {
+    setGroupsLoading(true);
+    try {
+      const [fetchedGroups, user] = await Promise.all([
+        getGroups(),
+        getCurrentUser<{ phone?: string }>(),
+      ]);
+      setGroups(fetchedGroups);
+      setSelectedGroup(fetchedGroups.find((g) => g.id === groupId) ?? fetchedGroups[0] ?? null);
+      setPayerPhone(user?.phone ?? "");
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const detectedNetwork = detectNetwork(payerPhone).network;
+  const paymentMethodLabel = payCash ? "Cash" : detectedNetwork;
 
   const handleAmountChange = (text: string) => {
     const cleaned = text.replace(/[^0-9.]/g, "");
@@ -78,10 +100,21 @@ export default function Contribute() {
   const num = parseFloat(amount.replace(/,/g, "")) || 0;
   const fee = num > 0 ? Math.max(1, Math.round(num * 0.005)) : 0;
   const minError =
-    num > 0 && num < selectedGroup.contributionAmount && type.label === "Cycle contribution"
+    !!selectedGroup && num > 0 && num < selectedGroup.contributionAmount && type.label === "Cycle contribution"
       ? `Minimum K ${selectedGroup.contributionAmount} for this cycle`
       : "";
   const displayError = (submitAttempted && num <= 0 ? "Enter a valid amount" : "") || minError;
+
+  if (groupsLoading || !selectedGroup) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+        <ScreenHeader title="Make contribution" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (step === "success") {
     return <SuccessScreen amount={num} group={selectedGroup.name} colors={colors} router={router} receiptId={receiptId.current} />;
@@ -239,37 +272,36 @@ export default function Contribute() {
                 </Card>
               )}
 
-              {/* Payment method picker */}
-              <Picker
-                label="Payment method"
-                value={paymentMethod.label}
-                onPress={() => setShowPaymentPicker((s) => !s)}
-                colors={colors}
-                testID="contribute-payment-picker"
-              />
-              {showPaymentPicker && (
-                <Card padding={4} style={{ marginTop: 8 }}>
-                  {PAYMENT_METHODS.map((m) => (
-                    <Pressable
-                      key={m.label}
-                      onPress={() => {
-                        setPaymentMethod(m);
-                        setShowPaymentPicker(false);
-                      }}
-                      style={({ pressed }) => [
-                        styles.option,
-                        { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
-                      ]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: colors.textMain, fontWeight: "500" }}>{m.label}</Text>
-                        <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.description}</Text>
-                      </View>
-                      {m.label === paymentMethod.label && <Check size={18} color={colors.primary} />}
-                    </Pressable>
-                  ))}
-                </Card>
-              )}
+              {/* Payment method (auto-detected) */}
+              <View
+                style={[styles.picker, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                testID="contribute-payment-detected"
+              >
+                <View>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 }}>
+                    FROM
+                  </Text>
+                  <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600", marginTop: 4 }}>
+                    {payCash ? "Cash" : detectedNetwork}
+                  </Text>
+                </View>
+                <Lock size={14} color={colors.textMuted} />
+              </View>
+
+              <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Pay with cash</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                    Recorded by an admin, no mobile money charge
+                  </Text>
+                </View>
+                <Switch
+                  value={payCash}
+                  onValueChange={setPayCash}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  testID="contribute-cash-toggle"
+                />
+              </View>
 
               {/* Cycle progress */}
               <View style={{ marginTop: 20 }}>
@@ -319,14 +351,36 @@ export default function Contribute() {
                   value={`#${Math.round(selectedGroup.cycleProgress * 12)} of 12`}
                   colors={colors}
                 />
-                <ConfirmRow label="From" value={paymentMethod.label} colors={colors} last />
+                <ConfirmRow label="From" value={paymentMethodLabel} colors={colors} last />
               </Card>
+
+              {submitError ? (
+                <Text style={[styles.errText, { color: colors.danger, marginTop: 12 }]}>{submitError}</Text>
+              ) : null}
 
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button
                 label="Confirm & pay"
-                onPress={() => {
-                  setTimeout(() => setStep("success"), 600);
+                loading={submitting}
+                disabled={submitting}
+                onPress={async () => {
+                  if (isPenalty) return; // handled on penalties screen
+                  setSubmitting(true);
+                  setSubmitError("");
+                  try {
+                    await submitContribution({
+                      groupId: selectedGroup.id,
+                      amount: num,
+                      contributionType: type.label === "Top-up" ? "topup" : "cycle",
+                      paymentMethod: paymentMethodLabel,
+                      payerPhone,
+                    });
+                    setStep("success");
+                  } catch (e: any) {
+                    setSubmitError(e?.message || "Payment failed. Please try again.");
+                  } finally {
+                    setSubmitting(false);
+                  }
                 }}
                 testID="contribute-confirm-btn"
               />
