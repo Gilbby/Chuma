@@ -38,8 +38,9 @@ export default function Otp() {
     return () => clearTimeout(t);
   }, [seconds]);
 
-  const onVerify = async () => {
-    const codeStr = code.join("");
+  const onVerify = async (submitCode?: string) => {
+    const codeStr = submitCode ?? code.join("");
+    if (codeStr.length !== LEN) return;
     setLoading(true);
     setError("");
     try {
@@ -61,7 +62,7 @@ export default function Otp() {
     setCode(next);
     if (ch && i < LEN - 1) refs.current[i + 1]?.focus();
     if (next.every((c) => c !== "")) {
-      setTimeout(() => onVerify(), 300);
+      setTimeout(() => onVerify(next.join("")), 300);
     }
   };
 
