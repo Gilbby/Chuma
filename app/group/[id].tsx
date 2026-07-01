@@ -23,11 +23,12 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
-import { approvals, transactions, loans } from "@/src/data/mock";
+import { transactions, loans } from "@/src/data/mock";
 import { getGroupById } from "@/src/services/groups";
+import { getApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
-import { Member, Group } from "@/src/types";
+import { Member, Group, Approval } from "@/src/types";
 import * as Clipboard from "expo-clipboard";
 import {
   Users,
@@ -68,6 +69,7 @@ export default function GroupDetails() {
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [groupApprovals, setGroupApprovals] = useState<Approval[]>([]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -75,7 +77,13 @@ export default function GroupDetails() {
     setError(false);
     try {
       const g = await getGroupById(id);
-      if (g) setGroup(g); else setError(true);
+      if (g) {
+        setGroup(g);
+        const a = await getApprovals({ groupId: id });
+        setGroupApprovals(a);
+      } else {
+        setError(true);
+      }
     } catch (e) {
       setError(true);
     } finally {
@@ -112,7 +120,6 @@ export default function GroupDetails() {
     );
   }
 
-  const groupApprovals = approvals.filter((a) => a.groupId === group.id);
   const groupTxn = transactions.filter((t) => t.groupId === group.id);
   const groupLoans = loans.filter((l) => l.groupId === group.id);
 
