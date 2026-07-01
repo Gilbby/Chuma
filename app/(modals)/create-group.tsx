@@ -12,6 +12,7 @@ import {
   Keyboard,
   Platform,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -21,11 +22,12 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { groups } from "@/src/data/mock";
+import { createGroup } from "@/src/services/groups";
+import { getCurrentUser } from "@/src/utils/currentUser";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X, CreditCard } from "lucide-react-native";
 import Slider from "@react-native-community/slider";
-import type { Group, GroupType, GroupConstitution } from "@/src/types";
+import type { GroupType, GroupConstitution } from "@/src/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -245,75 +247,69 @@ export default function CreateGroup() {
     setErrors({});
   };
 
-  const handlePayAndCreate = () => {
+  const handlePayAndCreate = async () => {
     if (paying) return;
     setPaying(true);
-    // TODO: replace simulated payment with PawaPay charge when payments are wired
-    setTimeout(() => {
+    try {
       const cycleMonths = parseMonths(cycleDuration);
       const d = new Date();
       d.setMonth(d.getMonth() + cycleMonths);
-      const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      const shareOutDate = `${MO[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const shareOutDate = `${yyyy}-${mm}-${dd}`;
 
-      const newId = `g${Date.now()}`;
-      const newGroup: Group = {
-        id: newId,
+      const constitution: GroupConstitution = {
+        penaltyRules: {
+          lateContribution: {
+            enabled: lateContribEnabled,
+            penaltyType: lateContribPenaltyType,
+            penaltyRate: lateContribPenaltyType === "percent" ? toNum(lateContributionPenaltyRate) || 1 : undefined,
+            penaltyAmount: lateContribPenaltyType === "flat" ? toNum(lateContribFlatAmount) || 20 : undefined,
+          },
+          missingMeeting: { enabled: false, amount: 0 },
+          lateRepayment: {
+            enabled: lateRepayEnabled,
+            penaltyType: lateRepayPenaltyType,
+            penaltyRate: lateRepayPenaltyType === "percent" ? toNum(lateRepaymentPenaltyRate) || 1 : undefined,
+            penaltyAmount: lateRepayPenaltyType === "flat" ? toNum(lateRepayFlatAmount) || 100 : undefined,
+          },
+        },
+        gracePeriodDays: parseInt(gracePeriod) || 0,
+        loanMultiplier: parseInt(loanMultiplier) || 2,
+        loanInterestRate: toNum(loanInterest) || 5,
+        loanRepaymentMonths: parseMonths(loanRepayment),
+        internalLendingEnabled: internalLending,
+        approvalThreshold,
+      };
+
+      const user = await getCurrentUser<{ phone?: string }>();
+
+      const payload = {
         name: groupName.trim(),
         description: groupDesc.trim(),
-        groupType: groupType as GroupType,
-        totalSavings: 0,
-        walletBalance: 0,
-        loanCirculation: 0,
-        memberCount: 0,
-        cycleProgress: 0,
-        shareOutDate,
+        groupType,
+        avatar: groupAvatar || undefined,
         contributionAmount: toNum(contribAmount),
         contributionFrequency: contribFreq,
+        shareOutDate,
         loanInterestRate: toNum(loanInterest) || 5,
         loanMaxMultiplier: parseInt(loanMultiplier) || 2,
-        members: [],
-        yourRole: "Chairperson",
-        governance: {
-          chairperson: "self",
-          treasurerPhone: treasurerPhone ? `+260${treasurerPhone}` : null,
-          secretaryPhone: secretaryPhone ? `+260${secretaryPhone}` : null,
-          approvalThreshold,
-          permissions: permissions as unknown as Record<string, boolean>,
-        },
-        constitution: {
-          penaltyRules: {
-            lateContribution: {
-              enabled: lateContribEnabled,
-              penaltyType: lateContribPenaltyType,
-              penaltyRate: lateContribPenaltyType === "percent" ? toNum(lateContributionPenaltyRate) || 1 : undefined,
-              penaltyAmount: lateContribPenaltyType === "flat" ? toNum(lateContribFlatAmount) || 20 : undefined,
-            },
-            missingMeeting: { enabled: false, amount: 0 },
-            lateRepayment: {
-              enabled: lateRepayEnabled,
-              penaltyType: lateRepayPenaltyType,
-              penaltyRate: lateRepayPenaltyType === "percent" ? toNum(lateRepaymentPenaltyRate) || 1 : undefined,
-              penaltyAmount: lateRepayPenaltyType === "flat" ? toNum(lateRepayFlatAmount) || 100 : undefined,
-            },
-          },
-          gracePeriodDays: parseInt(gracePeriod) || 0,
-          loanMultiplier: parseInt(loanMultiplier) || 2,
-          loanInterestRate: toNum(loanInterest) || 5,
-          loanRepaymentMonths: parseMonths(loanRepayment),
-          internalLendingEnabled: internalLending,
-          approvalThreshold,
-        },
-        registrationFee: 250,
-        registrationPaid: true,
-        registrationPaidAt: new Date().toISOString(),
-        registrationMethod: payMethod,
+        constitution,
+        treasurerPhone: treasurerPhone ? `+260${treasurerPhone}` : undefined,
+        secretaryPhone: secretaryPhone ? `+260${secretaryPhone}` : undefined,
+        payerPhone: user?.phone,
       };
-      groups.push(newGroup);
+
+      const res = await createGroup(payload);
+      const newId = String(res.group._id);
       setNewGroupId(newId);
-      setPaying(false);
       setStep(7);
-    }, 1200);
+    } catch (e: any) {
+      Alert.alert("Could not create group", e?.message || "Please try again.");
+    } finally {
+      setPaying(false);
+    }
   };
 
   // ─── Post-creation invite screen ────────────────────────────────────────────
@@ -467,7 +463,7 @@ export default function CreateGroup() {
               <RRow label="Name" value={groupName} colors={colors} />
               <RRow label="Type" value={typeLabel} colors={colors} />
               <RRow label="Cycle" value={cycleDuration} colors={colors} />
-              <RRow label="Registration fee" value={`K250.00 paid · ${payMethod}`} colors={colors} last />
+              <RRow label="Registration fee" value={`K100.00 paid · ${payMethod}`} colors={colors} last />
             </Card>
           </View>
 
@@ -1032,7 +1028,7 @@ export default function CreateGroup() {
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                     <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Group registration</Text>
-                    <Text style={{ color: colors.textMain, fontSize: 22, fontWeight: "700" }}>K250.00</Text>
+                    <Text style={{ color: colors.textMain, fontSize: 22, fontWeight: "700" }}>K100.00</Text>
                   </View>
                   <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 6 }}>
                     One-time fee charged to you as Chairperson
@@ -1078,11 +1074,11 @@ export default function CreateGroup() {
                 </View>
 
                 <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 14, lineHeight: 18, marginBottom: 24 }}>
-                  You will receive a payment prompt on your phone. Confirm the K250.00 payment to activate the group.
+                  You will receive a payment prompt on your phone. Confirm the K100.00 payment to activate the group.
                 </Text>
 
                 <Button
-                  label={paying ? "Processing…" : "Pay K250 & Create Group"}
+                  label={paying ? "Processing…" : "Pay K100 & Create Group"}
                   disabled={paying}
                   onPress={handlePayAndCreate}
                   testID="create-group-pay-btn"

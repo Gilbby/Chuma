@@ -32,3 +32,7 @@ export async function getGroupById(id: string): Promise<Group | undefined> {
 export async function acceptInvite(groupId: string): Promise<void> {
   await api(`/groups/${groupId}/accept`, { method: "POST" });
 }
+
+export async function createGroup(payload: any): Promise<{ group: any; transaction?: any }> {
+  return api("/groups", { method: "POST", body: payload });
+}
