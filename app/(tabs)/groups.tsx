@@ -9,9 +9,9 @@ import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
-import { notifications } from "@/src/data/mock";
-import { getGroups } from "@/src/services/groups";
-import { Group } from "@/src/types";
+import { getGroups, acceptInvite } from "@/src/services/groups";
+import { getNotifications, markNotificationRead } from "@/src/services/notifications";
+import { Group, Notice } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { Users, Plus, ChevronRight } from "lucide-react-native";
 
@@ -20,6 +20,7 @@ export default function Groups() {
   const router = useRouter();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [invites, setInvites] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -27,8 +28,9 @@ export default function Groups() {
     setLoading(true);
     setError(false);
     try {
-      const data = await getGroups();
-      setGroups(data);
+      const [g, notifs] = await Promise.all([getGroups(), getNotifications()]);
+      setGroups(g);
+      setInvites(notifs.filter((n) => n.type === "invite" && !n.read));
     } catch (e) {
       setError(true);
     } finally {
@@ -44,9 +46,7 @@ export default function Groups() {
     load();
   };
 
-  const pendingInvites = notifications.filter(
-    (n) => n.type === "invite" && !n.read && !dismissed.includes(n.id)
-  );
+  const pendingInvites = invites.filter((n) => !dismissed.includes(n.id));
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -102,7 +102,12 @@ export default function Groups() {
                       variant="outline"
                       size="sm"
                       fullWidth={false}
-                      onPress={() => setDismissed((d) => [...d, inv.id])}
+                      onPress={async () => {
+                        try {
+                          await markNotificationRead(inv.id);
+                        } catch {}
+                        setDismissed((d) => [...d, inv.id]);
+                      }}
                       testID={`invite-decline-${inv.id}`}
                     />
                     <Button
@@ -110,9 +115,15 @@ export default function Groups() {
                       variant="primary"
                       size="sm"
                       fullWidth={false}
-                      onPress={() => {
-                        setDismissed((d) => [...d, inv.id]);
-                        Alert.alert("Joined", `You joined ${inv.groupName}`);
+                      onPress={async () => {
+                        try {
+                          if (inv.groupId) await acceptInvite(inv.groupId);
+                          await markNotificationRead(inv.id);
+                          setDismissed((d) => [...d, inv.id]);
+                          await load();
+                        } catch (e) {
+                          Alert.alert("Could not join", "Please try again.");
+                        }
                       }}
                       testID={`invite-accept-${inv.id}`}
                     />
