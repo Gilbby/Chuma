@@ -1,14 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, Dimensions, Modal, Alert, Pressable, Share } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
+import { SkeletonGroup } from "@/src/components/ui";
+import { ErrorState } from "@/src/components/common";
 import { LineChart, BarChart } from "@/src/components/charts/Charts";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { savingsTrend, groups, loans, transactions } from "@/src/data/mock";
+import { savingsTrend } from "@/src/data/mock";
+import { getGroups } from "@/src/services/groups";
+import { getLoans } from "@/src/services/loans";
+import { getTransactions } from "@/src/services/transactions";
 import { getRepaymentRate, getSavingsGrowth } from "@/src/services/groupStats";
 import { formatZMW } from "@/src/utils/currency";
+import { Group, Loan, TxnItem } from "@/src/types";
 import { TrendingUp, TrendingDown, Users, Banknote, Download, FileText, FileSpreadsheet } from "lucide-react-native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
@@ -19,9 +26,38 @@ export default function Reports() {
   const { colors } = useTheme();
   const chartW = width - 40 - 32;
   const [exportOpen, setExportOpen] = useState(false);
+  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [transactions, setTransactions] = useState<TxnItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const [g, l, t] = await Promise.all([getGroups(), getLoans(), getTransactions()]);
+      setGroups(g);
+      setLoans(l);
+      setTransactions(t);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const data = transactions;
 
-  const primaryGroup = groups[0];
+  const primaryGroup = groupId
+    ? groups.find((g) => g.id === groupId) ?? groups[0]
+    : groups[0];
   const trendData =
     (primaryGroup as typeof primaryGroup & { trend?: typeof savingsTrend })?.trend ??
     savingsTrend;
@@ -111,6 +147,26 @@ export default function Reports() {
     { label: "Q3", value: 38 },
     { label: "Q4", value: 56 },
   ];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="reports-screen">
+        <ScreenHeader title="Reports" subtitle="Group performance analytics" />
+        <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
+          <SkeletonGroup count={4} height={120} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="reports-screen">
+        <ScreenHeader title="Reports" subtitle="Group performance analytics" />
+        <ErrorState onRetry={load} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
