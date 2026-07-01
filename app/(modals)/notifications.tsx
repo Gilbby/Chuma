@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -6,8 +6,9 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { notifications as initial, groups } from "@/src/data/mock";
-import { Notice } from "@/src/types";
+import { Notice, Group } from "@/src/types";
+import { getNotifications, markAllNotificationsRead } from "@/src/services/notifications";
+import { getGroups } from "@/src/services/groups";
 import { getGraceInfo, getAmountOwed, getMonthsOwed } from "@/src/services/groupFees";
 import { useRole } from "@/src/hooks/useRole";
 import { formatZMW } from "@/src/utils/currency";
@@ -45,11 +46,29 @@ const TINTS: Record<Notice["type"], "primary" | "info" | "success" | "warning" |
 export default function Notifications() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [items, setItems] = useState(initial);
+  const [items, setItems] = useState<Notice[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState<string[]>([]);
 
   const { role } = useRole();
   const isAdmin = role === "Chairperson" || role === "Treasurer";
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [n, g] = await Promise.all([getNotifications(), getGroups()]);
+      setItems(n);
+      setGroups(g);
+    } catch (e) {
+      // leave lists empty on error; screen still renders
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // In-app grace reminder derived from live fee status. The
   // backend will additionally PUSH this daily (day 1–5
@@ -86,13 +105,16 @@ export default function Notifications() {
     const today: Notice[] = [];
     const earlier: Notice[] = [];
     activeItems.forEach((n) => {
-      if (n.date.toLowerCase().includes("today")) today.push(n);
+      if (isToday(n.date)) today.push(n);
       else earlier.push(n);
     });
     return { today, earlier };
   }, [activeItems]);
 
-  const markAllRead = () => setItems((p) => p.map((n) => ({ ...n, read: true })));
+  const markAllRead = async () => {
+    await markAllNotificationsRead();
+    setItems((p) => p.map((n) => ({ ...n, read: true })));
+  };
 
   return (
     <SafeAreaView
