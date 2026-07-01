@@ -1,5 +1,6 @@
 import { api } from "./apiClient";
 import { setToken, clearToken } from "@/src/utils/authToken";
+import { setCurrentUser, clearCurrentUser } from "@/src/utils/currentUser";
 
 export async function requestOtp(
   phone: string,
@@ -18,6 +19,7 @@ export async function verifyOtp(
     { method: "POST", body: { phone, code, mode }, auth: false },
   );
   if (res.token) await setToken(res.token);
+  if (res.user) await setCurrentUser(res.user);
   return res;
 }
 
@@ -35,9 +37,12 @@ export async function setPin(pin: string) {
 }
 
 export async function getMe() {
-  return api("/auth/me");
+  const res = await api("/auth/me");
+  if (res?.user) await setCurrentUser(res.user);
+  return res;
 }
 
 export async function logout() {
   await clearToken();
+  await clearCurrentUser();
 }
