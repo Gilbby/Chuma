@@ -27,13 +27,13 @@ import {
   currentUser,
   transactions,
   approvals,
-  notifications,
 } from "@/src/data/mock";
 import { getGroups } from "@/src/services/groups";
 import { getLoans } from "@/src/services/loans";
 import { getPenalties } from "@/src/services/penalties";
+import { getNotifications } from "@/src/services/notifications";
 import { getCurrentUser } from "@/src/utils/currentUser";
-import { Group, Loan, Penalty } from "@/src/types";
+import { Group, Loan, Penalty, Notice } from "@/src/types";
 import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
@@ -68,6 +68,7 @@ export default function Home() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [notifications, setNotifications] = useState<Notice[]>([]);
   const [myUserId, setMyUserId] = useState<string>("");
 
   const load = useCallback(async () => {
@@ -76,14 +77,16 @@ export default function Home() {
     try {
       const user = await getCurrentUser<{ _id: string }>();
       setMyUserId(user?._id ? String(user._id) : "");
-      const [g, l, p] = await Promise.all([
+      const [g, l, p, n] = await Promise.all([
         getGroups(),
         getLoans({ mine: true }),
         getPenalties({ mine: true }),
+        getNotifications(),
       ]);
       setGroups(g);
       setLoans(l);
       setPenalties(p);
+      setNotifications(n);
     } catch (e) {
       setError(true);
     } finally {
