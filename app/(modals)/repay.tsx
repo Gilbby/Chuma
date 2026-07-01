@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,33 +6,102 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
+import { ErrorState } from "@/src/components/common";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { loans } from "@/src/data/mock";
+import { getLoans, repayLoan } from "@/src/services/loans";
+import { Loan } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { Check } from "lucide-react-native";
 
 export default function Repay() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [selected, setSelected] = useState(loans[0]);
+  const { loanId } = useLocalSearchParams<{ loanId?: string }>();
+
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [selected, setSelected] = useState<Loan | null>(null);
   const [mode, setMode] = useState<"installment" | "full" | "custom">("installment");
   const [custom, setCustom] = useState("500");
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [payError, setPayError] = useState("");
 
-  const amount =
-    mode === "installment"
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const all = await getLoans({ mine: true });
+      const repayable = all.filter((l) => l.status === "active" && l.outstanding > 0);
+      setLoans(repayable);
+      const preselected = loanId ? repayable.find((l) => l.id === loanId) : undefined;
+      setSelected(preselected ?? repayable[0] ?? null);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [loanId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const amount = selected
+    ? mode === "installment"
       ? selected.installmentAmount
       : mode === "full"
         ? selected.outstanding
-        : parseFloat(custom) || 0;
+        : parseFloat(custom) || 0
+    : 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="repay-screen">
+        <ScreenHeader title="Repay loan" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="repay-screen">
+        <ScreenHeader title="Repay loan" />
+        <ErrorState onRetry={load} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!selected) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="repay-screen">
+        <ScreenHeader title="Repay loan" />
+        <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
+          <Card padding={20}>
+            <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
+              No active loans to repay
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
+              You don&apos;t have any outstanding loans right now.
+            </Text>
+          </Card>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (success) {
     return (
@@ -214,10 +283,29 @@ export default function Repay() {
 
         <View style={{ height: 24 }} />
 
+        {payError ? (
+          <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 12, fontWeight: "500" }}>
+            {payError}
+          </Text>
+        ) : null}
+
         <Button
           label={`Pay ${formatZMW(amount)}`}
-          disabled={amount <= 0 || amount > selected.outstanding}
-          onPress={() => setTimeout(() => setSuccess(true), 600)}
+          disabled={amount <= 0 || amount > selected.outstanding || submitting}
+          loading={submitting}
+          onPress={async () => {
+            if (!selected) return;
+            setSubmitting(true);
+            setPayError("");
+            try {
+              await repayLoan({ loanId: selected.id, amount });
+              setSuccess(true);
+            } catch (e: any) {
+              setPayError(e?.message || "Payment failed. Please try again.");
+            } finally {
+              setSubmitting(false);
+            }
+          }}
           testID="repay-pay-btn"
         />
       </ScrollView>
