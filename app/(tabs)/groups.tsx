@@ -9,7 +9,9 @@ import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
-import { groups, notifications } from "@/src/data/mock";
+import { notifications } from "@/src/data/mock";
+import { getGroups } from "@/src/services/groups";
+import { Group } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { Users, Plus, ChevronRight } from "lucide-react-native";
 
@@ -17,22 +19,33 @@ export default function Groups() {
   const { colors } = useTheme();
   const router = useRouter();
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  useEffect(() => {
-    setError(false);
-    const t = setTimeout(() => {
-      setLoading(false);
-      // Temporary: real fetch will set error on catch.
-      // Keep error false by default so screens work normally.
-      setError(false);
-    }, 900);
-    return () => clearTimeout(t);
-  }, []);
-  const handleRetry = () => {
+
+  const fetchGroups = async (active: () => boolean) => {
     setLoading(true);
     setError(false);
-    setTimeout(() => setLoading(false), 900);
+    try {
+      const data = await getGroups();
+      if (active()) setGroups(data);
+    } catch (e) {
+      if (active()) setError(true);
+    } finally {
+      if (active()) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isActive = true;
+    fetchGroups(() => isActive);
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const handleRetry = () => {
+    fetchGroups(() => true);
   };
 
   const pendingInvites = notifications.filter(
