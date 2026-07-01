@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -25,13 +25,15 @@ import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import {
   currentUser,
-  groups,
-  loans,
-  penalties,
   transactions,
   approvals,
   notifications,
 } from "@/src/data/mock";
+import { getGroups } from "@/src/services/groups";
+import { getLoans } from "@/src/services/loans";
+import { getPenalties } from "@/src/services/penalties";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { Group, Loan, Penalty } from "@/src/types";
 import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
@@ -63,26 +65,45 @@ export default function Home() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  useEffect(() => {
-    setError(false);
-    const t = setTimeout(() => {
-      setLoading(false);
-      // Temporary: real fetch will set error on catch.
-      // Keep error false by default so screens work normally.
-      setError(false);
-    }, 900);
-    return () => clearTimeout(t);
-  }, []);
-  const handleRetry = () => {
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [myUserId, setMyUserId] = useState<string>("");
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError(false);
-    setTimeout(() => setLoading(false), 900);
+    try {
+      const user = await getCurrentUser<{ _id: string }>();
+      setMyUserId(user?._id ? String(user._id) : "");
+      const [g, l, p] = await Promise.all([
+        getGroups(),
+        getLoans({ mine: true }),
+        getPenalties({ mine: true }),
+      ]);
+      setGroups(g);
+      setLoans(l);
+      setPenalties(p);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const handleRetry = () => {
+    load();
   };
 
-  const myTotalSavings = groups.reduce((sum, g) => sum + (g.members[0]?.savings ?? 0), 0);
+  const myTotalSavings = groups.reduce((sum, g) => {
+    const me = (g.members ?? []).find((m: any) => String(m.userId) === myUserId);
+    return sum + (me?.savings ?? 0);
+  }, 0);
   const groupPoolTotal = groups.reduce((a, g) => a + g.totalSavings, 0);
 
-  const myLoans = loans.filter((l) => l.memberId === "m-0" && l.status === "active");
+  const myLoans = loans.filter((l) => String(l.memberId) === myUserId && l.status === "active");
   const myActiveLoans = myLoans.reduce((sum, l) => sum + l.outstanding, 0);
   const myLoanCount = myLoans.length;
   const nextRepaymentLoan = myLoans
@@ -135,15 +156,15 @@ export default function Home() {
       );
 
       const result = computeShareOut(
-        (g.members ?? []).map((m) => ({
-          id: m.id,
+        (g.members ?? []).map((m: any) => ({
+          id: String(m.userId ?? m.id),
           name: m.name,
           contribution: m.savings,
         })),
         profit
       );
 
-      const myId = g.members?.[0]?.id ?? "";
+      const myId = myUserId;
       const myShare = getMyShare(result.members, myId);
 
       return {
