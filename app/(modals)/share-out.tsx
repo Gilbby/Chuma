@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
@@ -9,9 +9,13 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { shareOut, groups, penalties, approvals as approvalsList, notifications } from "@/src/data/mock";
+import { shareOut, approvals as approvalsList, notifications } from "@/src/data/mock";
 import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { getRequiredApprovals } from "@/src/services/approvals";
+import { getGroups } from "@/src/services/groups";
+import { getPenalties } from "@/src/services/penalties";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { Group, Penalty } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
@@ -43,6 +47,32 @@ export default function ShareOutScreen() {
 
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const activeGroupId = groupId ?? shareOut.groupId;
+
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [myUserId, setMyUserId] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [g, p, user] = await Promise.all([
+        getGroups(),
+        getPenalties({ groupId: activeGroupId }),
+        getCurrentUser<{ _id: string }>(),
+      ]);
+      setGroups(g);
+      setPenalties(p);
+      setMyUserId(user?._id ? String(user._id) : "");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeGroupId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const group = groups.find((g) => g.id === activeGroupId);
 
   const penaltyIncome = penalties
@@ -66,8 +96,8 @@ export default function ShareOutScreen() {
     : shareOut.profit;
 
   const members = group
-    ? (group.members ?? []).map((m) => ({
-        id: m.id, name: m.name, contribution: m.savings,
+    ? (group.members ?? []).map((m: any) => ({
+        id: String(m.userId ?? m.id), name: m.name, contribution: m.savings,
       }))
     : shareOut.members.map((m) => ({
         id: m.id, name: m.name, contribution: m.contribution,
@@ -75,7 +105,7 @@ export default function ShareOutScreen() {
 
   const result = computeShareOut(members, computedProfit);
 
-  const myId = group?.members?.[0]?.id ?? "m-gilbert";
+  const myId = group ? myUserId : "m-gilbert";
 
   function formatShareOutDate(iso: string): string {
     const d = new Date(iso);
@@ -174,6 +204,17 @@ export default function ShareOutScreen() {
       );
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="shareout-screen">
+        <ScreenHeader title="Share-out" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
