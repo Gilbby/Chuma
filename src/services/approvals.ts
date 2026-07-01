@@ -1,5 +1,5 @@
-import { approvals as mockApprovals } from "@/src/data/mock";
 import { Approval } from "@/src/types";
+import { api } from "./apiClient";
 
 // Number of admin approvals required for a sensitive action,
 // based on the group's approval threshold and admin count.
@@ -19,15 +19,30 @@ export function getRequiredApprovals(
   }
 }
 
-export async function getApprovals(): Promise<Approval[]> {
-  return mockApprovals;
+function mapApproval(raw: any): Approval {
+  const votes = raw.votes ?? [];
+  const votesFor = votes.filter((v: any) => v.decision === "approve").length;
+  const votesAgainst = votes.filter((v: any) => v.decision === "reject").length;
+  return {
+    ...raw,
+    id: String(raw._id),
+    votesFor,
+    votesAgainst,
+    totalVoters: raw.requiredApprovals ?? 0,
+    timestamp: raw.createdAt ?? raw.date ?? "",
+    status: raw.status,
+  };
+}
+
+export async function getApprovals(opts?: { groupId?: string }): Promise<Approval[]> {
+  const qs = opts?.groupId ? `?groupId=${encodeURIComponent(opts.groupId)}` : "";
+  const res = await api<{ approvals: any[] }>(`/approvals${qs}`);
+  return (res.approvals ?? []).map(mapApproval);
 }
 
 export async function voteOnApproval(
   id: string,
   action: "approve" | "reject",
-): Promise<{ success: boolean }> {
-  void id;
-  void action;
-  return { success: true };
+): Promise<{ approval: any; progress: { approves: number; required: number }; executed: any }> {
+  return api(`/approvals/${id}/vote`, { method: "POST", body: { decision: action } });
 }
