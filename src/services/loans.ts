@@ -73,19 +73,32 @@ export async function getLoans(opts?: {
   return (res.loans ?? []).map(mapLoan);
 }
 
+export async function getLoanEligibility(groupId: string): Promise<{
+  savings: number;
+  maxLoan: number;
+  multiplier: number;
+  interestRate: number;
+}> {
+  return api(`/loans/eligibility?groupId=${encodeURIComponent(groupId)}`);
+}
+
 export async function requestLoan(payload: {
   groupId: string;
   amount: number;
-  purpose?: string;
-}): Promise<{ success: boolean }> {
-  void payload;
-  return { success: true };
+  durationMonths: number;
+  reason?: string;
+}): Promise<{ loan: any; approval: any; breakdown: any }> {
+  return api("/loans", { method: "POST", body: payload });
 }
 
 export async function repayLoan(payload: {
   loanId: string;
   amount: number;
-}): Promise<{ success: boolean }> {
-  void payload;
-  return { success: true };
+  payerPhone?: string;
+}): Promise<{ loan?: any }> {
+  const { loanId, amount, payerPhone } = payload;
+  return api(`/loans/${loanId}/repay`, {
+    method: "POST",
+    body: payerPhone ? { amount, payerPhone } : { amount },
+  });
 }
