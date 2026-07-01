@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Switch, Modal } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Switch, Modal, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
@@ -23,8 +23,10 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react-native";
-import { currentUser, groups, penalties } from "@/src/data/mock";
-import { Role } from "@/src/types";
+import { getGroups } from "@/src/services/groups";
+import { getPenalties } from "@/src/services/penalties";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { Role, Group, Penalty } from "@/src/types";
 import { getTrustScore, getTrustBand } from "@/src/services/trustScore";
 import { useRole } from "@/src/contexts/RoleContext";
 
@@ -36,15 +38,41 @@ export default function Profile() {
   const [notif, setNotif] = React.useState(true);
   const [trustOpen, setTrustOpen] = useState(false);
 
-  const myContributions = groups.reduce(
-    (sum, g) => sum + (g.members?.[0]?.contributions ?? 0), 0
-  );
-  const myActiveLoan = groups.reduce(
-    (sum, g) => sum + (g.members?.[0]?.loanActive ?? 0), 0
-  );
-  const myPenaltyCount = penalties.filter(
-    (p) => p.memberId === "m-0" && p.status === "pending"
-  ).length;
+  const [me, setMe] = useState<any>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [myUserId, setMyUserId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const user = await getCurrentUser<any>();
+      setMe(user);
+      setMyUserId(user?._id ? String(user._id) : "");
+      const [g, p] = await Promise.all([getGroups(), getPenalties({ mine: true })]);
+      setGroups(g);
+      setPenalties(p);
+    } catch {
+      // leave defaults; screen still renders
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const myContributions = groups.reduce((sum, g) => {
+    const meMember = (g.members ?? []).find((m: any) => String(m.userId) === myUserId);
+    return sum + (meMember?.contributions ?? 0);
+  }, 0);
+  const myActiveLoan = groups.reduce((sum, g) => {
+    const meMember = (g.members ?? []).find((m: any) => String(m.userId) === myUserId);
+    return sum + (meMember?.loanActive ?? 0);
+  }, 0);
+  const myPenaltyCount = penalties.filter((p) => p.status === "pending").length;
 
   const trustScore = getTrustScore(
     { contributions: myContributions, loanActive: myActiveLoan },
@@ -60,10 +88,23 @@ export default function Profile() {
   }[trustBand.band];
 
   const memberSince = (() => {
-    const d = new Date(currentUser.joinedDate);
+    const d = new Date(me?.joinedDate ?? "");
     if (isNaN(d.getTime())) return "—";
     return d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
   })();
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="profile-screen">
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.textMain }]}>Profile</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -80,10 +121,10 @@ export default function Profile() {
           <Card padding={18}>
             <View style={{ position: "relative" }}>
               <View style={styles.profileRow}>
-                <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
+                <Image source={{ uri: me?.avatar }} style={styles.avatar} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.name, { color: colors.textMain }]}>{currentUser.name}</Text>
-                  <Text style={[styles.phone, { color: colors.textMuted }]}>{currentUser.phone}</Text>
+                  <Text style={[styles.name, { color: colors.textMain }]}>{me?.name ?? "—"}</Text>
+                  <Text style={[styles.phone, { color: colors.textMuted }]}>{me?.phone ?? "—"}</Text>
                   <View style={{ marginTop: 8, flexDirection: "row" }}>
                     <StatusBadge label={role} variant="primary" testID="profile-role-badge" />
                   </View>
