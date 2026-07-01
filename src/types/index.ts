@@ -41,6 +41,15 @@ export interface GroupGovernance {
   permissions: Record<string, boolean>;
 }
 
+export interface FeeStatus {
+  status: "paid" | "grace" | "locked";
+  daysIntoGrace: number;
+  daysLeft: number;
+  monthsOwed: number;
+  amountOwed: number;
+  locked: boolean;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -74,6 +83,7 @@ export interface Group {
   monthlyFee?: number;
   feeDueDay?: number;
   feePaidThrough?: string;
+  feeStatus?: FeeStatus;
   createdAt?: string;
 }
 
