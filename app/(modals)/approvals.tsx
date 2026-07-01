@@ -1,13 +1,16 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
+import { SkeletonGroup } from "@/src/components/ui";
+import { ErrorState } from "@/src/components/common";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { approvals as initial } from "@/src/data/mock";
+import { getApprovals, voteOnApproval } from "@/src/services/approvals";
+import { Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles } from "lucide-react-native";
@@ -24,24 +27,41 @@ export default function Approvals() {
   const { colors } = useTheme();
   const { role, can } = useRole();
   const canVote = can("vote");
-  const [items, setItems] = useState(initial);
+  const [items, setItems] = useState<Approval[]>([]);
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [voting, setVoting] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await getApprovals();
+      setItems(res);
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const data = items.filter((i) => (filter === "pending" ? i.status === "pending" : true));
 
-  const vote = (id: string, action: "approve" | "reject") => {
-    setItems((prev) =>
-      prev.map((a) => {
-        if (a.id !== id) return a;
-        const votesFor = action === "approve" ? a.votesFor + 1 : a.votesFor;
-        const votesAgainst = action === "reject" ? a.votesAgainst + 1 : a.votesAgainst;
-        const threshold = Math.ceil(a.totalVoters * 0.6);
-        let status = a.status;
-        if (votesFor >= threshold) status = "approved";
-        else if (votesAgainst > a.totalVoters - threshold) status = "rejected";
-        return { ...a, votesFor, votesAgainst, status };
-      }),
-    );
+  const onVote = async (id: string, action: "approve" | "reject") => {
+    setVoting(id);
+    try {
+      await voteOnApproval(id, action);
+      await load();
+    } catch (e: any) {
+      Alert.alert("Vote failed", e?.message || "Please try again.");
+    } finally {
+      setVoting(null);
+    }
   };
 
   return (
@@ -79,7 +99,11 @@ export default function Approvals() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {data.length === 0 && (
+        {loading ? (
+          <SkeletonGroup count={3} height={160} />
+        ) : error ? (
+          <ErrorState onRetry={load} />
+        ) : data.length === 0 ? (
           <Card padding={28} style={{ alignItems: "center" }}>
             <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft }]}>
               <Check size={28} color={colors.primary} />
@@ -91,9 +115,8 @@ export default function Approvals() {
               No approvals waiting. We&apos;ll notify you when new requests come in.
             </Text>
           </Card>
-        )}
-
-        {data.map((a) => {
+        ) : (
+          data.map((a) => {
           const Icon = TYPE_ICONS[a.type];
           const progress = a.totalVoters === 0 ? 0 : a.votesFor / a.totalVoters;
           const isPending = a.status === "pending";
@@ -137,7 +160,7 @@ export default function Approvals() {
                     {a.votesFor} APPROVED · {a.votesAgainst} REJECTED
                   </Text>
                   <Text style={{ color: colors.textMain, fontSize: 12, fontWeight: "700" }}>
-                    {a.votesFor + a.votesAgainst}/{a.totalVoters}
+                    {a.votesFor} of {a.totalVoters} approvals
                   </Text>
                 </View>
                 <View style={{ marginTop: 6 }}>
@@ -170,20 +193,22 @@ export default function Approvals() {
                   <Button
                     label="Reject"
                     variant="outline"
-                    onPress={() => vote(a.id, "reject")}
+                    onPress={() => onVote(a.id, "reject")}
                     size="md"
                     fullWidth={false}
-                    disabled={!canVote}
+                    disabled={!canVote || voting === a.id}
+                    loading={voting === a.id}
                     style={{ flex: 1, marginRight: 8 }}
                     icon={<X size={16} color={colors.primary} />}
                     testID={`approval-reject-${a.id}`}
                   />
                   <Button
-                    label={role === "Chairperson" && a.votesFor + 1 >= Math.ceil(a.totalVoters * 0.6) ? "Final approve" : "Approve"}
-                    onPress={() => vote(a.id, "approve")}
+                    label="Approve"
+                    onPress={() => onVote(a.id, "approve")}
                     size="md"
                     fullWidth={false}
-                    disabled={!canVote}
+                    disabled={!canVote || voting === a.id}
+                    loading={voting === a.id}
                     style={{ flex: 1, marginLeft: 8 }}
                     icon={<Check size={16} color="#fff" />}
                     testID={`approval-approve-${a.id}`}
@@ -192,7 +217,8 @@ export default function Approvals() {
               ) : null}
             </Card>
           );
-        })}
+          })
+        )}
       </ScrollView>
     </SafeAreaView>
   );
