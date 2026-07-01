@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -23,29 +23,25 @@ export default function Groups() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const fetchGroups = async (active: () => boolean) => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
       const data = await getGroups();
-      if (active()) setGroups(data);
+      setGroups(data);
     } catch (e) {
-      if (active()) setError(true);
+      setError(true);
     } finally {
-      if (active()) setLoading(false);
+      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    let isActive = true;
-    fetchGroups(() => isActive);
-    return () => {
-      isActive = false;
-    };
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const handleRetry = () => {
-    fetchGroups(() => true);
+    load();
   };
 
   const pendingInvites = notifications.filter(
