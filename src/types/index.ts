@@ -2,6 +2,7 @@ export type Role = "Chairperson" | "Treasurer" | "Secretary" | "Member";
 
 export interface Member {
   id: string;
+  userId?: string;
   name: string;
   role: Role;
   phone: string;
@@ -94,6 +95,7 @@ export interface TxnItem {
   status: "completed" | "pending" | "failed";
   groupId: string;
   groupName: string;
+  memberId?: string;
   date: string;
   note?: string;
   direction: "in" | "out";

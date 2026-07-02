@@ -25,6 +25,20 @@ export async function getTransactions(opts?: {
   return (res.transactions ?? []).map(mapTxn);
 }
 
+export async function getGroupTransactions(
+  groupId: string,
+  opts?: { type?: string; range?: "all" | "week" | "month" | "3months" }
+): Promise<TxnItem[]> {
+  const params = new URLSearchParams();
+  if (opts?.type && opts.type !== "all") params.set("type", opts.type);
+  if (opts?.range && opts.range !== "all") params.set("range", opts.range);
+  const qs = params.toString();
+  const res = await api<{ transactions: any[] }>(
+    `/groups/${groupId}/transactions${qs ? `?${qs}` : ""}`
+  );
+  return (res.transactions ?? []).map(mapTxn);
+}
+
 export async function submitContribution(payload: {
   groupId: string;
   amount: number;

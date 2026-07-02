@@ -24,12 +24,13 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
-import { transactions, loans } from "@/src/data/mock";
 import { getGroupById } from "@/src/services/groups";
 import { getApprovals } from "@/src/services/approvals";
+import { getGroupTransactions } from "@/src/services/transactions";
+import { getLoans } from "@/src/services/loans";
 import { formatZMW } from "@/src/utils/currency";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
-import { Member, Group, Approval } from "@/src/types";
+import { Member, Group, Approval, TxnItem, Loan } from "@/src/types";
 import * as Clipboard from "expo-clipboard";
 import {
   Users,
@@ -72,6 +73,8 @@ export default function GroupDetails() {
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [groupApprovals, setGroupApprovals] = useState<Approval[]>([]);
+  const [groupTxn, setGroupTxn] = useState<TxnItem[]>([]);
+  const [groupLoans, setGroupLoans] = useState<Loan[]>([]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -83,6 +86,17 @@ export default function GroupDetails() {
         setGroup(g);
         const a = await getApprovals({ groupId: id });
         setGroupApprovals(a);
+        try {
+          const [txns, lns] = await Promise.all([
+            getGroupTransactions(id),
+            getLoans({ groupId: id }),
+          ]);
+          setGroupTxn(txns);
+          setGroupLoans(lns);
+        } catch {
+          setGroupTxn([]);
+          setGroupLoans([]);
+        }
       } else {
         setError(true);
       }
@@ -130,9 +144,6 @@ export default function GroupDetails() {
       </SafeAreaView>
     );
   }
-
-  const groupTxn = transactions.filter((t) => t.groupId === group.id);
-  const groupLoans = loans.filter((l) => l.groupId === group.id);
 
   const locked = group.feeStatus?.locked ?? isGroupLocked(group);
   const monthsOwed = group.feeStatus?.monthsOwed ?? getMonthsOwed(group);
@@ -686,7 +697,9 @@ export default function GroupDetails() {
                     RECENT ACTIVITY
                   </Text>
                   {(() => {
-                    const memberTxns = groupTxn.filter((t) => t.note?.includes(selectedMember.name));
+                    const memberTxns = groupTxn.filter(
+                      (t) => String(t.memberId) === String(selectedMember.userId ?? selectedMember.id)
+                    );
                     const display = memberTxns.length > 0 ? memberTxns.slice(0, 3) : groupTxn.slice(0, 3);
                     if (display.length === 0) {
                       return (
