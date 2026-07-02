@@ -9,7 +9,6 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { shareOut } from "@/src/data/mock";
 import { computeShareOut, estimateGroupProfit, getMyShare, proposeShareOut } from "@/src/services/shareOut";
 import { getApprovals, getRequiredApprovals, voteOnApproval } from "@/src/services/approvals";
 import { getGroups } from "@/src/services/groups";
@@ -42,7 +41,7 @@ export default function ShareOutScreen() {
   const canApprove = can("approve.shareout");
 
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
-  const activeGroupId = groupId ?? shareOut.groupId;
+  const activeGroupId = groupId ?? "";
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [penalties, setPenalties] = useState<Penalty[]>([]);
@@ -97,19 +96,17 @@ export default function ShareOutScreen() {
         cycleMonths,
         penaltyIncome
       )
-    : shareOut.profit;
+    : 0;
 
   const members = group
     ? (group.members ?? []).map((m: any) => ({
         id: String(m.userId ?? m.id), name: m.name, contribution: m.savings,
       }))
-    : shareOut.members.map((m) => ({
-        id: m.id, name: m.name, contribution: m.contribution,
-      }));
+    : [];
 
   const result = computeShareOut(members, computedProfit);
 
-  const myId = group ? myUserId : "m-gilbert";
+  const myId = myUserId;
 
   function formatShareOutDate(iso: string): string {
     const d = new Date(iso);
@@ -121,10 +118,10 @@ export default function ShareOutScreen() {
 
   const displayDate = group?.shareOutDate
     ? formatShareOutDate(group.shareOutDate)
-    : shareOut.date;
-  const displayName = group?.name ?? shareOut.groupName;
+    : "";
+  const displayName = group?.name ?? "";
 
-  const shareOutISO = group?.shareOutDate ?? shareOut.date;
+  const shareOutISO = group?.shareOutDate ?? "";
   const now = new Date();
   const stageDates = {
     finalContrib: addDays(shareOutISO, -48),
