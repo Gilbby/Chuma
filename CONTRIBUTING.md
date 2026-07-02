@@ -20,11 +20,10 @@ src/
 ├── constants/
 │   └── index.ts       # App-wide constants (APP_NAME, currency, thresholds)
 ├── contexts/          # React context providers
-│   ├── AuthContext.tsx # Auth state (userId, token, login, logout)
 │   └── RoleContext.tsx # Demo role switcher with permission checks
 ├── data/
 │   └── mock/          # Mock data split by domain (groups, loans, transactions, …)
-├── hooks/             # Thin re-export hooks (useAuth, useRole, useTheme)
+├── hooks/             # Thin re-export hooks (useRole, useTheme)
 ├── services/          # Async data-access layer (currently backed by mock data)
 │   ├── approvals.ts
 │   ├── auth.ts
