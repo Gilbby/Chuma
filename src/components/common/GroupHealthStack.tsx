@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, Pressable, Dimensions } from "react-native";
 import Animated, {
   useSharedValue,
@@ -14,8 +14,9 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { LineChart } from "@/src/components/charts/Charts";
 import { TrendingUp } from "lucide-react-native";
-import { savingsTrend, loans } from "@/src/data/mock";
-import type { Group } from "@/src/types";
+import { savingsTrend } from "@/src/data/mock";
+import { getLoans } from "@/src/services/loans";
+import type { Group, Loan } from "@/src/types";
 import {
   getSavingsGrowth,
   getRepaymentRate,
@@ -42,6 +43,11 @@ const STACK_CONFIGS = [
 export function GroupHealthStack({ groups, onCardPress }: Props) {
   const { colors } = useTheme();
   const [topIndex, setTopIndex] = useState(0);
+  const [loans, setLoans] = useState<Loan[]>([]);
+
+  useEffect(() => {
+    getLoans().then(setLoans).catch(() => setLoans([]));
+  }, []);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -120,6 +126,7 @@ export function GroupHealthStack({ groups, onCardPress }: Props) {
                   <HealthCardContent
                     group={group}
                     colors={colors}
+                    loans={loans}
                     onPress={() => onCardPress(group.id)}
                   />
                 </Animated.View>
@@ -132,6 +139,7 @@ export function GroupHealthStack({ groups, onCardPress }: Props) {
               <HealthCardContent
                 group={group}
                 colors={colors}
+                loans={loans}
                 onPress={() => {}}
               />
             </Animated.View>
@@ -173,10 +181,12 @@ export function GroupHealthStack({ groups, onCardPress }: Props) {
 function HealthCardContent({
   group,
   colors,
+  loans,
   onPress,
 }: {
   group: Group;
   colors: ReturnType<typeof useTheme>["colors"];
+  loans: Loan[];
   onPress: () => void;
 }) {
   const growth = getSavingsGrowth(group);
