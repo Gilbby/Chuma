@@ -14,8 +14,8 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { LineChart } from "@/src/components/charts/Charts";
 import { TrendingUp } from "lucide-react-native";
-import { savingsTrend } from "@/src/data/mock";
 import { getLoans } from "@/src/services/loans";
+import { getSavingsTrend } from "@/src/services/reports";
 import type { Group, Loan } from "@/src/types";
 import {
   getSavingsGrowth,
@@ -44,10 +44,25 @@ export function GroupHealthStack({ groups, onCardPress }: Props) {
   const { colors } = useTheme();
   const [topIndex, setTopIndex] = useState(0);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [trends, setTrends] = useState<
+    Record<string, { label: string; value: number }[]>
+  >({});
 
   useEffect(() => {
     getLoans().then(setLoans).catch(() => setLoans([]));
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      const entries = await Promise.all(
+        groups.map(
+          async (g) =>
+            [g.id, await getSavingsTrend(g.id).catch(() => [])] as const
+        )
+      );
+      setTrends(Object.fromEntries(entries));
+    })();
+  }, [groups]);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -127,6 +142,7 @@ export function GroupHealthStack({ groups, onCardPress }: Props) {
                     group={group}
                     colors={colors}
                     loans={loans}
+                    trend={trends[group.id] ?? []}
                     onPress={() => onCardPress(group.id)}
                   />
                 </Animated.View>
@@ -140,6 +156,7 @@ export function GroupHealthStack({ groups, onCardPress }: Props) {
                 group={group}
                 colors={colors}
                 loans={loans}
+                trend={trends[group.id] ?? []}
                 onPress={() => {}}
               />
             </Animated.View>
@@ -182,11 +199,13 @@ function HealthCardContent({
   group,
   colors,
   loans,
+  trend,
   onPress,
 }: {
   group: Group;
   colors: ReturnType<typeof useTheme>["colors"];
   loans: Loan[];
+  trend: { label: string; value: number }[];
   onPress: () => void;
 }) {
   const growth = getSavingsGrowth(group);
@@ -251,7 +270,7 @@ function HealthCardContent({
         </View>
 
         <View style={{ marginVertical: 14 }}>
-          <LineChart data={savingsTrend} width={CARD_WIDTH - 36} height={110} />
+          <LineChart data={trend} width={CARD_WIDTH - 36} height={110} />
         </View>
 
         <View style={{ flexDirection: "row" }}>

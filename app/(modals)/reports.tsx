@@ -9,10 +9,10 @@ import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
 import { LineChart, BarChart } from "@/src/components/charts/Charts";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { savingsTrend } from "@/src/data/mock";
 import { getGroups } from "@/src/services/groups";
 import { getLoans } from "@/src/services/loans";
 import { getTransactions } from "@/src/services/transactions";
+import { getSavingsTrend } from "@/src/services/reports";
 import { getRepaymentRate, getSavingsGrowth } from "@/src/services/groupStats";
 import { formatZMW } from "@/src/utils/currency";
 import { Group, Loan, TxnItem } from "@/src/types";
@@ -31,6 +31,7 @@ export default function Reports() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [transactions, setTransactions] = useState<TxnItem[]>([]);
+  const [trendData, setTrendData] = useState<{ label: string; value: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -58,9 +59,16 @@ export default function Reports() {
   const primaryGroup = groupId
     ? groups.find((g) => g.id === groupId) ?? groups[0]
     : groups[0];
-  const trendData =
-    (primaryGroup as typeof primaryGroup & { trend?: typeof savingsTrend })?.trend ??
-    savingsTrend;
+
+  useEffect(() => {
+    if (!primaryGroup?.id) {
+      setTrendData([]);
+      return;
+    }
+    getSavingsTrend(primaryGroup.id)
+      .then(setTrendData)
+      .catch(() => setTrendData([]));
+  }, [primaryGroup?.id]);
 
   const repaymentByGroup = groups.map((g) => ({
     name: g.name,
