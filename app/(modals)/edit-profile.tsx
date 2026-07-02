@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Keyboard,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -19,7 +20,8 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Button } from "@/src/components/ui/Button";
 import { Card } from "@/src/components/ui/Card";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { currentUser } from "@/src/data/mock";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { updateProfile } from "@/src/services/auth";
 import { Camera, Check, ChevronDown } from "lucide-react-native";
 import { useRouter } from "expo-router";
 
@@ -37,15 +39,46 @@ const WALLET_METHODS: PaymentMethod[] = ["MTN MoMo", "Airtel Money", "Zamtel Kwa
 export default function EditProfile() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [name, setName] = useState(currentUser.name);
-  const [avatar, setAvatar] = useState(currentUser.avatar);
+  const [me, setMe] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState("");
   const [preferredMethod, setPreferredMethod] = useState<PaymentMethod>("Airtel Money");
-  const [accountName, setAccountName] = useState(currentUser.name);
-  const [accountNumber, setAccountNumber] = useState(currentUser.phone);
+  const [accountName, setAccountName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nameError, setNameError] = useState("");
   const [accountNameError, setAccountNameError] = useState("");
   const [accountNumberError, setAccountNumberError] = useState("");
+
+  // Load the current user on mount
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const user = await getCurrentUser();
+      if (active) {
+        setMe(user);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Initialize field states once the user is loaded
+  useEffect(() => {
+    if (!me) return;
+    setName(me.name ?? "");
+    setAvatar(me.avatar ?? "");
+    setAccountName(me.preferredPayment?.accountName ?? me.name ?? "");
+    setAccountNumber(me.preferredPayment?.accountNumber ?? me.phone ?? "");
+    const method = me.preferredPayment?.method;
+    if (method && (PAYMENT_METHODS as readonly string[]).includes(method)) {
+      setPreferredMethod(method as PaymentMethod);
+    }
+  }, [me]);
 
   const isWallet = (WALLET_METHODS as PaymentMethod[]).includes(preferredMethod);
   const isCash = preferredMethod === "Cash";
@@ -65,15 +98,14 @@ export default function EditProfile() {
   const handleSelectMethod = (m: PaymentMethod) => {
     setPreferredMethod(m);
     setPickerOpen(false);
-    if (m === "Bank Transfer" && accountNumber === currentUser.phone) {
+    if (m === "Bank Transfer" && accountNumber === me?.phone) {
       setAccountNumber("");
     } else if ((WALLET_METHODS as PaymentMethod[]).includes(m) && accountNumber === "") {
-      setAccountNumber(currentUser.phone);
+      setAccountNumber(me?.phone ?? "");
     }
   };
 
-  const handleSave = () => {
-    // TODO: persist to backend/AsyncStorage when ready
+  const handleSave = async () => {
     let valid = true;
     if (!name.trim()) {
       setNameError("Name is required");
@@ -98,10 +130,37 @@ export default function EditProfile() {
       }
     }
     if (!valid) return;
-    Alert.alert("Profile updated", "Your changes have been saved.", [
-      { text: "OK", onPress: () => router.back() },
-    ]);
+    setSaving(true);
+    try {
+      await updateProfile({
+        name: name.trim(),
+        avatar,
+        preferredPayment: { method: preferredMethod, accountName, accountNumber },
+      });
+      Alert.alert("Profile updated", "Your changes have been saved.", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (e: any) {
+      Alert.alert("Update failed", e?.message || "Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading || !me) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        edges={["top"]}
+        testID="edit-profile-screen"
+      >
+        <ScreenHeader title="Edit profile" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -156,6 +215,28 @@ export default function EditProfile() {
             {nameError ? (
               <Text style={[styles.errText, { color: colors.danger }]}>{nameError}</Text>
             ) : null}
+
+            {/* Phone — login identity, not editable */}
+            <Text style={[styles.label, { color: colors.textMuted, marginTop: 20 }]}>
+              PHONE NUMBER
+            </Text>
+            <View
+              style={[
+                styles.inputField,
+                {
+                  backgroundColor: colors.surfaceSecondary,
+                  borderColor: colors.border,
+                  justifyContent: "center",
+                },
+              ]}
+            >
+              <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "500" }}>
+                {me.phone}
+              </Text>
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
+              Your login number can't be changed here.
+            </Text>
 
             {/* Section 3 — Preferred payment method */}
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 20 }]}>
@@ -280,6 +361,8 @@ export default function EditProfile() {
             <Button
               label="Save changes"
               onPress={handleSave}
+              loading={saving}
+              disabled={saving}
               testID="edit-profile-save-btn"
             />
           </ScrollView>
