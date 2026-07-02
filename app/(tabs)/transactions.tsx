@@ -298,7 +298,21 @@ export default function TransactionsScreen() {
             <TransactionRow
               txn={item}
               testID={`txn-row-${index}`}
-              onPress={() => router.push({ pathname: "/receipt", params: { id: item.id } })}
+              onPress={() =>
+                router.push({
+                  pathname: "/receipt",
+                  params: {
+                    amount: String(item.amount),
+                    type: item.type,
+                    group: item.groupName,
+                    date: item.date,
+                    note: item.note ?? "",
+                    status: item.status,
+                    direction: item.direction,
+                    id: item.id,
+                  },
+                })
+              }
             />
           </Card>
         )}

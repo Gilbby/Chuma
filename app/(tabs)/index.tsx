@@ -403,7 +403,21 @@ export default function Home() {
                     <TransactionRow
                       txn={t}
                       testID={`home-txn-${i}`}
-                      onPress={() => router.push({ pathname: "/receipt", params: { id: t.id } })}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/receipt",
+                          params: {
+                            amount: String(t.amount),
+                            type: t.type,
+                            group: t.groupName,
+                            date: t.date,
+                            note: t.note ?? "",
+                            status: t.status,
+                            direction: t.direction,
+                            id: t.id,
+                          },
+                        })
+                      }
                     />
                   </View>
                   {i < recentTxns.length - 1 && (

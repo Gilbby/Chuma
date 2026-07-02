@@ -15,7 +15,6 @@ import * as Sharing from "expo-sharing";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { transactions } from "@/src/data/mock";
 import { formatZMW } from "@/src/utils/currency";
 import {
   CheckCircle2,
@@ -54,23 +53,13 @@ export default function ReceiptScreen() {
   const router = useRouter();
   const params = useLocalSearchParams() as ReceiptParams;
 
-  // If id passed, look up from mock; else use raw params
+  // Build the receipt entirely from params — callers pass all needed data.
   const data = useMemo(() => {
-    if (params.id) {
-      const t = transactions.find((x) => x.id === params.id);
-      if (t) {
-        return {
-          amount: t.amount,
-          type: t.type,
-          groupName: t.groupName,
-          date: t.date,
-          note: t.note ?? "",
-          status: t.status,
-          direction: t.direction,
-          txnId: `CHM-${t.id.toUpperCase()}-${(2026 + parseInt(t.id.replace(/\D/g, "") || "0", 10)) % 99999}`,
-        };
-      }
-    }
+    const txnId = params.txnId
+      ? params.txnId
+      : params.id
+        ? `CHM-${params.id.toUpperCase()}-${(2026 + parseInt(params.id.replace(/\D/g, "") || "0", 10)) % 99999}`
+        : `CHM-${Date.now().toString().slice(-8)}`;
     return {
       amount: parseFloat(params.amount ?? "0"),
       type: (params.type ?? "contribution") as keyof typeof TYPE_ICONS,
@@ -79,7 +68,7 @@ export default function ReceiptScreen() {
       note: params.note ?? "",
       status: (params.status ?? "completed") as "completed" | "pending" | "failed",
       direction: (params.direction ?? "out") as "in" | "out",
-      txnId: params.txnId ?? `CHM-${Date.now().toString().slice(-8)}`,
+      txnId,
     };
   }, [params]);
 
