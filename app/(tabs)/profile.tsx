@@ -26,6 +26,7 @@ import {
 } from "lucide-react-native";
 import { getGroups } from "@/src/services/groups";
 import { getPenalties } from "@/src/services/penalties";
+import { logout } from "@/src/services/auth";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { Role, Group, Penalty } from "@/src/types";
 import { getTrustScore, getTrustBand } from "@/src/services/trustScore";
@@ -300,7 +301,10 @@ export default function Profile() {
               styles.logoutBtn,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}
-            onPress={() => router.replace("/welcome")}
+            onPress={async () => {
+              await logout(); // clear stored token + user before leaving
+              router.replace("/welcome");
+            }}
             testID="profile-logout-btn"
           >
             <LogOut size={18} color={colors.danger} />

@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
   Share,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -32,19 +33,6 @@ const DATE_RANGES: { key: "all" | "week" | "month" | "3months"; label: string }[
   { key: "3months", label: "Last 3 months" },
 ];
 
-function isInRange(dateStr: string, range: "all" | "week" | "month" | "3months"): boolean {
-  if (range === "all") return true;
-  const now = new Date();
-  const txDate = new Date(dateStr);
-  if (isNaN(txDate.getTime())) return true;
-  const diffMs = now.getTime() - txDate.getTime();
-  const diffDays = diffMs / (1000 * 60 * 60 * 24);
-  if (range === "week") return diffDays <= 7;
-  if (range === "month") return diffDays <= 30;
-  if (range === "3months") return diffDays <= 90;
-  return true;
-}
-
 const FILTERS: { key: TxnItem["type"] | "all"; label: string }[] = [
   { key: "all", label: "All" },
   { key: "contribution", label: "Contributions" },
@@ -59,19 +47,28 @@ export default function TransactionsScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [transactions, setTransactions] = useState<TxnItem[]>([]);
 
+  const [filter, setFilter] = useState<TxnItem["type"] | "all">("all");
+  const [dateRange, setDateRange] = useState<"all" | "week" | "month" | "3months">("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // Type + date filtering happens server-side (indexed queries, smaller
+  // payloads on mobile data); only the text search stays client-side.
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      setTransactions(await getTransactions());
+      setTransactions(await getTransactions({ type: filter, range: dateRange }));
     } catch (e) {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter, dateRange]);
 
   useEffect(() => {
     load();
@@ -81,25 +78,25 @@ export default function TransactionsScreen() {
     load();
   };
 
-  const [filter, setFilter] = useState<TxnItem["type"] | "all">("all");
-  const [dateRange, setDateRange] = useState<"all" | "week" | "month" | "3months">("all");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   const data = useMemo(() => {
-    return transactions.filter((t) => {
-      const matchType = filter === "all" || t.type === filter;
-      const matchDate = isInRange(t.date, dateRange);
-      const q = query.trim().toLowerCase();
-      const matchQ =
-        !q ||
+    const q = query.trim().toLowerCase();
+    if (!q) return transactions;
+    return transactions.filter(
+      (t) =>
         t.groupName.toLowerCase().includes(q) ||
         t.type.toLowerCase().includes(q) ||
-        (t.note ?? "").toLowerCase().includes(q);
-      return matchType && matchDate && matchQ;
-    });
-  }, [transactions, filter, dateRange, query]);
+        (t.note ?? "").toLowerCase().includes(q)
+    );
+  }, [transactions, query]);
 
   async function handleExportPDF() {
     try {
@@ -286,6 +283,7 @@ export default function TransactionsScreen() {
         data={data}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -348,7 +346,7 @@ export default function TransactionsScreen() {
               <Download size={18} color={colors.textMuted} />
             </Pressable>
           </Card>
-          <Button variant="ghost" fullWidth style={{ marginTop: 16 }} onPress={() => setExportOpen(false)}>Cancel</Button>
+          <Button label="Cancel" variant="ghost" fullWidth style={{ marginTop: 16 }} onPress={() => setExportOpen(false)} />
         </View>
       </Modal>
     </SafeAreaView>

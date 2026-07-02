@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -20,20 +20,18 @@ import {
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Skeleton, SkeletonGroup } from "@/src/components/ui";
+import { Avatar } from "@/src/components/ui/Avatar";
 import { ErrorState, GroupHealthStack } from "@/src/components/common";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
-import {
-  currentUser,
-  transactions,
-} from "@/src/data/mock";
 import { getGroups } from "@/src/services/groups";
 import { getLoans } from "@/src/services/loans";
 import { getPenalties } from "@/src/services/penalties";
 import { getNotifications } from "@/src/services/notifications";
 import { getApprovals } from "@/src/services/approvals";
+import { getTransactions } from "@/src/services/transactions";
 import { getCurrentUser } from "@/src/utils/currentUser";
-import { Group, Loan, Penalty, Notice, Approval } from "@/src/types";
+import { Group, Loan, Penalty, Notice, Approval, TxnItem } from "@/src/types";
 import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
@@ -65,31 +63,37 @@ export default function Home() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [penalties, setPenalties] = useState<Penalty[]>([]);
   const [notifications, setNotifications] = useState<Notice[]>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [recentTxns, setRecentTxns] = useState<TxnItem[]>([]);
   const [myUserId, setMyUserId] = useState<string>("");
+  const [me, setMe] = useState<{ name?: string; avatar?: string }>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const user = await getCurrentUser<{ _id: string }>();
+      const user = await getCurrentUser<{ _id: string; name?: string; avatar?: string }>();
       setMyUserId(user?._id ? String(user._id) : "");
-      const [g, l, p, n, a] = await Promise.all([
+      setMe({ name: user?.name, avatar: user?.avatar });
+      const [g, l, p, n, a, t] = await Promise.all([
         getGroups(),
         getLoans({ mine: true }),
         getPenalties({ mine: true }),
         getNotifications(),
         getApprovals(),
+        getTransactions({ range: "month" }),
       ]);
       setGroups(g);
       setLoans(l);
       setPenalties(p);
       setNotifications(n);
       setApprovals(a);
+      setRecentTxns(t.slice(0, 4));
     } catch (e) {
       setError(true);
     } finally {
@@ -102,6 +106,15 @@ export default function Home() {
   const handleRetry = () => {
     load();
   };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   const myTotalSavings = groups.reduce((sum, g) => {
     const me = (g.members ?? []).find((m: any) => String(m.userId) === myUserId);
@@ -201,7 +214,11 @@ export default function Home() {
       edges={["top"]}
       testID="home-screen"
     >
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Pressable
@@ -209,13 +226,12 @@ export default function Home() {
             onPress={() => router.push("/(tabs)/profile")}
             testID="home-profile-btn"
           >
-            <Image
-              source={{ uri: currentUser.avatar }}
-              style={styles.avatar}
-            />
-            <View>
+            <Avatar name={me.name || "Member"} uri={me.avatar} size={44} />
+            <View style={{ marginLeft: 10 }}>
               <Text style={[styles.greeting, { color: colors.textMuted }]}>Hi,</Text>
-              <Text style={[styles.name, { color: colors.textMain }]}>Gilbert</Text>
+              <Text style={[styles.name, { color: colors.textMain }]}>
+                {(me.name || "Member").split(" ")[0]}
+              </Text>
             </View>
           </Pressable>
           <Pressable
@@ -369,20 +385,33 @@ export default function Home() {
 
         <View style={{ paddingHorizontal: 20 }}>
           <Card padding={8}>
-            {transactions.slice(0, 4).map((t, i) => (
-              <View key={t.id}>
-                <View style={{ paddingHorizontal: 10 }}>
-                  <TransactionRow
-                    txn={t}
-                    testID={`home-txn-${i}`}
-                    onPress={() => router.push({ pathname: "/receipt", params: { id: t.id } })}
-                  />
+            {recentTxns.length === 0 ? (
+              <Text
+                style={{
+                  color: colors.textMuted,
+                  fontSize: 13,
+                  textAlign: "center",
+                  paddingVertical: 16,
+                }}
+              >
+                No activity this month yet
+              </Text>
+            ) : (
+              recentTxns.map((t, i) => (
+                <View key={t.id}>
+                  <View style={{ paddingHorizontal: 10 }}>
+                    <TransactionRow
+                      txn={t}
+                      testID={`home-txn-${i}`}
+                      onPress={() => router.push({ pathname: "/receipt", params: { id: t.id } })}
+                    />
+                  </View>
+                  {i < recentTxns.length - 1 && (
+                    <View style={[styles.separator, { backgroundColor: colors.border }]} />
+                  )}
                 </View>
-                {i < 3 && (
-                  <View style={[styles.separator, { backgroundColor: colors.border }]} />
-                )}
-              </View>
-            ))}
+              ))
+            )}
           </Card>
         </View>
 
@@ -505,7 +534,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   user: { flexDirection: "row", alignItems: "center" },
-  avatar: { width: 44, height: 44, borderRadius: 22, marginRight: 12 },
   greeting: { fontSize: 12, fontWeight: "500" },
   name: { fontSize: 22, fontWeight: "700", letterSpacing: -0.4, marginTop: -2 },
   bell: {

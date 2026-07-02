@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
@@ -62,6 +62,7 @@ export default function Notifications() {
   const [items, setItems] = useState<Notice[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>([]);
 
   const { role } = useRole();
@@ -81,6 +82,15 @@ export default function Notifications() {
   }, []);
   useEffect(() => {
     load();
+  }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   // In-app grace reminder derived from live fee status. The
@@ -145,7 +155,10 @@ export default function Notifications() {
           </Pressable>
         }
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {grouped.today.length > 0 && (
           <>
             <Text style={[styles.group, { color: colors.textMuted }]}>TODAY</Text>

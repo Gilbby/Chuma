@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, Image } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { useTheme } from "@/src/theme/ThemeContext";
 
 interface Props {
@@ -31,7 +32,12 @@ export const Avatar: React.FC<Props> = ({ name, uri, size = 44, bg }) => {
       ]}
     >
       {uri ? (
-        <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        <Image
+          source={{ uri }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          cachePolicy="disk"
+          transition={100}
+        />
       ) : (
         <Text style={[styles.text, { color: colors.primary, fontSize: size * 0.36 }]}>
           {initials}

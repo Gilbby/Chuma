@@ -52,7 +52,7 @@ interface ReceiptParams {
 export default function ReceiptScreen() {
   const { colors, mode } = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<ReceiptParams>();
+  const params = useLocalSearchParams() as ReceiptParams;
 
   // If id passed, look up from mock; else use raw params
   const data = useMemo(() => {

@@ -9,6 +9,7 @@ import {
   Linking,
   Alert,
   TextInput,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -69,6 +70,7 @@ export default function GroupDetails() {
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [groupApprovals, setGroupApprovals] = useState<Approval[]>([]);
 
   const load = useCallback(async () => {
@@ -92,6 +94,15 @@ export default function GroupDetails() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   const cycleStatus = useMemo(() =>
     (group?.members ?? []).map((m, i) => {
@@ -157,7 +168,11 @@ export default function GroupDetails() {
         }
       />
       <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 32 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         {/* Financial overview */}
         <View style={{ paddingHorizontal: 20 }}>
           <Card padding={20} style={{ backgroundColor: colors.primary, borderColor: colors.primary }}>
@@ -264,10 +279,10 @@ export default function GroupDetails() {
           <View style={{ paddingHorizontal: 20 }}>
             <Card padding={0}>
               {group.members.slice(0, 12).map((m, i) => (
-                <View key={m.id}>
+                <View key={m.userId ?? m.id ?? m.phone ?? String(i)}>
                   <Pressable
                     onPress={() => { setSelectedMember(m); setSheetVisible(true); }}
-                    testID={`member-row-${m.id}`}
+                    testID={`member-row-${m.userId ?? m.id ?? m.phone}`}
                   >
                     <MemberRow member={m} colors={colors} />
                   </Pressable>
@@ -307,7 +322,7 @@ export default function GroupDetails() {
                 CONTRIBUTION STATUS THIS CYCLE
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {cycleStatus.map(({ member, status }) => {
+                {cycleStatus.map(({ member, status }, i) => {
                   const bg =
                     status === "paid"
                       ? colors.success
@@ -323,9 +338,9 @@ export default function GroupDetails() {
                   const firstName = member.name.split(" ")[0];
                   return (
                     <View
-                      key={member.id}
+                      key={member.userId ?? member.id ?? member.phone ?? String(i)}
                       style={{ width: 48, alignItems: "center" }}
-                      testID={`contrib-chip-${member.id}`}
+                      testID={`contrib-chip-${member.userId ?? member.id ?? member.phone ?? i}`}
                     >
                       <View
                         style={{

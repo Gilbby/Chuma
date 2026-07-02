@@ -333,7 +333,7 @@ export default function Reports() {
               <Download size={18} color={colors.textMuted} />
             </Pressable>
           </Card>
-          <Button variant="ghost" fullWidth style={{ marginTop: 16 }} onPress={() => setExportOpen(false)}>Cancel</Button>
+          <Button label="Cancel" variant="ghost" fullWidth style={{ marginTop: 16 }} onPress={() => setExportOpen(false)} />
         </View>
       </Modal>
     </SafeAreaView>
