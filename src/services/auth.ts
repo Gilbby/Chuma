@@ -42,6 +42,16 @@ export async function getMe() {
   return res;
 }
 
+export async function updateProfile(payload: {
+  name?: string;
+  avatar?: string;
+  preferredPayment?: { method?: string; accountName?: string; accountNumber?: string };
+}): Promise<any> {
+  const res = await api<{ user: any }>("/auth/profile", { method: "PATCH", body: payload });
+  if (res?.user) await setCurrentUser(res.user); // keep cached user fresh
+  return res.user;
+}
+
 export async function logout() {
   await clearToken();
   await clearCurrentUser();
