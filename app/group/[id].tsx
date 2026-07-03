@@ -62,7 +62,7 @@ export default function GroupDetails() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [invitePhone, setInvitePhone] = useState("+260 ");
+  const [invitePhone, setInvitePhone] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [inviting, setInviting] = useState(false);
 
@@ -805,12 +805,12 @@ export default function GroupDetails() {
         visible={inviteOpen}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => { setInviteOpen(false); setInvitePhone("+260 "); setInviteError(""); }}
+        onRequestClose={() => { setInviteOpen(false); setInvitePhone(""); setInviteError(""); }}
       >
         <View style={{ flex: 1, justifyContent: "flex-end" }}>
           <Pressable
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
-            onPress={() => { setInviteOpen(false); setInvitePhone("+260 "); setInviteError(""); }}
+            onPress={() => { setInviteOpen(false); setInvitePhone(""); setInviteError(""); }}
           />
           <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
@@ -823,24 +823,35 @@ export default function GroupDetails() {
             <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 12 }}>
               PHONE NUMBER
             </Text>
-            <TextInput
-              placeholder="9XX XXX XXX"
-              keyboardType="phone-pad"
-              value={invitePhone}
-              onChangeText={(v) => { setInvitePhone(v); setInviteError(""); }}
+            <View
               style={{
+                flexDirection: "row",
+                alignItems: "center",
                 borderRadius: 12,
                 borderWidth: 1,
                 borderColor: inviteError ? colors.danger : colors.border,
-                padding: 14,
-                color: colors.textMain,
-                fontSize: 16,
+                paddingHorizontal: 14,
                 backgroundColor: colors.surface,
                 marginBottom: 6,
               }}
-              placeholderTextColor={colors.textMuted}
-              autoFocus
-            />
+            >
+              <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: "600", marginRight: 8 }}>+260</Text>
+              <TextInput
+                placeholder="97X XXX XXX"
+                keyboardType="phone-pad"
+                maxLength={9}
+                value={invitePhone}
+                onChangeText={(t) => { setInvitePhone(t.replace(/\D/g, "").slice(0, 9)); setInviteError(""); }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  color: colors.textMain,
+                  fontSize: 16,
+                }}
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+              />
+            </View>
             {inviteError ? (
               <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>
                 {inviteError}
@@ -856,21 +867,21 @@ export default function GroupDetails() {
               loading={inviting}
               disabled={inviting}
               onPress={async () => {
-                const digits = invitePhone.replace(/\D/g, "");
-                if (digits.length < 12) {
-                  setInviteError("Enter a valid Zambian number");
+                if (invitePhone.length < 9) {
+                  setInviteError("Enter a 9-digit number after +260");
                   return;
                 }
+                const full = `+260${invitePhone}`;
                 setInviting(true);
                 setInviteError("");
                 try {
                   // send the normalized phone with country code; backend also normalizes
-                  await inviteMember(id, invitePhone.trim());
+                  await inviteMember(id, full);
                   Alert.alert(
                     "Invite sent",
-                    `${invitePhone.trim()} has been invited. They'll see the invitation after signing up with this number.`
+                    `${full} has been invited. They'll see the invitation after signing up with this number.`
                   );
-                  setInvitePhone("+260 ");
+                  setInvitePhone("");
                   setInviteOpen(false);
                   await load(); // refresh so the pending member shows in the members list
                 } catch (e: any) {

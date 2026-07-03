@@ -21,7 +21,7 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { createGroup } from "@/src/services/groups";
+import { createGroup, inviteMember } from "@/src/services/groups";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X, CreditCard } from "lucide-react-native";
@@ -141,10 +141,10 @@ export default function CreateGroup() {
 
   // Post-creation invite state (used on invite screen after success)
   const [phoneInput, setPhoneInput] = useState("");
-  const [aliasInput, setAliasInput] = useState("");
-  const [aliasResult, setAliasResult] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [showInvite, setShowInvite] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
 
   // Step 5 — Review
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -215,17 +215,21 @@ export default function CreateGroup() {
     if (!result.canceled) setGroupAvatar(result.assets[0].uri);
   };
 
-  const addPhoneInvite = () => {
-    if (!phoneInput.trim()) return;
-    setInvites((prev) => [...prev, { id: `${Date.now()}`, contact: phoneInput.trim(), status: "Pending" }]);
-    setPhoneInput("");
-  };
-
-  const addAliasInvite = () => {
-    if (!aliasResult) return;
-    setInvites((prev) => [...prev, { id: `${Date.now()}`, contact: aliasResult, status: "Pending" }]);
-    setAliasInput("");
-    setAliasResult(null);
+  const addPhoneInvite = async () => {
+    if (!phoneInput) return;
+    if (!newGroupId) { setInviteError("Group not ready yet — please wait a moment."); return; }
+    if (phoneInput.length < 9) { setInviteError("Enter a 9-digit number after +260"); return; }
+    const full = `+260${phoneInput}`;
+    setInviting(true); setInviteError("");
+    try {
+      await inviteMember(newGroupId, full);
+      setInvites((prev) => [...prev, { id: `${Date.now()}`, contact: full, status: "Pending" }]);
+      setPhoneInput("");
+    } catch (e: any) {
+      setInviteError(e?.message || "Could not send invite. Please try again.");
+    } finally {
+      setInviting(false);
+    }
   };
 
   const removeInvite = (id: string) => setInvites((prev) => prev.filter((i) => i.id !== id));
@@ -316,60 +320,31 @@ export default function CreateGroup() {
                 Invite people to {groupName} by phone number. They'll get an SMS and see the invite in their app.
               </Text>
 
-              {/* TODO: send real invites to created group via backend */}
               <FL text="Invite by phone" colors={colors} />
               <View style={styles.inputActionRow}>
-                <TextInput
-                  style={[styles.inputField, { flex: 1, color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
-                  value={phoneInput}
-                  onChangeText={setPhoneInput}
-                  placeholder="+260 97X XXX XXX"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="phone-pad"
-                  testID="invite-phone-input"
-                />
+                <View style={[styles.inputRow, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>+260</Text>
+                  <TextInput
+                    style={[styles.inlineInput, { color: colors.textMain, flex: 1 }]}
+                    value={phoneInput}
+                    onChangeText={(t) => setPhoneInput(t.replace(/\D/g, "").slice(0, 9))}
+                    placeholder="97X XXX XXX"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="phone-pad"
+                    maxLength={9}
+                    testID="invite-phone-input"
+                  />
+                </View>
                 <Pressable
                   onPress={addPhoneInvite}
-                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                  disabled={inviting}
+                  style={[styles.actionBtn, { backgroundColor: colors.primary, opacity: inviting ? 0.6 : 1 }]}
                   testID="invite-phone-send"
                 >
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Send</Text>
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>{inviting ? "Sending…" : "Send"}</Text>
                 </Pressable>
               </View>
-
-              <FL text="Invite by username" colors={colors} style={{ marginTop: 16 }} />
-              <View style={styles.inputActionRow}>
-                <TextInput
-                  style={[styles.inputField, { flex: 1, color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
-                  value={aliasInput}
-                  onChangeText={(t) => { setAliasInput(t); setAliasResult(null); }}
-                  placeholder="@username"
-                  placeholderTextColor={colors.textMuted}
-                  testID="invite-alias-input"
-                />
-                <Pressable
-                  onPress={() => { if (aliasInput.trim()) setAliasResult(aliasInput.trim()); }}
-                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                  testID="invite-alias-search"
-                >
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Search</Text>
-                </Pressable>
-              </View>
-              {aliasResult && (
-                <Card padding={12} style={{ marginTop: 8 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <View style={[styles.aliasAvatar, { backgroundColor: colors.primarySoft }]}>
-                      <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 14 }}>
-                        {aliasResult.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <Text style={{ color: colors.textMain, fontWeight: "600", flex: 1, marginLeft: 10 }}>{aliasResult}</Text>
-                    <Pressable onPress={addAliasInvite} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
-                      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Add</Text>
-                    </Pressable>
-                  </View>
-                </Card>
-              )}
+              {inviteError ? <Text style={[styles.errText, { color: colors.danger }]}>{inviteError}</Text> : null}
 
               {invites.length > 0 && (
                 <>
@@ -1254,13 +1229,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-  },
-  aliasAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
   },
   statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   infoNote: { marginTop: 20, padding: 14, borderRadius: 14 },

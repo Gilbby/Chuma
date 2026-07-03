@@ -149,12 +149,34 @@ export default function Reports() {
     }
   }
 
-  const loanAnalytics = [
-    { label: "Q1", value: 32 },
-    { label: "Q2", value: 41 },
-    { label: "Q3", value: 38 },
-    { label: "Q4", value: 56 },
-  ];
+  // Disbursements binned into the trailing 4 calendar quarters (oldest → current)
+  const loanAnalytics = (() => {
+    const now = new Date();
+    const curQ = Math.floor(now.getMonth() / 3); // 0-3
+    const curY = now.getFullYear();
+    return Array.from({ length: 4 }, (_, idx) => {
+      const i = 3 - idx; // quarters back from current: 3,2,1,0
+      let q = curQ - i;
+      let y = curY;
+      while (q < 0) {
+        q += 4;
+        y -= 1;
+      }
+      const start = new Date(y, q * 3, 1);
+      const end = new Date(y, q * 3 + 3, 1); // exclusive upper bound
+      const total = loans.reduce((sum, loan) => {
+        return (
+          sum +
+          loan.history.reduce((s, h) => {
+            if (h.type !== "disbursement") return s;
+            const d = new Date(h.date);
+            return d >= start && d < end ? s + h.amount : s;
+          }, 0)
+        );
+      }, 0);
+      return { label: `Q${q + 1}`, value: Math.round(total / 1000) };
+    });
+  })();
 
   if (loading) {
     return (
@@ -246,7 +268,7 @@ export default function Reports() {
           </View>
         </Card>
 
-        {/* Loan analytics — TODO: backend, quarterly issuance isn't derivable from current mock */}
+        {/* Loan analytics */}
         <Card padding={20} style={{ marginTop: 14 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Loans issued</Text>
           <Text style={[styles.cardSub, { color: colors.textMuted }]}>By quarter (K thousands)</Text>
