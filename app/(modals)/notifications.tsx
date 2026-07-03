@@ -7,8 +7,8 @@ import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Notice, Group } from "@/src/types";
-import { getNotifications, markAllNotificationsRead } from "@/src/services/notifications";
-import { getGroups } from "@/src/services/groups";
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from "@/src/services/notifications";
+import { getGroups, acceptInvite } from "@/src/services/groups";
 import { getGraceInfo, getAmountOwed, getMonthsOwed } from "@/src/services/groupFees";
 import { useRole } from "@/src/hooks/useRole";
 import { formatZMW } from "@/src/utils/currency";
@@ -139,6 +139,24 @@ export default function Notifications() {
     setItems((p) => p.map((n) => ({ ...n, read: true })));
   };
 
+  const handleAcceptInvite = async (n: Notice) => {
+    try {
+      if (n.groupId) await acceptInvite(n.groupId);
+      await markNotificationRead(n.id);
+      setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)));
+      setDismissed((d) => [...d, n.id]);
+      Alert.alert("Joined", `You joined ${n.groupName}.`);
+    } catch (e: any) {
+      Alert.alert("Could not join", e?.message || "Please try again.");
+    }
+  };
+
+  const handleDeclineInvite = async (n: Notice) => {
+    try { await markNotificationRead(n.id); } catch {}
+    setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)));
+    setDismissed((d) => [...d, n.id]);
+  };
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -168,11 +186,8 @@ export default function Notifications() {
                 n={n}
                 colors={colors}
                 onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
-                onAccept={() => {
-                  setDismissed((d) => [...d, n.id]);
-                  Alert.alert("Joined", `You joined ${n.groupName}`);
-                }}
-                onDecline={() => setDismissed((d) => [...d, n.id])}
+                onAccept={() => handleAcceptInvite(n)}
+                onDecline={() => handleDeclineInvite(n)}
                 onPayPenalty={() => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
                   router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
@@ -192,11 +207,8 @@ export default function Notifications() {
                 n={n}
                 colors={colors}
                 onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
-                onAccept={() => {
-                  setDismissed((d) => [...d, n.id]);
-                  Alert.alert("Joined", `You joined ${n.groupName}`);
-                }}
-                onDecline={() => setDismissed((d) => [...d, n.id])}
+                onAccept={() => handleAcceptInvite(n)}
+                onDecline={() => handleDeclineInvite(n)}
                 onPayPenalty={() => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
                   router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
