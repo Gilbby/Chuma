@@ -24,7 +24,7 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
-import { getGroupById } from "@/src/services/groups";
+import { getGroupById, inviteMember } from "@/src/services/groups";
 import { getApprovals } from "@/src/services/approvals";
 import { getGroupTransactions } from "@/src/services/transactions";
 import { getLoans } from "@/src/services/loans";
@@ -64,6 +64,7 @@ export default function GroupDetails() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitePhone, setInvitePhone] = useState("+260 ");
   const [inviteError, setInviteError] = useState("");
+  const [inviting, setInviting] = useState(false);
 
   const { role } = useRole();
   const insets = useSafeAreaInsets();
@@ -852,19 +853,31 @@ export default function GroupDetails() {
             <View style={{ height: inviteError ? 20 : 0 }} />
             <Button
               label="Send invite"
-              onPress={() => {
+              loading={inviting}
+              disabled={inviting}
+              onPress={async () => {
                 const digits = invitePhone.replace(/\D/g, "");
                 if (digits.length < 12) {
                   setInviteError("Enter a valid Zambian number");
                   return;
                 }
-                Alert.alert(
-                  "Invite sent",
-                  `An SMS invite has been sent to ${invitePhone.trim()}. They will see the invitation in their notifications and groups screen.`
-                );
-                setInvitePhone("+260 ");
+                setInviting(true);
                 setInviteError("");
-                setInviteOpen(false);
+                try {
+                  // send the normalized phone with country code; backend also normalizes
+                  await inviteMember(id, invitePhone.trim());
+                  Alert.alert(
+                    "Invite sent",
+                    `${invitePhone.trim()} has been invited. They'll see the invitation after signing up with this number.`
+                  );
+                  setInvitePhone("+260 ");
+                  setInviteOpen(false);
+                  await load(); // refresh so the pending member shows in the members list
+                } catch (e: any) {
+                  setInviteError(e?.message || "Could not send invite. Please try again.");
+                } finally {
+                  setInviting(false);
+                }
               }}
               testID="members-invite-send-btn"
             />

@@ -43,3 +43,11 @@ export async function payGroupFee(groupId: string, payerPhone?: string): Promise
     body: payerPhone ? { payerPhone } : {},
   });
 }
+
+export async function inviteMember(
+  groupId: string,
+  phone: string,
+  role: string = "Member"
+): Promise<{ message: string }> {
+  return api(`/groups/${groupId}/invite`, { method: "POST", body: { phone, role } });
+}
