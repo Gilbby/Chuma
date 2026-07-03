@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import * as Clipboard from "expo-clipboard";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
@@ -96,7 +95,6 @@ interface Invite {
 export default function CreateGroup() {
   const { colors } = useTheme();
   const router = useRouter();
-  const inviteCode = useRef(Math.random().toString(36).slice(2, 8).toUpperCase());
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -146,7 +144,6 @@ export default function CreateGroup() {
   const [aliasInput, setAliasInput] = useState("");
   const [aliasResult, setAliasResult] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
 
   // Step 5 — Review
@@ -216,12 +213,6 @@ export default function CreateGroup() {
       quality: 0.8,
     });
     if (!result.canceled) setGroupAvatar(result.assets[0].uri);
-  };
-
-  const handleCopyLink = async () => {
-    try { await Clipboard.setStringAsync(`CHUMA-${inviteCode.current}`); } catch {}
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   const addPhoneInvite = () => {
@@ -379,20 +370,6 @@ export default function CreateGroup() {
                   </View>
                 </Card>
               )}
-
-              <Pressable onPress={handleCopyLink} style={{ marginTop: 20 }} testID="invite-copy-link">
-                <Card padding={14}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <View>
-                      <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>Share invite link</Text>
-                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>CHUMA-{inviteCode.current}</Text>
-                    </View>
-                    <Text style={{ color: linkCopied ? colors.success : colors.primary, fontWeight: "700", fontSize: 13 }}>
-                      {linkCopied ? "Copied!" : "Copy"}
-                    </Text>
-                  </View>
-                </Card>
-              </Pressable>
 
               {invites.length > 0 && (
                 <>
