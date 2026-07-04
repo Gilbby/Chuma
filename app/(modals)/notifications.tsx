@@ -192,7 +192,12 @@ export default function Notifications() {
                 onDecline={() => handleDeclineInvite(n)}
                 onPayPenalty={n.penaltyId ? () => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
-                  router.push({ pathname: "/penalty-pay", params: { penaltyId: String(n.penaltyId) } });
+                  router.push({ pathname: "/penalty-pay", params: {
+                    penaltyId: String(n.penaltyId),
+                    amount: String(n.penaltyAmount),
+                    reason: String(n.penaltyReason),
+                    groupName: n.groupName ?? "",
+                  }});
                 } : undefined}
                 onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
                 tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
@@ -213,7 +218,12 @@ export default function Notifications() {
                 onDecline={() => handleDeclineInvite(n)}
                 onPayPenalty={n.penaltyId ? () => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
-                  router.push({ pathname: "/penalty-pay", params: { penaltyId: String(n.penaltyId) } });
+                  router.push({ pathname: "/penalty-pay", params: {
+                    penaltyId: String(n.penaltyId),
+                    amount: String(n.penaltyAmount),
+                    reason: String(n.penaltyReason),
+                    groupName: n.groupName ?? "",
+                  }});
                 } : undefined}
                 onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
                 tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
