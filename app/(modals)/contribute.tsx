@@ -26,7 +26,7 @@ import { getCurrentUser } from "@/src/utils/currentUser";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { Group } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, ChevronDown, Receipt, AlertTriangle, Lock } from "lucide-react-native";
+import { Check, ChevronDown, Receipt, AlertTriangle, Lock, Clock } from "lucide-react-native";
 
 type Step = "entry" | "confirm" | "success";
 
@@ -62,6 +62,7 @@ export default function Contribute() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [serverTxn, setServerTxn] = useState<any>(null);
   const receiptId = useRef(
     `CHM-${Math.floor(Math.random() * 90000) + 10000}`
   );
@@ -117,7 +118,17 @@ export default function Contribute() {
   }
 
   if (step === "success") {
-    return <SuccessScreen amount={num} group={selectedGroup.name} colors={colors} router={router} receiptId={receiptId.current} />;
+    return (
+      <SuccessScreen
+        amount={num}
+        group={selectedGroup.name}
+        colors={colors}
+        router={router}
+        receiptId={serverTxn?.receiptId ?? receiptId.current}
+        status={serverTxn?.status ?? "completed"}
+        isCash={payCash}
+      />
+    );
   }
 
   return (
@@ -368,13 +379,14 @@ export default function Contribute() {
                   setSubmitting(true);
                   setSubmitError("");
                   try {
-                    await submitContribution({
+                    const res = await submitContribution({
                       groupId: selectedGroup.id,
                       amount: num,
                       contributionType: type.label === "Top-up" ? "topup" : "cycle",
                       paymentMethod: paymentMethodLabel,
                       payerPhone,
                     });
+                    setServerTxn(res.transaction);
                     setStep("success");
                   } catch (e: any) {
                     setSubmitError(e?.message || "Payment failed. Please try again.");
@@ -458,84 +470,107 @@ const SuccessScreen = ({
   colors,
   router,
   receiptId,
+  status,
+  isCash,
 }: {
   amount: number;
   group: string;
   colors: ReturnType<typeof useTheme>["colors"];
   router: ReturnType<typeof useRouter>;
   receiptId: string;
-}) => (
-  <SafeAreaView
-    style={{ flex: 1, backgroundColor: colors.background }}
-    edges={["top"]}
-    testID="contribute-success"
-  >
-    <View style={styles.successWrap}>
-      <View style={[styles.successCircle, { backgroundColor: colors.primary }]}>
-        <Check size={56} color="#fff" strokeWidth={3} />
-      </View>
-      <Text style={{ color: colors.textMain, fontSize: 24, fontWeight: "700", letterSpacing: -0.4 }}>
-        Contribution received
-      </Text>
-      <Text
-        style={{
-          color: colors.textMuted,
-          fontSize: 14,
-          marginTop: 8,
-          textAlign: "center",
-          paddingHorizontal: 40,
-        }}
-      >
-        Your contribution of {formatZMW(amount)} to {group} has been recorded.
-      </Text>
+  status: "completed" | "pending" | string;
+  isCash: boolean;
+}) => {
+  const pending = status === "pending";
+  const title = !pending
+    ? "Contribution received"
+    : isCash
+      ? "Awaiting treasurer confirmation"
+      : "Payment processing";
+  const message = !pending
+    ? `Your contribution of ${formatZMW(amount)} to ${group} has been recorded and your savings updated.`
+    : isCash
+      ? `Your ${formatZMW(amount)} cash contribution to ${group} has been recorded. Your savings will update once the treasurer confirms receiving the cash.`
+      : `Approve the ${formatZMW(amount)} payment on your phone. Your savings in ${group} will update as soon as the payment is confirmed — usually within seconds.`;
+  return (
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={["top"]}
+      testID="contribute-success"
+    >
+      <View style={styles.successWrap}>
+        <View style={[styles.successCircle, { backgroundColor: pending ? colors.warning : colors.primary }]}>
+          {pending ? (
+            <Clock size={56} color="#fff" strokeWidth={2.5} />
+          ) : (
+            <Check size={56} color="#fff" strokeWidth={3} />
+          )}
+        </View>
+        <Text style={{ color: colors.textMain, fontSize: 24, fontWeight: "700", letterSpacing: -0.4, textAlign: "center", paddingHorizontal: 24 }}>
+          {title}
+        </Text>
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 14,
+            marginTop: 8,
+            textAlign: "center",
+            paddingHorizontal: 40,
+          }}
+        >
+          {message}
+        </Text>
 
-      <View style={{ width: "100%", paddingHorizontal: 24, marginTop: 28 }}>
-        <Card padding={16}>
-          <View style={styles.rowBetween}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Receipt size={18} color={colors.primary} />
-              <Text style={{ color: colors.textMain, fontWeight: "600", marginLeft: 8 }}>
-                Receipt {receiptId}
+        <View style={{ width: "100%", paddingHorizontal: 24, marginTop: 28 }}>
+          <Card padding={16}>
+            <View style={styles.rowBetween}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Receipt size={18} color={colors.primary} />
+                <Text style={{ color: colors.textMain, fontWeight: "600", marginLeft: 8 }}>
+                  Receipt {receiptId}
+                </Text>
+              </View>
+              <Text style={{ color: pending ? colors.warning : colors.primary, fontWeight: "700", fontSize: 13 }}>
+                {pending ? "Pending" : "Saved"}
               </Text>
             </View>
-            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>Saved</Text>
-          </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>Updated savings balance</Text>
-          <Text style={{ color: colors.textMain, fontSize: 20, fontWeight: "700", marginTop: 4 }}>
-            {formatZMW(18450 + amount)}
-          </Text>
-        </Card>
-      </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>Contribution amount</Text>
+            <Text style={{ color: colors.textMain, fontSize: 20, fontWeight: "700", marginTop: 4 }}>
+              {formatZMW(amount)}
+            </Text>
+          </Card>
+        </View>
 
-      <View style={{ flex: 1 }} />
+        <View style={{ flex: 1 }} />
 
-      <View style={{ width: "100%", paddingHorizontal: 24 }}>
-        <Button
-          label="View & share receipt"
-          onPress={() =>
-            router.replace({
-              pathname: "/receipt",
-              params: {
-                amount: String(amount),
-                type: "contribution",
-                group,
-                date: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
-                note: "Cycle contribution",
-                status: "completed",
-                direction: "out",
-                txnId: receiptId,
-              },
-            })
-          }
-          testID="contribute-receipt-btn"
-        />
-        <View style={{ height: 10 }} />
-        <Button label="Done" variant="ghost" onPress={() => router.replace("/(tabs)")} testID="contribute-done-btn" />
+        <View style={{ width: "100%", paddingHorizontal: 24 }}>
+          <Button
+            label="View & share receipt"
+            onPress={() =>
+              router.replace({
+                pathname: "/receipt",
+                params: {
+                  amount: String(amount),
+                  type: "contribution",
+                  group,
+                  date: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
+                  note: "Cycle contribution",
+                  status,
+                  direction: "out",
+                  txnId: receiptId,
+                },
+              })
+            }
+            testID="contribute-receipt-btn"
+          />
+          <View style={{ height: 10 }} />
+          <Button label="Done" variant="ghost" onPress={() => router.replace("/(tabs)")} testID="contribute-done-btn" />
+        </View>
       </View>
-    </View>
-  </SafeAreaView>
-);
+    </SafeAreaView>
+  );
+};
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 20 },

@@ -8,6 +8,7 @@ import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Notice, Group } from "@/src/types";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "@/src/services/notifications";
+import { confirmCashContribution, retryPayout } from "@/src/services/transactions";
 import { getGroups, acceptInvite } from "@/src/services/groups";
 import { getGraceInfo, getAmountOwed, getMonthsOwed } from "@/src/services/groupFees";
 import { useRole } from "@/src/hooks/useRole";
@@ -159,6 +160,36 @@ export default function Notifications() {
     setDismissed((d) => [...d, n.id]);
   };
 
+  const handleCashReceipt = async (n: Notice, received: boolean) => {
+    try {
+      if (n.transactionId) await confirmCashContribution(n.transactionId, received);
+      await markNotificationRead(n.id);
+      setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)));
+      Alert.alert(
+        received ? "Cash confirmed" : "Marked not received",
+        received
+          ? "The member's savings have been updated."
+          : "The contribution was declined and no savings were credited."
+      );
+    } catch (e: any) {
+      Alert.alert("Could not update", e?.message || "Please try again.");
+    }
+  };
+
+  const handleRetryPayout = async (n: Notice) => {
+    try {
+      if (n.transactionId) await retryPayout(n.transactionId);
+      await markNotificationRead(n.id);
+      setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)));
+      Alert.alert(
+        "Payout re-sent",
+        "A new payout has been initiated. The member will be notified once it lands in their wallet."
+      );
+    } catch (e: any) {
+      Alert.alert("Retry failed", e?.message || "Please try again.");
+    }
+  };
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -190,6 +221,9 @@ export default function Notifications() {
                 onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
                 onAccept={() => handleAcceptInvite(n)}
                 onDecline={() => handleDeclineInvite(n)}
+                onCashConfirm={() => handleCashReceipt(n, true)}
+                onCashDecline={() => handleCashReceipt(n, false)}
+                onRetryPayout={() => handleRetryPayout(n)}
                 onPayPenalty={n.penaltyId ? () => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
                   router.push({ pathname: "/penalty-pay", params: {
@@ -216,6 +250,9 @@ export default function Notifications() {
                 onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
                 onAccept={() => handleAcceptInvite(n)}
                 onDecline={() => handleDeclineInvite(n)}
+                onCashConfirm={() => handleCashReceipt(n, true)}
+                onCashDecline={() => handleCashReceipt(n, false)}
+                onRetryPayout={() => handleRetryPayout(n)}
                 onPayPenalty={n.penaltyId ? () => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
                   router.push({ pathname: "/penalty-pay", params: {
@@ -244,6 +281,9 @@ const NotifCard = ({
   onDecline,
   onPayPenalty,
   onPayFee,
+  onCashConfirm,
+  onCashDecline,
+  onRetryPayout,
   tintOverride,
 }: {
   n: Notice;
@@ -253,9 +293,21 @@ const NotifCard = ({
   onDecline?: () => void;
   onPayPenalty?: () => void;
   onPayFee?: () => void;
+  onCashConfirm?: () => void;
+  onCashDecline?: () => void;
+  onRetryPayout?: () => void;
   tintOverride?: string;
 }) => {
   const Icon = ICONS[n.type] ?? Banknote;
+  // Treasurer/chairperson action card: acknowledge physical cash receipt
+  const isCashReceipt =
+    n.type === "contribution" && !!n.transactionId && n.title.includes("confirm receipt");
+  // Admin action card: a loan-disbursement / share-out payout failed at the
+  // provider — only admin copies carry a transactionId to act on.
+  const isFailedPayout =
+    !!n.transactionId &&
+    /^(Loan disbursement|Share-out payout) failed$/.test(n.title) &&
+    n.body.includes("please retry");
   const tint = TINTS[n.type];
   const tintColor = tintOverride ?? (
     tint === "primary"
@@ -318,6 +370,38 @@ const NotifCard = ({
                 fullWidth={false}
                 onPress={onAccept}
                 testID={`notif-accept-${n.id}`}
+              />
+            </View>
+          )}
+          {isCashReceipt && !n.read && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <Button
+                label="Not received"
+                variant="outline"
+                size="sm"
+                fullWidth={false}
+                onPress={onCashDecline}
+                testID={`cash-decline-${n.id}`}
+              />
+              <Button
+                label="Confirm receipt"
+                variant="primary"
+                size="sm"
+                fullWidth={false}
+                onPress={onCashConfirm}
+                testID={`cash-confirm-${n.id}`}
+              />
+            </View>
+          )}
+          {isFailedPayout && !n.read && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <Button
+                label="Retry payout"
+                variant="primary"
+                size="sm"
+                fullWidth={false}
+                onPress={onRetryPayout}
+                testID={`retry-payout-${n.id}`}
               />
             </View>
           )}

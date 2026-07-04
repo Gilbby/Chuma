@@ -10,7 +10,7 @@ import { payPenalty } from "@/src/services/penalties";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, Receipt } from "lucide-react-native";
+import { Check, Clock, Receipt } from "lucide-react-native";
 
 type Step = "confirm" | "success";
 
@@ -30,6 +30,7 @@ export default function PenaltyPay() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [alreadyPaid, setAlreadyPaid] = useState(false);
+  const [resultTxn, setResultTxn] = useState<any>(null);
   const receiptId = useRef(`CHM-${Math.floor(Math.random() * 90000) + 10000}`);
 
   const load = useCallback(async () => {
@@ -84,7 +85,8 @@ export default function PenaltyPay() {
         group={groupName!}
         colors={colors}
         router={router}
-        receiptId={receiptId.current}
+        receiptId={resultTxn?.receiptId ?? receiptId.current}
+        pending={resultTxn?.status === "pending"}
       />
     );
   }
@@ -157,7 +159,8 @@ export default function PenaltyPay() {
             setSubmitting(true);
             setError("");
             try {
-              await payPenalty(String(penaltyId));
+              const res = await payPenalty(String(penaltyId));
+              setResultTxn(res?.transaction ?? null);
               setStep("success");
             } catch (e: any) {
               const msg = e?.message || "";
@@ -200,12 +203,14 @@ const SuccessScreen = ({
   colors,
   router,
   receiptId,
+  pending,
 }: {
   amount: number;
   group: string;
   colors: ReturnType<typeof useTheme>["colors"];
   router: ReturnType<typeof useRouter>;
   receiptId: string;
+  pending: boolean;
 }) => (
   <SafeAreaView
     style={{ flex: 1, backgroundColor: colors.background }}
@@ -213,11 +218,15 @@ const SuccessScreen = ({
     testID="penalty-pay-success"
   >
     <View style={styles.successWrap}>
-      <View style={[styles.successCircle, { backgroundColor: colors.primary }]}>
-        <Check size={56} color="#fff" strokeWidth={3} />
+      <View style={[styles.successCircle, { backgroundColor: pending ? colors.warning : colors.primary }]}>
+        {pending ? (
+          <Clock size={56} color="#fff" strokeWidth={2.5} />
+        ) : (
+          <Check size={56} color="#fff" strokeWidth={3} />
+        )}
       </View>
       <Text style={{ color: colors.textMain, fontSize: 24, fontWeight: "700", letterSpacing: -0.4 }}>
-        Penalty paid
+        {pending ? "Payment processing" : "Penalty paid"}
       </Text>
       <Text
         style={{
@@ -228,7 +237,9 @@ const SuccessScreen = ({
           paddingHorizontal: 40,
         }}
       >
-        Your penalty payment of {formatZMW(amount)} to {group} has been recorded.
+        {pending
+          ? `Approve the ${formatZMW(amount)} payment on your phone. The penalty will be marked paid as soon as the payment is confirmed.`
+          : `Your penalty payment of ${formatZMW(amount)} to ${group} has been recorded.`}
       </Text>
 
       <View style={{ width: "100%", paddingHorizontal: 24, marginTop: 28 }}>
@@ -240,7 +251,9 @@ const SuccessScreen = ({
                 Receipt {receiptId}
               </Text>
             </View>
-            <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>Saved</Text>
+            <Text style={{ color: pending ? colors.warning : colors.primary, fontWeight: "700", fontSize: 13 }}>
+              {pending ? "Pending" : "Saved"}
+            </Text>
           </View>
         </Card>
       </View>

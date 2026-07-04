@@ -164,4 +164,5 @@ export interface Notice {
   penaltyAmount?: number;
   penaltyReason?: string;
   penaltyId?: string;
+  transactionId?: string;
 }

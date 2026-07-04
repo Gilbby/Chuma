@@ -45,6 +45,30 @@ export async function submitContribution(payload: {
   contributionType: "cycle" | "topup";
   paymentMethod: string;
   payerPhone?: string;
-}): Promise<{ transaction: any }> {
+}): Promise<{ transaction: any; message?: string }> {
   return api("/contributions", { method: "POST", body: payload });
+}
+
+/**
+ * Treasurer/chairperson acknowledges (or declines) physical receipt of a
+ * Cash contribution. Confirming credits the member's savings.
+ */
+export async function confirmCashContribution(
+  transactionId: string,
+  received: boolean
+): Promise<{ transaction: any }> {
+  return api(`/contributions/${transactionId}/confirm-cash`, {
+    method: "POST",
+    body: { received },
+  });
+}
+
+/**
+ * Treasurer/chairperson re-sends a FAILED loan-disbursement or share-out
+ * payout. Returns the fresh pending transaction.
+ */
+export async function retryPayout(
+  transactionId: string
+): Promise<{ transaction: any }> {
+  return api(`/transactions/${transactionId}/retry-payout`, { method: "POST" });
 }

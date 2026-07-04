@@ -12,7 +12,7 @@ import { Group } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { detectNetwork } from "@/src/services/mobileMoney";
-import { Check, CalendarClock } from "lucide-react-native";
+import { Check, Clock, CalendarClock } from "lucide-react-native";
 
 type Receipt = {
   amount: number;
@@ -23,6 +23,8 @@ type Receipt = {
   groupName: string;
   paidThrough: string;
   date: string;
+  receiptId?: string;
+  pending?: boolean;
 };
 
 export default function GroupFeeScreen() {
@@ -110,19 +112,23 @@ export default function GroupFeeScreen() {
           contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Success check */}
+          {/* Success / processing check */}
           <View style={{ alignItems: "center", paddingTop: 16, paddingBottom: 8 }}>
             <View
               style={{
                 width: 80,
                 height: 80,
                 borderRadius: 40,
-                backgroundColor: colors.success + "20",
+                backgroundColor: (receipt.pending ? colors.warning : colors.success) + "20",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Check size={40} color={colors.success} strokeWidth={2.5} />
+              {receipt.pending ? (
+                <Clock size={40} color={colors.warning} strokeWidth={2.5} />
+              ) : (
+                <Check size={40} color={colors.success} strokeWidth={2.5} />
+              )}
             </View>
             <Text
               style={{
@@ -133,16 +139,18 @@ export default function GroupFeeScreen() {
                 marginTop: 16,
               }}
             >
-              Payment successful
+              {receipt.pending ? "Payment processing" : "Payment successful"}
             </Text>
             <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 4 }}>
-              {receipt.groupName} reactivated
+              {receipt.pending
+                ? `Approve the payment on your phone — ${receipt.groupName} reactivates once it's confirmed`
+                : `${receipt.groupName} reactivated`}
             </Text>
           </View>
 
           {/* Receipt card */}
           <Card padding={16} style={{ marginTop: 20 }}>
-            <ReceiptRow label="Receipt no." value={receiptRef.current} colors={colors} />
+            <ReceiptRow label="Receipt no." value={receipt.receiptId ?? receiptRef.current} colors={colors} />
             <ReceiptRow label="Amount paid" value={formatZMW(receipt.amount)} colors={colors} />
             <ReceiptRow
               label="Months cleared"
@@ -169,7 +177,11 @@ export default function GroupFeeScreen() {
               }
             />
             <ReceiptRow label="Number" value={receipt.phone} colors={colors} />
-            <ReceiptRow label="Paid until" value={paidUntilLabel} colors={colors} />
+            <ReceiptRow
+              label="Paid until"
+              value={receipt.pending ? "Updates on confirmation" : paidUntilLabel}
+              colors={colors}
+            />
             <ReceiptRow label="Date" value={receipt.date} colors={colors} />
             <ReceiptRow
               label="Status"
@@ -178,14 +190,20 @@ export default function GroupFeeScreen() {
               valueNode={
                 <View
                   style={{
-                    backgroundColor: colors.success + "20",
+                    backgroundColor: (receipt.pending ? colors.warning : colors.success) + "20",
                     borderRadius: 999,
                     paddingHorizontal: 10,
                     paddingVertical: 3,
                   }}
                 >
-                  <Text style={{ color: colors.success, fontSize: 12, fontWeight: "700" }}>
-                    Active
+                  <Text
+                    style={{
+                      color: receipt.pending ? colors.warning : colors.success,
+                      fontSize: 12,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {receipt.pending ? "Processing" : "Active"}
                   </Text>
                 </View>
               }
@@ -245,6 +263,9 @@ export default function GroupFeeScreen() {
     try {
       const res = await payGroupFee(group.id, me?.phone);
       const r = res?.receipt ?? {};
+      // While the payment is processing, paidThrough hasn't advanced yet —
+      // the settlement service extends it once PawaPay confirms.
+      const pending = !r.paidThrough;
       const paidThrough =
         r.paidThrough ?? res?.group?.feePaidThrough ?? group.feePaidThrough ?? new Date().toISOString().split("T")[0];
       setReceipt({
@@ -260,6 +281,8 @@ export default function GroupFeeScreen() {
           month: "short",
           year: "numeric",
         }),
+        receiptId: r.receiptId,
+        pending,
       });
       setPaid(true);
     } catch (e: any) {

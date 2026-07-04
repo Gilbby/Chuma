@@ -20,7 +20,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { getLoans, repayLoan } from "@/src/services/loans";
 import { Loan } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
-import { Check } from "lucide-react-native";
+import { Check, Clock } from "lucide-react-native";
 
 export default function Repay() {
   const { colors } = useTheme();
@@ -32,6 +32,7 @@ export default function Repay() {
   const [mode, setMode] = useState<"installment" | "full" | "custom">("installment");
   const [custom, setCustom] = useState("500");
   const [success, setSuccess] = useState(false);
+  const [resultTxn, setResultTxn] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -104,6 +105,7 @@ export default function Repay() {
   }
 
   if (success) {
+    const pending = resultTxn?.status === "pending";
     return (
       <SafeAreaView
         style={{ flex: 1, backgroundColor: colors.background }}
@@ -111,11 +113,15 @@ export default function Repay() {
         testID="repay-success"
       >
         <View style={styles.successWrap}>
-          <View style={[styles.successCircle, { backgroundColor: colors.primary }]}>
-            <Check size={56} color="#fff" strokeWidth={3} />
+          <View style={[styles.successCircle, { backgroundColor: pending ? colors.warning : colors.primary }]}>
+            {pending ? (
+              <Clock size={56} color="#fff" strokeWidth={2.5} />
+            ) : (
+              <Check size={56} color="#fff" strokeWidth={3} />
+            )}
           </View>
           <Text style={{ color: colors.textMain, fontSize: 24, fontWeight: "700", letterSpacing: -0.4 }}>
-            Payment received
+            {pending ? "Payment processing" : "Payment received"}
           </Text>
           <Text
             style={{
@@ -126,7 +132,9 @@ export default function Repay() {
               paddingHorizontal: 40,
             }}
           >
-            {formatZMW(amount)} applied to your loan with {selected.groupName}.
+            {pending
+              ? `Approve the ${formatZMW(amount)} payment on your phone. It will be applied to your loan with ${selected.groupName} as soon as it's confirmed — usually within seconds.`
+              : `${formatZMW(amount)} applied to your loan with ${selected.groupName}.`}
           </Text>
           <View style={{ flex: 1 }} />
           <View style={{ width: "100%", paddingHorizontal: 24 }}>
@@ -144,9 +152,9 @@ export default function Repay() {
                     group: selected.groupName,
                     date: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
                     note: `Installment payment`,
-                    status: "completed",
+                    status: resultTxn?.status ?? "completed",
                     direction: "out",
-                    txnId: `CHM-RP-${Date.now().toString().slice(-6)}`,
+                    txnId: resultTxn?.receiptId ?? `CHM-RP-${Date.now().toString().slice(-6)}`,
                   },
                 })
               }
@@ -298,7 +306,8 @@ export default function Repay() {
             setSubmitting(true);
             setPayError("");
             try {
-              await repayLoan({ loanId: selected.id, amount });
+              const res = await repayLoan({ loanId: selected.id, amount });
+              setResultTxn(res?.transaction ?? null);
               setSuccess(true);
             } catch (e: any) {
               setPayError(e?.message || "Payment failed. Please try again.");

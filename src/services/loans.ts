@@ -95,7 +95,7 @@ export async function repayLoan(payload: {
   loanId: string;
   amount: number;
   payerPhone?: string;
-}): Promise<{ loan?: any }> {
+}): Promise<{ loan?: any; transaction?: any }> {
   const { loanId, amount, payerPhone } = payload;
   return api(`/loans/${loanId}/repay`, {
     method: "POST",

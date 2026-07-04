@@ -6,6 +6,7 @@ function mapNotice(raw: any): Notice {
     ...raw,
     id: String(raw._id),
     penaltyId: raw.penaltyId != null ? String(raw.penaltyId) : undefined,
+    transactionId: raw.transactionId != null ? String(raw.transactionId) : undefined,
   };
 }
 

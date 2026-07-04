@@ -155,8 +155,11 @@ export async function getPenalties(opts?: {
   return (res.penalties ?? []).map(mapPenalty);
 }
 
-export async function payPenalty(penaltyId: string, payerPhone?: string): Promise<void> {
-  await api(`/penalties/${penaltyId}/pay`, {
+export async function payPenalty(
+  penaltyId: string,
+  payerPhone?: string
+): Promise<{ message?: string; penalty?: any; transaction?: any }> {
+  return api(`/penalties/${penaltyId}/pay`, {
     method: "POST",
     body: payerPhone ? { payerPhone } : {},
   });
