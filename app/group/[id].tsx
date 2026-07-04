@@ -738,12 +738,18 @@ export default function GroupDetails() {
                     <Card padding={14} style={{ marginBottom: 10, backgroundColor: colors.surface }}>
                       <Pressable
                         style={{ flexDirection: "row", alignItems: "center" }}
-                        onPress={() =>
-                          Alert.alert(
-                            "Coming soon",
-                            "Violation recording will be available when the penalty system is built."
-                          )
-                        }
+                        onPress={() => {
+                          setSheetVisible(false);
+                          router.push({
+                            pathname: "/record-violation",
+                            params: {
+                              groupId: group.id,
+                              memberId: String(selectedMember.userId ?? selectedMember.id),
+                              memberName: selectedMember.name,
+                              groupName: group.name,
+                            },
+                          });
+                        }}
                         testID="member-violation-btn"
                       >
                         <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.warning + "20", alignItems: "center", justifyContent: "center" }}>
@@ -818,7 +824,7 @@ export default function GroupDetails() {
               Invite a member
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24, lineHeight: 18 }}>
-              Enter their Zambian phone number and we'll send them an SMS invitation to join {group.name}.
+              Enter their Zambian phone number and we&apos;ll send them an SMS invitation to join {group.name}.
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 12 }}>
               PHONE NUMBER

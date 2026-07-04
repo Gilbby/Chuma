@@ -142,7 +142,7 @@ export interface Penalty {
   groupName: string;
   memberId: string;
   memberName: string;
-  violationType: "lateContribution" | "missingMeeting" | "lateRepayment";
+  violationType: "lateContribution" | "missingMeeting" | "lateRepayment" | "other";
   reason: string;
   amount: number;
   fundsDestination: "group-pool" | "emergency-fund" | "welfare-account";

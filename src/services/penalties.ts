@@ -155,6 +155,20 @@ export async function getPenalties(opts?: {
   return (res.penalties ?? []).map(mapPenalty);
 }
 
+export async function recordViolation(input: {
+  groupId: string;
+  memberId: string;
+  violationType: Penalty["violationType"];
+  reason: string;
+  amount: number;
+}): Promise<Penalty> {
+  const res = await api<{ penalty: any }>("/penalties", {
+    method: "POST",
+    body: input,
+  });
+  return mapPenalty(res.penalty);
+}
+
 export async function payPenalty(
   penaltyId: string,
   payerPhone?: string

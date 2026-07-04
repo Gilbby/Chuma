@@ -16,6 +16,7 @@ const VIOLATION_LABELS: Record<Penalty["violationType"], string> = {
   lateContribution: "Late contribution",
   missingMeeting: "Missing meeting",
   lateRepayment: "Late repayment",
+  other: "Other violation",
 };
 
 function formatDate(iso: string): string {
