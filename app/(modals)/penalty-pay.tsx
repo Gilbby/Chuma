@@ -29,6 +29,7 @@ export default function PenaltyPay() {
   const [userLoading, setUserLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [alreadyPaid, setAlreadyPaid] = useState(false);
   const receiptId = useRef(`CHM-${Math.floor(Math.random() * 90000) + 10000}`);
 
   const load = useCallback(async () => {
@@ -88,6 +89,34 @@ export default function PenaltyPay() {
     );
   }
 
+  if (alreadyPaid) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        edges={["top"]}
+        testID="penalty-pay-already-paid"
+      >
+        <ScreenHeader title="Pay penalty" />
+        <View style={styles.content}>
+          <Card padding={20}>
+            <Text style={{ color: colors.textMain, fontSize: 16, fontWeight: "700" }}>
+              Already paid
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 6, lineHeight: 19 }}>
+              This penalty of {formatZMW(num)} has already been paid. Nothing more is owed.
+            </Text>
+          </Card>
+          <View style={{ flex: 1 }} />
+          <Button
+            label="Back to penalties"
+            onPress={() => router.replace("/penalties")}
+            testID="penalty-pay-already-paid-btn"
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -131,7 +160,12 @@ export default function PenaltyPay() {
               await payPenalty(String(penaltyId));
               setStep("success");
             } catch (e: any) {
-              setError(e?.message || "Payment failed. Please try again.");
+              const msg = e?.message || "";
+              if (/already.*paid/i.test(msg)) {
+                setAlreadyPaid(true);
+              } else {
+                setError(msg || "Payment failed. Please try again.");
+              }
             } finally {
               setSubmitting(false);
             }
