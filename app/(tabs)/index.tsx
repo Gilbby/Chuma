@@ -331,7 +331,7 @@ export default function Home() {
         >
           <OverviewCard
             label="Contribution due"
-            value={upcomingContribution ? formatZMW(upcomingContribution.nextContributionAmount!) : "—"}
+            value={upcomingContribution ? formatZMW(upcomingContribution.nextContributionAmount ?? upcomingContribution.contributionAmount) : "—"}
             sub={
               daysUntilDue === null
                 ? "Nothing due"

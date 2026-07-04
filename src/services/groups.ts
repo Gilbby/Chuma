@@ -10,7 +10,7 @@ function mapGroup(raw: any, currentUserId?: string): Group {
   return {
     ...raw,
     id: String(raw._id),
-    memberCount: members.length,
+    memberCount: members.filter((m: any) => m.status === "active").length,
     yourRole: mine?.role ?? "Member",
     // keep shareOutDate / nextContributionDate as ISO strings — Hermes date math
     // needs ISO; components format for display. Do NOT reformat here.
