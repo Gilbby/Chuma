@@ -190,10 +190,10 @@ export default function Notifications() {
                 onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
                 onAccept={() => handleAcceptInvite(n)}
                 onDecline={() => handleDeclineInvite(n)}
-                onPayPenalty={() => {
+                onPayPenalty={n.penaltyId ? () => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
-                  router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
-                }}
+                  router.push({ pathname: "/penalty-pay", params: { penaltyId: String(n.penaltyId) } });
+                } : undefined}
                 onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
                 tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
               />
@@ -211,10 +211,10 @@ export default function Notifications() {
                 onPress={() => setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i))}
                 onAccept={() => handleAcceptInvite(n)}
                 onDecline={() => handleDeclineInvite(n)}
-                onPayPenalty={() => {
+                onPayPenalty={n.penaltyId ? () => {
                   setItems((prev) => prev.map((i) => i.id === n.id ? { ...i, read: true } : i));
-                  router.push({ pathname: "/contribute", params: { lockedType: "penalty", lockedAmount: String(n.penaltyAmount), penaltyReason: n.penaltyReason, groupId: n.groupId } });
-                }}
+                  router.push({ pathname: "/penalty-pay", params: { penaltyId: String(n.penaltyId) } });
+                } : undefined}
                 onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
                 tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
               />
@@ -311,7 +311,7 @@ const NotifCard = ({
               />
             </View>
           )}
-          {n.type === "penalty" && !n.read && (
+          {n.type === "penalty" && !n.read && n.penaltyId && (
             <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
               <Button
                 label={`Pay K${n.penaltyAmount?.toFixed(2)}`}

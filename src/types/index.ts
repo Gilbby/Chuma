@@ -163,4 +163,5 @@ export interface Notice {
   invitedBy?: string;
   penaltyAmount?: number;
   penaltyReason?: string;
+  penaltyId?: string;
 }

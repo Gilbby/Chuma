@@ -5,6 +5,7 @@ function mapNotice(raw: any): Notice {
   return {
     ...raw,
     id: String(raw._id),
+    penaltyId: raw.penaltyId != null ? String(raw.penaltyId) : undefined,
   };
 }
 
