@@ -88,6 +88,8 @@ export default function Contribute() {
 
   const detectedNetwork = detectNetwork(payerPhone).network;
   const paymentMethodLabel = payCash ? "Cash" : detectedNetwork;
+  // "Unknown" is not a payment method the server accepts — never submit it.
+  const networkUnknown = !payCash && detectedNetwork === "Unknown";
 
   const handleAmountChange = (text: string) => {
     const cleaned = text.replace(/[^0-9.]/g, "");
@@ -285,19 +287,25 @@ export default function Contribute() {
 
               {/* Payment method (auto-detected) */}
               <View
-                style={[styles.picker, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+                style={[styles.picker, { backgroundColor: colors.surfaceSecondary, borderColor: networkUnknown ? colors.danger : colors.border }]}
                 testID="contribute-payment-detected"
               >
                 <View>
                   <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 }}>
                     FROM
                   </Text>
-                  <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600", marginTop: 4 }}>
+                  <Text style={{ color: networkUnknown ? colors.danger : colors.textMain, fontSize: 15, fontWeight: "600", marginTop: 4 }}>
                     {payCash ? "Cash" : detectedNetwork}
                   </Text>
                 </View>
                 <Lock size={14} color={colors.textMuted} />
               </View>
+              {networkUnknown && (
+                <Text style={[styles.errText, { color: colors.danger }]}>
+                  We couldn't detect a mobile money network from your phone number. Update your
+                  profile number to an MTN, Airtel or Zamtel line, or pay with cash.
+                </Text>
+              )}
 
               <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={{ flex: 1, paddingRight: 12 }}>
@@ -337,7 +345,7 @@ export default function Contribute() {
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button
                 label="Review"
-                disabled={!!minError}
+                disabled={!!minError || networkUnknown}
                 onPress={() => {
                   if (num <= 0) { setSubmitAttempted(true); return; }
                   setStep("confirm");
@@ -376,6 +384,12 @@ export default function Contribute() {
                 disabled={submitting}
                 onPress={async () => {
                   if (isPenalty) return; // handled on penalties screen
+                  if (networkUnknown) {
+                    setSubmitError(
+                      "No mobile money network detected for your number — update your profile or pay with cash."
+                    );
+                    return;
+                  }
                   setSubmitting(true);
                   setSubmitError("");
                   try {
