@@ -58,7 +58,16 @@ export async function api<T = any>(path: string, opts: Options = {}): Promise<T>
   }
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  // Never assume JSON: a proxy/tunnel error page (HTML) would otherwise throw
+  // a raw SyntaxError at the user instead of a readable message.
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (res.ok) throw new Error("Unexpected server response. Try again.");
+    }
+  }
 
   if (!res.ok) {
     // Expired/invalid session: clear credentials and return to sign-in
