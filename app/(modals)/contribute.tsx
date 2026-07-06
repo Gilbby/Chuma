@@ -22,6 +22,7 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { getGroups } from "@/src/services/groups";
 import { submitContribution } from "@/src/services/transactions";
+import { api } from "@/src/services/apiClient";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { Group } from "@/src/types";
@@ -63,6 +64,16 @@ export default function Contribute() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [serverTxn, setServerTxn] = useState<any>(null);
+  // Server-computed fee breakdown for the confirm screen — the single source of
+  // truth. Fetched from POST /pricing/preview; the client never computes fees.
+  const [pricing, setPricing] = useState<{
+    base: number;
+    platformFee: number;
+    depositAmount: number;
+    feesCovered: number;
+  } | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [pricingError, setPricingError] = useState<string | null>(null);
   const receiptId = useRef(
     `CHM-${Math.floor(Math.random() * 90000) + 10000}`
   );
@@ -98,15 +109,44 @@ export default function Contribute() {
     if (parts[1] !== undefined && parts[1].length > 2) return;
     setAmount(cleaned);
     if (submitAttempted && parseFloat(cleaned) > 0) setSubmitAttempted(false);
+    if (pricingError) setPricingError(null);
   };
 
   const num = parseFloat(amount.replace(/,/g, "")) || 0;
-  const fee = num > 0 ? Math.max(1, Math.round(num * 0.005)) : 0;
   const minError =
     !!selectedGroup && num > 0 && num < selectedGroup.contributionAmount && type.label === "Cycle contribution"
       ? `Minimum K ${selectedGroup.contributionAmount} for this cycle`
       : "";
   const displayError = (submitAttempted && num <= 0 ? "Enter a valid amount" : "") || minError;
+
+  // Review → Confirm: fetch the REAL server-computed breakdown first, and only
+  // advance once it returns. Cash is priced identically by the backend (it
+  // records the same platformFee + grossed-up depositAmount), so no cash guard.
+  const goToConfirm = async () => {
+    if (num <= 0) {
+      setSubmitAttempted(true);
+      return;
+    }
+    setPricingLoading(true);
+    setPricingError(null);
+    try {
+      const res = await api<{
+        base: number;
+        platformFee: number;
+        depositAmount: number;
+        feesCovered: number;
+      }>("/pricing/preview", {
+        method: "POST",
+        body: { kind: "contribution", amount: num },
+      });
+      setPricing(res);
+      setStep("confirm");
+    } catch (e: any) {
+      setPricingError(e?.message || "Couldn't load fees. Please try again.");
+    } finally {
+      setPricingLoading(false);
+    }
+  };
 
   if (groupsLoading || !selectedGroup) {
     return (
@@ -343,13 +383,16 @@ export default function Contribute() {
               </View>
 
               <View style={{ flex: 1, minHeight: 24 }} />
+              {pricingError ? (
+                <Text style={[styles.errText, { color: colors.danger, marginBottom: 10 }]}>
+                  {pricingError}
+                </Text>
+              ) : null}
               <Button
                 label="Review"
-                disabled={!!minError || networkUnknown}
-                onPress={() => {
-                  if (num <= 0) { setSubmitAttempted(true); return; }
-                  setStep("confirm");
-                }}
+                loading={pricingLoading}
+                disabled={!!minError || networkUnknown || pricingLoading}
+                onPress={goToConfirm}
                 testID="contribute-review-btn"
               />
             </>
@@ -358,11 +401,12 @@ export default function Contribute() {
               <Card padding={20}>
                 <Text style={[styles.confirmLabel, { color: colors.textMuted }]}>Total</Text>
                 <Text style={[styles.confirmAmount, { color: colors.textMain }]}>
-                  {formatZMW(num + fee)}
+                  {formatZMW(pricing?.depositAmount ?? num)}
                 </Text>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                <ConfirmRow label="Contribution" value={formatZMW(num)} colors={colors} />
-                <ConfirmRow label="Transaction fee" value={formatZMW(fee)} colors={colors} />
+                <ConfirmRow label="Contribution" value={formatZMW(pricing?.base ?? num)} colors={colors} />
+                <ConfirmRow label="Transaction fee" value={formatZMW(pricing?.feesCovered ?? 0)} colors={colors} />
+                <ConfirmRow label="Platform fee" value={formatZMW(pricing?.platformFee ?? 0)} colors={colors} />
                 <ConfirmRow label="Group" value={selectedGroup.name} colors={colors} />
                 <ConfirmRow label="Type" value={type.label} colors={colors} />
                 <ConfirmRow

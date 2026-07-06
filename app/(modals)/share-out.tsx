@@ -16,6 +16,7 @@ import { getPenalties } from "@/src/services/penalties";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { Group, Penalty, Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
+import { usePricingPreview, PayoutPreview } from "@/src/hooks/usePricingPreview";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
 
@@ -107,6 +108,15 @@ export default function ShareOutScreen() {
   const result = computeShareOut(members, computedProfit);
 
   const myId = myUserId;
+  const myShare = getMyShare(result.members, myId);
+
+  // What the CURRENT member will actually receive after fees, computed by the
+  // server (never on the client). Debounced; only runs once we know their share.
+  const {
+    data: payout,
+    loading: payoutLoading,
+    error: payoutError,
+  } = usePricingPreview<PayoutPreview>("payout", myShare, { enabled: myShare > 0 });
 
   function formatShareOutDate(iso: string): string {
     const d = new Date(iso);
@@ -256,8 +266,44 @@ export default function ShareOutScreen() {
           </View>
         </Card>
 
+        {/* What the current member actually receives after fees */}
+        {myShare > 0 && (
+          <Card padding={18} style={{ marginTop: 16 }} testID="shareout-net-receive">
+            {payoutLoading && !payout ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                  Calculating what you&apos;ll receive…
+                </Text>
+              </View>
+            ) : payoutError ? (
+              <Text style={{ color: colors.textMuted, fontSize: 13 }} testID="shareout-net-error">
+                Couldn&apos;t load your payout breakdown. Try again shortly.
+              </Text>
+            ) : payout?.tooSmall ? (
+              <Text style={{ color: colors.textMuted, fontSize: 13 }} testID="shareout-net-toosmall">
+                This amount is too small to pay out after fees.
+              </Text>
+            ) : payout ? (
+              <>
+                <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "600", letterSpacing: 0.3 }}>
+                  YOU&apos;LL RECEIVE
+                </Text>
+                <Text style={{ color: colors.textMain, fontSize: 28, fontWeight: "700", letterSpacing: -0.5, marginTop: 4 }}>
+                  {formatZMW(payout.netReceived)}
+                </Text>
+                <View style={[styles.netDivider, { backgroundColor: colors.border }]} />
+                <NetRow label="Owed" value={formatZMW(payout.owed)} colors={colors} />
+                <NetRow label="Transaction fee" value={formatZMW(payout.transactionFee)} colors={colors} />
+                <NetRow label="Platform fee" value={formatZMW(payout.platformFee)} colors={colors} />
+                <NetRow label="You receive" value={formatZMW(payout.netReceived)} colors={colors} last />
+              </>
+            ) : null}
+          </Card>
+        )}
+
         {/* Allocations */}
-        <Text style={[styles.label, { color: colors.textMuted }]}>MEMBER ALLOCATIONS</Text>
+        <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>MEMBER ALLOCATIONS</Text>
         <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8 }}>
           {`Profit from loan interest${penaltyIncome > 0 ? " + penalty income" : ""} this cycle`}
         </Text>
@@ -400,8 +446,31 @@ export default function ShareOutScreen() {
   );
 }
 
+const NetRow = ({
+  label,
+  value,
+  colors,
+  last,
+}: {
+  label: string;
+  value: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+  last?: boolean;
+}) => (
+  <View
+    style={[
+      { paddingVertical: 10, flexDirection: "row", justifyContent: "space-between" },
+      !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
+    ]}
+  >
+    <Text style={{ color: colors.textMuted, fontSize: 13 }}>{label}</Text>
+    <Text style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }}>{value}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 32 },
+  netDivider: { height: 1, marginVertical: 12 },
   label: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginVertical: 12 },
   heroStats: { flexDirection: "row", marginTop: 18 },
   heroStatLabel: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "500", letterSpacing: 0.3 },
