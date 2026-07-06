@@ -23,15 +23,6 @@ export async function verifyOtp(
   return res;
 }
 
-export async function submitKyc(payload: {
-  nrcNumber: string;
-  fullName: string;
-  dateOfBirth: string;
-  photoUrl?: string;
-}) {
-  return api("/auth/kyc", { method: "POST", body: payload });
-}
-
 export async function setPin(pin: string) {
   return api("/auth/pin", { method: "POST", body: { pin } });
 }

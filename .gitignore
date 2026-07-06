@@ -36,11 +36,8 @@ yarn-error.*
 .env.local
 .env*.local
 
-# Claude Code
-CLAUDE.md
-
-# docs
-CONTRIBUTING.md
+# markdown docs (not used by the app — CLAUDE.md, README, docs/*.md, etc.)
+*.md
 
 # typescript
 *.tsbuildinfo
