@@ -39,7 +39,7 @@ export interface KycStatusResult {
 }
 
 // Deep link the Didit hosted flow returns to when the user finishes. Uses the
-// app scheme from app.json ("frontend") → frontend://kyc-callback.
+// app scheme from app.json ("chuma") → chuma://kyc-callback.
 export const KYC_RETURN_URL = Linking.createURL("kyc-callback");
 
 // Ask our backend to create a Didit session. The backend configures the

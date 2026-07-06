@@ -22,6 +22,7 @@ import {
   Check,
   Users,
   AlertTriangle,
+  ShieldCheck,
 } from "lucide-react-native";
 
 const ICONS = {
@@ -32,6 +33,7 @@ const ICONS = {
   repayment: RefreshCw,
   invite: Users,
   penalty: AlertTriangle,
+  kyc: ShieldCheck,
 };
 
 function isToday(dateStr: string): boolean {
@@ -55,6 +57,7 @@ const TINTS: Record<Notice["type"], "primary" | "info" | "success" | "warning" |
   repayment: "info",
   invite: "primary",
   penalty: "warning",
+  kyc: "warning",
 };
 
 export default function Notifications() {
@@ -298,6 +301,7 @@ const NotifCard = ({
   onRetryPayout?: () => void;
   tintOverride?: string;
 }) => {
+  const router = useRouter();
   const Icon = ICONS[n.type] ?? Banknote;
   // Treasurer/chairperson action card: acknowledge physical cash receipt
   const isCashReceipt =
@@ -402,6 +406,17 @@ const NotifCard = ({
                 fullWidth={false}
                 onPress={onRetryPayout}
                 testID={`retry-payout-${n.id}`}
+              />
+            </View>
+          )}
+          {n.type === "kyc" && !n.read && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <Button
+                label="Verify now"
+                size="sm"
+                fullWidth={false}
+                onPress={() => router.push("/kyc?return=tabs" as never)}
+                testID={`kyc-verify-${n.id}`}
               />
             </View>
           )}

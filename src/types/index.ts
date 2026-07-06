@@ -153,7 +153,7 @@ export interface Penalty {
 
 export interface Notice {
   id: string;
-  type: "loan" | "contribution" | "governance" | "security" | "repayment" | "invite" | "penalty";
+  type: "loan" | "contribution" | "governance" | "security" | "repayment" | "invite" | "penalty" | "kyc";
   title: string;
   body: string;
   date: string;

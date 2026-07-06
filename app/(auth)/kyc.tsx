@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ShieldCheck, ScanFace, IdCard, Clock, AlertTriangle } from "lucide-react-native";
 import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
@@ -32,9 +32,17 @@ const TERMINAL: KycStatus[] = ["approved", "declined", "expired", "abandoned"];
 export default function Kyc() {
   const { colors } = useTheme();
   const router = useRouter();
+  // When launched from the in-app KYC nudge (return=tabs) we go back to the app
+  // afterwards; during first-time onboarding we continue to PIN setup.
+  const { return: returnTo } = useLocalSearchParams<{ return?: string }>();
+  const afterKyc = returnTo === "tabs" ? "/(tabs)" : "/pin";
+  // New-signup onboarding is a HARD gate — no skip. The in-app nudge (existing
+  // users tapping the banner/notification, return=tabs) may skip for now.
+  const canSkip = returnTo === "tabs";
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const busy = phase === "starting" || phase === "verifying" || phase === "checking";
 
@@ -67,6 +75,13 @@ export default function Kyc() {
         await setCurrentUser({ ...current, name: firstName });
       }
     }
+    // Reflect verified status in the cached user so the home KYC nudge clears.
+    const current = (await getCurrentUser<any>()) ?? {};
+    await setCurrentUser({
+      ...current,
+      name: firstName || current.name,
+      kyc: { ...(current.kyc ?? {}), status: "verified" },
+    });
     await storage.setItem("kyc_draft", {
       firstName,
       fullName: v.fullName ?? firstName,
@@ -74,7 +89,7 @@ export default function Kyc() {
       dateOfBirth: v.dateOfBirth ?? "",
       complete: true,
     });
-    router.replace("/pin");
+    router.replace(afterKyc);
   };
 
   const startVerification = async () => {
@@ -82,38 +97,65 @@ export default function Kyc() {
     setPhase("starting");
     try {
       const session = await startKycSession();
+      setSessionId(session.sessionId);
       setPhase("verifying");
       // Whether they return via the deep link or just close the browser, we
       // still check the decision — the webhook may already have landed.
       await openKycFlow(session.url);
       setPhase("checking");
       const result = await pollStatus(session.sessionId);
-
-      if (result.status === "approved" && result.verified) {
-        await applyApproved(result.verified);
-        return;
-      }
-      if (result.status === "declined") {
-        setPhase("idle");
-        setError("We couldn't verify your identity. Please try again with a clear photo of your document.");
-        return;
-      }
-      if (result.status === "expired" || result.status === "abandoned") {
-        setPhase("idle");
-        setError("Your verification session ended before it finished. Please start again.");
-        return;
-      }
-      // pending / in_review — submitted but not yet decided.
-      setPhase("review");
+      await handleResult(result);
     } catch (e: any) {
       setPhase("idle");
       setError(e?.message || "Couldn't start verification. Please try again.");
     }
   };
 
+  // Route the KYC decision. The ONLY way out of this screen is `approved`
+  // (→ applyApproved → /pin). Everything else keeps the user here — identity
+  // verification is mandatory before they can access the app.
+  const handleResult = async (result: KycStatusResult) => {
+    if (result.status === "approved" && result.verified) {
+      await applyApproved(result.verified);
+      return;
+    }
+    if (result.status === "declined") {
+      setPhase("idle");
+      setError("We couldn't verify your identity. Please try again with a clear photo of your document.");
+      return;
+    }
+    if (result.status === "expired" || result.status === "abandoned") {
+      setPhase("idle");
+      setError("Your verification session ended before it finished. Please start again.");
+      return;
+    }
+    // pending / in_review — submitted but not yet decided. Hold on the review
+    // screen until Didit returns a decision.
+    setPhase("review");
+  };
+
+  // Re-poll the existing session (used from the review screen) without
+  // reopening the Didit flow. Advances to the app only if now approved.
+  const recheck = async () => {
+    if (!sessionId) {
+      setPhase("idle");
+      return;
+    }
+    setPhase("checking");
+    try {
+      const result = await pollStatus(sessionId);
+      await handleResult(result);
+    } catch {
+      setPhase("review");
+    }
+  };
+
+  // KYC is a soft nudge, not a hard gate: the user may continue into the app
+  // without verifying now. A standing reminder stays in their inbox (and a home
+  // banner) until they complete it.
   const handleSkip = async () => {
     await storage.setItem("kyc_draft", { complete: false });
-    router.push("/pin");
+    router.replace(afterKyc);
   };
 
   // ── Review state: submitted, awaiting Didit's decision ──────────────────────
@@ -127,18 +169,29 @@ export default function Kyc() {
           </View>
           <Text style={[styles.title, { color: colors.textMain }]}>Verification in review</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
-            Your details were submitted. This usually takes a few minutes — we&apos;ll update your
-            profile automatically once it&apos;s approved.
+            Your details were submitted. This usually takes a few minutes. You&apos;ll be able to
+            continue as soon as your identity is approved.
           </Text>
           <View style={{ flex: 1 }} />
-          <Button label="Continue" onPress={handleSkip} testID="kyc-continue-btn" />
-          <View style={{ height: 10 }} />
           <Button
-            label="Check again"
-            variant="ghost"
-            onPress={startVerification}
+            label="Check status"
+            onPress={recheck}
+            loading={busy}
+            disabled={busy}
             testID="kyc-recheck-btn"
           />
+          {canSkip && (
+            <>
+              <View style={{ height: 10 }} />
+              <Button
+                label="Continue for now"
+                variant="ghost"
+                onPress={handleSkip}
+                disabled={busy}
+                testID="kyc-continue-btn"
+              />
+            </>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -202,14 +255,18 @@ export default function Kyc() {
           disabled={busy}
           testID="kyc-verify-btn"
         />
-        <View style={{ height: 10 }} />
-        <Button
-          label="I'll do this later"
-          variant="ghost"
-          onPress={handleSkip}
-          disabled={busy}
-          testID="kyc-skip-btn"
-        />
+        {canSkip && (
+          <>
+            <View style={{ height: 10 }} />
+            <Button
+              label="I'll do this later"
+              variant="ghost"
+              onPress={handleSkip}
+              disabled={busy}
+              testID="kyc-skip-btn"
+            />
+          </>
+        )}
 
         <Text style={[styles.disclaimer, { color: colors.textMuted }]}>
           Your information is encrypted and processed by Didit. It is never shared without your consent.
