@@ -91,6 +91,10 @@ export default function Profile() {
     low: colors.danger,
   }[trustBand.band];
 
+  // The demo role switcher is a testing tool — only the seeded Gilbert account
+  // may see it. Everyone else gets the role assigned to their account.
+  const isTester = String(me?.phone ?? "").replace(/\D/g, "") === "260975988642";
+
   const memberSince = (() => {
     const d = new Date(me?.joinedDate ?? "");
     if (isNaN(d.getTime())) return "—";
@@ -226,7 +230,7 @@ export default function Profile() {
           />
         </Section>
 
-        {__DEV__ && (
+        {isTester && (
           <Section title="Demo role" colors={colors}>
             <View style={{ padding: 14 }}>
               <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>

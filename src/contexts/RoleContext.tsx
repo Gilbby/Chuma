@@ -48,11 +48,11 @@ const DESCRIPTIONS: Record<Role, string> = {
 const RoleContext = createContext<RoleContextValue | undefined>(undefined);
 
 export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [role, setRoleState] = useState<Role>("Chairperson");
+  const [role, setRoleState] = useState<Role>("Member");
 
   useEffect(() => {
     (async () => {
-      const saved = await storage.getItem<string>(STORAGE_KEY, "Chairperson");
+      const saved = await storage.getItem<string>(STORAGE_KEY, "Member");
       if (saved === "Chairperson" || saved === "Treasurer" || saved === "Secretary" || saved === "Member") {
         setRoleState(saved);
       }
