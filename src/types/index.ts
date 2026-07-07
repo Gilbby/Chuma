@@ -19,6 +19,15 @@ export type GroupType =
   | "church-group"
   | "investment-group";
 
+// A repayment tier caps how long a loan may run based on its size. Loans are
+// matched to the first tier whose `maxAmount` covers the amount; the top tier
+// uses `maxAmount: null` to catch everything above the last band. This lets a
+// K200 loan be repaid quickly while a K5,000 loan gets a longer term.
+export interface LoanRepaymentTier {
+  maxAmount: number | null; // inclusive upper bound of the band; null = no cap (top tier)
+  maxMonths: number; // longest repayment term allowed for loans in this band
+}
+
 export interface GroupConstitution {
   penaltyRules: {
     lateContribution: { enabled: boolean; penaltyType: "flat" | "percent"; penaltyRate?: number; penaltyAmount?: number };
@@ -28,7 +37,11 @@ export interface GroupConstitution {
   gracePeriodDays: number;
   loanMultiplier: number;
   loanInterestRate: number;
-  loanRepaymentMonths: number;
+  loanRepaymentMonths: number; // legacy single cap — kept as a fallback
+  loanRepaymentTiers?: LoanRepaymentTier[];
+  // No new loans may be issued within this many months of share-out, so every
+  // loan is due before the cycle closes. VSLA norm is 1–2 months.
+  loanFreeWindowMonths?: number;
   internalLendingEnabled: boolean;
   approvalThreshold: "2-of-3" | "majority" | "all";
   penaltyFundsDestination?: "group-pool" | "emergency-fund" | "welfare-account";

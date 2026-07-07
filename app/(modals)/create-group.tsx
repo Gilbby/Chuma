@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -22,11 +22,12 @@ import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { createGroup, inviteMember } from "@/src/services/groups";
+import { defaultTiersForCycle, tierBandLabel } from "@/src/services/loans";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X, CreditCard } from "lucide-react-native";
 import Slider from "@react-native-community/slider";
-import type { GroupType, GroupConstitution } from "@/src/types";
+import type { GroupType, GroupConstitution, LoanRepaymentTier } from "@/src/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,8 @@ const LOAN_MULTIPLIERS = [
   { label: "3×", value: "3" },
   { label: "5×", value: "5" },
 ];
-const LOAN_REPAYMENTS = ["1 month", "3 months", "6 months", "12 months"];
+// Selectable max-term options (months) for each repayment tier.
+const TIER_TERM_OPTIONS = [1, 2, 3, 6, 9, 12];
 const PAYMENT_METHODS = ["MTN MoMo", "Airtel Money", "Zamtel Kwacha", "Bank Transfer"];
 
 const APPROVAL_THRESHOLDS: { label: string; value: GroupConstitution["approvalThreshold"] }[] = [
@@ -118,7 +120,14 @@ export default function CreateGroup() {
   const [internalLending, setInternalLending] = useState(true);
   const [loanMultiplier, setLoanMultiplier] = useState("2");
   const [loanInterest, setLoanInterest] = useState("5");
-  const [loanRepayment, setLoanRepayment] = useState("6 months");
+  // Size-based repayment tiers: bigger loans get longer terms. Amount bands are
+  // fixed; the group tunes the max term per band.
+  const [repaymentTiers, setRepaymentTiers] = useState<LoanRepaymentTier[]>(
+    () => defaultTiersForCycle(6)
+  );
+  // Stop issuing new loans within this many months of share-out so every loan
+  // clears before the cycle closes (VSLA norm is 1–2 months).
+  const [loanFreeWindow, setLoanFreeWindow] = useState(1);
   const [gracePeriod, setGracePeriod] = useState("0");
   const [lateRepayEnabled, setLateRepayEnabled] = useState(false);
   const [lateRepaymentPenaltyRate, setLateRepaymentPenaltyRate] = useState("1");
@@ -161,6 +170,19 @@ export default function CreateGroup() {
 
   const toNum = (s: string) => parseFloat(s) || 0;
   const parseMonths = (s: string) => parseInt(s.split(" ")[0]) || 6;
+
+  // Re-baseline loan repayment tiers whenever the cycle length changes, so the
+  // defaults always fit the cycle (a longer cycle allows longer loans). Skips
+  // the first render so it doesn't overwrite a user's edits on mount.
+  const cycleMonths = parseMonths(cycleDuration);
+  const didMountCycleRef = useRef(false);
+  useEffect(() => {
+    if (!didMountCycleRef.current) {
+      didMountCycleRef.current = true;
+      return;
+    }
+    setRepaymentTiers(defaultTiersForCycle(cycleMonths));
+  }, [cycleMonths]);
 
   const handleNumericInput = (text: string, setter: (v: string) => void) => {
     const cleaned = text.replace(/[^0-9.]/g, "");
@@ -282,7 +304,10 @@ export default function CreateGroup() {
         gracePeriodDays: parseInt(gracePeriod) || 0,
         loanMultiplier: parseInt(loanMultiplier) || 2,
         loanInterestRate: toNum(loanInterest) || 5,
-        loanRepaymentMonths: parseMonths(loanRepayment),
+        // Legacy single cap kept for back-compat = the longest tier term.
+        loanRepaymentMonths: Math.max(...repaymentTiers.map((t) => t.maxMonths)),
+        loanRepaymentTiers: repaymentTiers,
+        loanFreeWindowMonths: loanFreeWindow,
         internalLendingEnabled: internalLending,
         approvalThreshold,
       };
@@ -737,18 +762,65 @@ export default function CreateGroup() {
                       <Text style={{ color: colors.textMuted, fontSize: 11 }}>30% max</Text>
                     </View>
 
-                    <FL text="Repayment duration" colors={colors} style={{ marginTop: 20 }} />
+                    <FL text="Repayment terms by loan size" colors={colors} style={{ marginTop: 20 }} />
+                    <Text style={[styles.fieldHint, { color: colors.textMuted, marginBottom: 4 }]}>
+                      Tuned to your {cycleDuration} cycle — bigger loans get longer to repay, but always clear before share-out so the fund keeps circulating.
+                    </Text>
+                    <Card padding={4} style={{ marginTop: 4 }}>
+                      {repaymentTiers.map((tier, i) => {
+                        const prevMax = i === 0 ? null : repaymentTiers[i - 1].maxAmount;
+                        return (
+                          <View
+                            key={i}
+                            style={[
+                              styles.tierRow,
+                              i < repaymentTiers.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                            ]}
+                          >
+                            <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 13, flex: 1 }}>
+                              {tierBandLabel(tier, prevMax, formatZMW)}
+                            </Text>
+                            <View style={styles.tierTerms}>
+                              {TIER_TERM_OPTIONS.map((m) => {
+                                const active = tier.maxMonths === m;
+                                return (
+                                  <Pressable
+                                    key={m}
+                                    onPress={() =>
+                                      setRepaymentTiers((prev) =>
+                                        prev.map((t, j) => (j === i ? { ...t, maxMonths: m } : t))
+                                      )
+                                    }
+                                    style={[styles.tierTermChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                                    testID={`repay-tier-${i}-months-${m}`}
+                                  >
+                                    <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 12 }}>{m}mo</Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </Card>
+
+                    <FL text="Stop new loans before share-out" colors={colors} style={{ marginTop: 20 }} />
+                    <Text style={[styles.fieldHint, { color: colors.textMuted, marginBottom: 4 }]}>
+                      No new loans are issued this close to the cycle end, so every loan is repaid before share-out.
+                    </Text>
                     <View style={styles.chipsRow}>
-                      {LOAN_REPAYMENTS.map((r) => {
-                        const active = loanRepayment === r;
+                      {[0, 1, 2].map((m) => {
+                        const active = loanFreeWindow === m;
                         return (
                           <Pressable
-                            key={r}
-                            onPress={() => setLoanRepayment(r)}
+                            key={m}
+                            onPress={() => setLoanFreeWindow(m)}
                             style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
-                            testID={`loan-repay-${r}`}
+                            testID={`loan-free-window-${m}`}
                           >
-                            <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{r}</Text>
+                            <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>
+                              {m === 0 ? "No cut-off" : `${m} month${m > 1 ? "s" : ""} before`}
+                            </Text>
                           </Pressable>
                         );
                       })}
@@ -947,7 +1019,15 @@ export default function CreateGroup() {
                     <>
                       <RRow label="Multiplier" value={`${loanMultiplier}× savings`} colors={colors} />
                       <RRow label="Interest" value={`${loanInterest}% / month`} colors={colors} />
-                      <RRow label="Repayment" value={loanRepayment} colors={colors} />
+                      {repaymentTiers.map((tier, i) => (
+                        <RRow
+                          key={i}
+                          label={i === 0 ? "Repayment terms" : ""}
+                          value={`${tierBandLabel(tier, i === 0 ? null : repaymentTiers[i - 1].maxAmount, formatZMW)} → up to ${tier.maxMonths}mo`}
+                          colors={colors}
+                        />
+                      ))}
+                      <RRow label="Loan cut-off" value={loanFreeWindow === 0 ? "None" : `${loanFreeWindow} mo before share-out`} colors={colors} />
                       <RRow label="Grace period" value={`${gracePeriod} days`} colors={colors} />
                       <RRow label="Late penalty" value={lateRepayEnabled ? lateRepayPenaltyType === "flat" ? `K${lateRepayFlatAmount} flat fee` : `${lateRepaymentPenaltyRate}% per day (max 30%)` : "None"} colors={colors} last />
                     </>
@@ -1193,6 +1273,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
+  },
+  tierRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    gap: 8,
+  },
+  tierTerms: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "flex-end" },
+  tierTermChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    minWidth: 38,
+    alignItems: "center",
   },
   amountWrap: {
     flexDirection: "row",

@@ -26,6 +26,7 @@ import {
   checkEligibility,
   getLoanEligibility,
   requestLoan,
+  loanTermInfo,
 } from "@/src/services/loans";
 import { getRequiredApprovals } from "@/src/services/approvals";
 import { usePricingPreview, PayoutPreview } from "@/src/hooks/usePricingPreview";
@@ -35,12 +36,10 @@ import { Check, ChevronDown, Clock, Info } from "lucide-react-native";
 
 type Step = "request" | "breakdown" | "confirm" | "success";
 
-const DURATIONS = [
-  { months: 3, label: "3 months" },
-  { months: 6, label: "6 months" },
-  { months: 9, label: "9 months" },
-  { months: 12, label: "12 months" },
-];
+// Base ladder of selectable terms. The options actually shown are capped by the
+// group's size-based repayment tier for the amount being requested.
+const DURATION_LADDER = [1, 3, 6, 9, 12];
+const termLabel = (m: number) => `${m} month${m > 1 ? "s" : ""}`;
 
 export default function Loan() {
   const { colors } = useTheme();
@@ -49,7 +48,7 @@ export default function Loan() {
 
   const [step, setStep] = useState<Step>("request");
   const [amount, setAmount] = useState("5000");
-  const [duration, setDuration] = useState(DURATIONS[1]);
+  const [duration, setDuration] = useState({ months: 6, label: "6 months" });
   const [groups, setGroups] = useState<Group[]>([]);
   const [grp, setGrp] = useState<Group | null>(null);
   const [showGroup, setShowGroup] = useState(false);
@@ -129,9 +128,29 @@ export default function Loan() {
   const threshold = grp.constitution?.approvalThreshold ?? "majority";
   const requiredApprovals = getRequiredApprovals(threshold, adminCount);
 
-  const breakdown = getLoanBreakdown(num, grp.loanInterestRate, duration.months);
+  // Term is capped by BOTH the size tier and the time left until share-out (a
+  // loan must be fully repaid before the cycle closes). Lending also closes
+  // entirely inside the group's loan-free window near share-out.
+  const { maxTerm, monthsToShareOut, lendingClosed, windowMonths } = loanTermInfo(num, {
+    tiers: grp.constitution?.loanRepaymentTiers,
+    shareOutDate: grp.shareOutDate,
+    loanFreeWindowMonths: grp.constitution?.loanFreeWindowMonths,
+  });
+  const durationOptions = DURATION_LADDER.filter((m) => m <= maxTerm).map((m) => ({
+    months: m,
+    label: termLabel(m),
+  }));
+  const effectiveDuration =
+    duration.months <= maxTerm
+      ? duration
+      : durationOptions[durationOptions.length - 1] ?? {
+          months: maxTerm,
+          label: termLabel(maxTerm),
+        };
+
+  const breakdown = getLoanBreakdown(num, grp.loanInterestRate, effectiveDuration.months);
   const eligibility = checkEligibility(num, maxLoan);
-  const eligible = eligibility.eligible;
+  const eligible = eligibility.eligible && !lendingClosed;
   const savingsLoanRatio = num > 0 ? mySavings / num : 0;
 
   if (step === "success") {
@@ -219,6 +238,28 @@ export default function Loan() {
         <ScrollView contentContainerStyle={styles.content}>
           {step === "request" && (
             <>
+              {lendingClosed && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.danger,
+                    marginBottom: 20,
+                  }}
+                  testID="loan-lending-closed"
+                >
+                  <Clock size={18} color={colors.danger} style={{ marginTop: 1 }} />
+                  <Text style={{ color: colors.textMain, fontSize: 13, lineHeight: 19, flex: 1 }}>
+                    Lending is closed for this cycle. New loans stop within {windowMonths}{" "}
+                    {windowMonths === 1 ? "month" : "months"} of share-out so every loan is repaid
+                    before the group shares out{grp.shareOutDate ? ` on ${grp.shareOutDate}` : ""}.
+                  </Text>
+                </View>
+              )}
               <Text style={[styles.label, { color: colors.textMuted }]}>Loan amount</Text>
               <View
                 style={[
@@ -356,13 +397,13 @@ export default function Loan() {
                 </Card>
               )}
 
-              {/* Duration */}
+              {/* Duration — options capped by the group's size-based tier */}
               <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
                 Repayment duration
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {DURATIONS.map((d) => {
-                  const active = duration.months === d.months;
+                {durationOptions.map((d) => {
+                  const active = effectiveDuration.months === d.months;
                   return (
                     <Pressable
                       key={d.months}
@@ -383,6 +424,14 @@ export default function Loan() {
                   );
                 })}
               </View>
+              {num > 0 && !lendingClosed && (
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 8 }}>
+                  Up to {termLabel(maxTerm)} for a {formatZMW(num)} loan
+                  {Number.isFinite(monthsToShareOut) && monthsToShareOut <= 12
+                    ? ` — capped so it clears before share-out (${termLabel(monthsToShareOut)} left in the cycle).`
+                    : ", per this group's rules."}
+                </Text>
+              )}
 
               {/* Group */}
               <Pressable
@@ -449,7 +498,7 @@ export default function Loan() {
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 <Row label="Principal" value={formatZMW(num)} colors={colors} />
                 <Row label={`Interest (${grp.loanInterestRate}%/mo)`} value={formatZMW(breakdown.interest)} colors={colors} />
-                <Row label="Duration" value={duration.label} colors={colors} />
+                <Row label="Duration" value={effectiveDuration.label} colors={colors} />
                 <Row
                   label="Monthly installment"
                   value={formatZMW(breakdown.monthlyInstallment)}
@@ -485,7 +534,7 @@ export default function Loan() {
                 </Text>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 <Row label="Amount" value={formatZMW(num)} colors={colors} />
-                <Row label="Duration" value={duration.label} colors={colors} />
+                <Row label="Duration" value={effectiveDuration.label} colors={colors} />
                 <Row label="Group" value={grp.name} colors={colors} last={reason.trim() === ""} />
                 {reason.trim() !== "" && (
                   <Row label="Purpose" value={reason.trim()} colors={colors} last />
@@ -508,7 +557,7 @@ export default function Loan() {
                     await requestLoan({
                       groupId: grp.id,
                       amount: num,
-                      durationMonths: duration.months,
+                      durationMonths: effectiveDuration.months,
                       reason: reason.trim() || undefined,
                     });
                     setStep("success");
