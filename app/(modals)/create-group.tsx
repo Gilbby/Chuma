@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -97,6 +97,7 @@ export default function CreateGroup() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const scrollRef = useRef<ScrollView>(null);
 
   // Step 1 — Group Basics
   const [groupName, setGroupName] = useState("");
@@ -314,7 +315,7 @@ export default function CreateGroup() {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-invite-screen">
         <ScreenHeader title="Invite members" onBack={() => setShowInvite(false)} />
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 24 }}>
                 Invite people to {groupName} by phone number. They'll get an SMS and see the invite in their app.
@@ -464,8 +465,8 @@ export default function CreateGroup() {
       </View>
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             {/* ─── STEP 1 — Group Basics ──────────────────────────────────────── */}
             {step === 1 && (
@@ -504,6 +505,7 @@ export default function CreateGroup() {
                   style={[styles.inputField, styles.textArea, { color: colors.textMain, backgroundColor: colors.surface, borderColor: colors.border }]}
                   value={groupDesc}
                   onChangeText={setGroupDesc}
+                  onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
                   placeholder="What is this group for?"
                   placeholderTextColor={colors.textMuted}
                   multiline
@@ -590,7 +592,7 @@ export default function CreateGroup() {
                         style={[styles.inlineInput, { color: colors.textMain }]}
                         value={deadlineDay}
                         onChangeText={(t) => { handleIntInput(t, setDeadlineDay, 28); clearErr("deadlineDay"); }}
-                        keyboardType="numeric"
+                        keyboardType="number-pad"
                         placeholder="1"
                         placeholderTextColor={colors.textMuted}
                         testID="create-group-deadline-day"
@@ -643,7 +645,7 @@ export default function CreateGroup() {
                             style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
                             value={lateContribFlatAmount}
                             onChangeText={(t) => setLateContribFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5))}
-                            keyboardType="numeric"
+                            keyboardType="number-pad"
                             testID="create-group-late-contrib-flat"
                           />
                         </View>
@@ -746,7 +748,7 @@ export default function CreateGroup() {
                         style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
                         value={gracePeriod}
                         onChangeText={(t) => handleIntInput(t, setGracePeriod, 14)}
-                        keyboardType="numeric"
+                        keyboardType="number-pad"
                         placeholder="0"
                         placeholderTextColor={colors.textMuted}
                         testID="create-group-grace-period"
@@ -781,7 +783,7 @@ export default function CreateGroup() {
                                 style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
                                 value={lateRepayFlatAmount}
                                 onChangeText={(t) => setLateRepayFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5))}
-                                keyboardType="numeric"
+                                keyboardType="number-pad"
                                 testID="create-group-late-repay-flat"
                               />
                             </View>
