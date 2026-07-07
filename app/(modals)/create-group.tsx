@@ -197,6 +197,14 @@ export default function CreateGroup() {
         const d = parseInt(deadlineDay) || 0;
         if (d < 1 || d > 28) e.deadlineDay = "Enter a day between 1 and 28";
       }
+      if (lateContribEnabled && lateContribPenaltyType === "flat" && toNum(lateContribFlatAmount) < 1) {
+        e.lateContribFlatAmount = "Flat fee should be more than 1";
+      }
+    }
+    if (step === 3) {
+      if (lateRepayEnabled && lateRepayPenaltyType === "flat" && toNum(lateRepayFlatAmount) < 1) {
+        e.lateRepayFlatAmount = "Flat fee should be more than 1";
+      }
     }
     if (step === 4) {
       if (treasurerPhone.trim() && !isValidZambianPhone(treasurerPhone.trim())) e.treasurerPhone = "Enter a valid Zambian phone number";
@@ -586,19 +594,15 @@ export default function CreateGroup() {
                 />
                 {contribFreq === "Monthly" ? (
                   <>
-                    <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: errors.deadlineDay ? colors.danger : colors.border }]}>
-                      <Text style={{ color: colors.textMuted, fontSize: 14 }}>Day</Text>
-                      <TextInput
-                        style={[styles.inlineInput, { color: colors.textMain }]}
-                        value={deadlineDay}
-                        onChangeText={(t) => { handleIntInput(t, setDeadlineDay, 28); clearErr("deadlineDay"); }}
-                        keyboardType="number-pad"
-                        placeholder="1"
-                        placeholderTextColor={colors.textMuted}
-                        testID="create-group-deadline-day"
-                      />
-                      <Text style={{ color: colors.textMuted, fontSize: 14 }}>of each month</Text>
-                    </View>
+                    <TextInput
+                      style={[styles.inputField, { color: colors.textMain, backgroundColor: colors.surface, borderColor: errors.deadlineDay ? colors.danger : colors.border }]}
+                      value={deadlineDay}
+                      onChangeText={(t) => { handleIntInput(t, setDeadlineDay, 28); clearErr("deadlineDay"); }}
+                      keyboardType="number-pad"
+                      placeholder="1"
+                      placeholderTextColor={colors.textMuted}
+                      testID="create-group-deadline-day"
+                    />
                     {errors.deadlineDay ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.deadlineDay}</Text> : null}
                   </>
                 ) : (
@@ -639,19 +643,23 @@ export default function CreateGroup() {
                     {lateContribPenaltyType === "flat" ? (
                       <>
                         <FL text="Penalty amount" colors={colors} />
-                        <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: errors.lateContribFlatAmount ? colors.danger : colors.border }]}>
                           <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
                           <TextInput
                             style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
                             value={lateContribFlatAmount}
-                            onChangeText={(t) => setLateContribFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5))}
+                            onChangeText={(t) => { setLateContribFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5)); clearErr("lateContribFlatAmount"); }}
                             keyboardType="number-pad"
                             testID="create-group-late-contrib-flat"
                           />
                         </View>
-                        <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
-                          Members will be charged a fixed K{lateContribFlatAmount} per violation
-                        </Text>
+                        {errors.lateContribFlatAmount ? (
+                          <Text style={[styles.errText, { color: colors.danger }]}>{errors.lateContribFlatAmount}</Text>
+                        ) : (
+                          <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
+                            Members will be charged a fixed K{lateContribFlatAmount} per violation
+                          </Text>
+                        )}
                       </>
                     ) : (
                       <>
@@ -777,19 +785,23 @@ export default function CreateGroup() {
                         {lateRepayPenaltyType === "flat" ? (
                           <>
                             <FL text="Penalty amount" colors={colors} />
-                            <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: errors.lateRepayFlatAmount ? colors.danger : colors.border }]}>
                               <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
                               <TextInput
                                 style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
                                 value={lateRepayFlatAmount}
-                                onChangeText={(t) => setLateRepayFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5))}
+                                onChangeText={(t) => { setLateRepayFlatAmount(t.replace(/[^0-9]/g, "").slice(0, 5)); clearErr("lateRepayFlatAmount"); }}
                                 keyboardType="number-pad"
                                 testID="create-group-late-repay-flat"
                               />
                             </View>
-                            <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
-                              Members will be charged a fixed K{lateRepayFlatAmount} per violation
-                            </Text>
+                            {errors.lateRepayFlatAmount ? (
+                              <Text style={[styles.errText, { color: colors.danger }]}>{errors.lateRepayFlatAmount}</Text>
+                            ) : (
+                              <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
+                                Members will be charged a fixed K{lateRepayFlatAmount} per violation
+                              </Text>
+                            )}
                           </>
                         ) : (
                           <>
