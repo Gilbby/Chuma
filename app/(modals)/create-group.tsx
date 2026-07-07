@@ -198,12 +198,12 @@ export default function CreateGroup() {
         if (d < 1 || d > 28) e.deadlineDay = "Enter a day between 1 and 28";
       }
       if (lateContribEnabled && lateContribPenaltyType === "flat" && toNum(lateContribFlatAmount) < 1) {
-        e.lateContribFlatAmount = "Flat fee should be more than 1";
+        e.lateContribFlatAmount = "Flat fee should be more than 0";
       }
     }
     if (step === 3) {
       if (lateRepayEnabled && lateRepayPenaltyType === "flat" && toNum(lateRepayFlatAmount) < 1) {
-        e.lateRepayFlatAmount = "Flat fee should be more than 1";
+        e.lateRepayFlatAmount = "Flat fee should be more than 0";
       }
     }
     if (step === 4) {
