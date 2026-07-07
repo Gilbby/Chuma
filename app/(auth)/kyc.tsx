@@ -119,18 +119,16 @@ export default function Kyc() {
       await applyApproved(result.verified);
       return;
     }
-    if (result.status === "declined") {
-      setPhase("idle");
-      setError("We couldn't verify your identity. Please try again with a clear photo of your document.");
-      return;
-    }
     if (result.status === "expired" || result.status === "abandoned") {
       setPhase("idle");
       setError("Your verification session ended before it finished. Please start again.");
       return;
     }
-    // pending / in_review — submitted but not yet decided. Hold on the review
-    // screen until Didit returns a decision.
+    // declined / pending / in_review — submitted but not yet approved. We hold on
+    // the review screen rather than dead-ending: Zambian NRCs the automated engine
+    // can't read are approved manually, so a "declined" here becomes a review hold
+    // that clears once we approve the account. Genuine bad captures can re-submit
+    // from the review screen ("Try a different photo").
     setPhase("review");
   };
 
@@ -169,8 +167,8 @@ export default function Kyc() {
           </View>
           <Text style={[styles.title, { color: colors.textMain }]}>Verification in review</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
-            Your details were submitted. This usually takes a few minutes. You&apos;ll be able to
-            continue as soon as your identity is approved.
+            Your details were submitted and are being reviewed. Some IDs need a quick manual check,
+            so this can take a little while. Tap Check status once you&apos;ve been approved.
           </Text>
           <View style={{ flex: 1 }} />
           <Button
@@ -179,6 +177,14 @@ export default function Kyc() {
             loading={busy}
             disabled={busy}
             testID="kyc-recheck-btn"
+          />
+          <View style={{ height: 10 }} />
+          <Button
+            label="Try a different photo"
+            variant="ghost"
+            onPress={startVerification}
+            disabled={busy}
+            testID="kyc-resubmit-btn"
           />
           {canSkip && (
             <>
