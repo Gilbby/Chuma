@@ -719,18 +719,22 @@ export default function CreateGroup() {
                       })}
                     </View>
 
-                    <FL text="Interest rate (% per month)" colors={colors} style={{ marginTop: 20 }} />
-                    <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <TextInput
-                        style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
-                        value={loanInterest}
-                        onChangeText={(t) => handleNumericInput(t, setLoanInterest)}
-                        keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
-                        placeholder="5"
-                        placeholderTextColor={colors.textMuted}
-                        testID="create-group-loan-interest"
-                      />
-                      <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: "600" }}>%</Text>
+                    <FL text={`Interest rate: ${loanInterest}% per month`} colors={colors} style={{ marginTop: 20 }} />
+                    <Slider
+                      minimumValue={1}
+                      maximumValue={30}
+                      step={0.5}
+                      value={parseFloat(loanInterest) || 5}
+                      onValueChange={(v) => setLoanInterest(v.toFixed(1))}
+                      minimumTrackTintColor={colors.primary}
+                      maximumTrackTintColor={colors.border}
+                      thumbTintColor={colors.primary}
+                      style={{ marginVertical: 8 }}
+                      testID="create-group-loan-interest"
+                    />
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: colors.textMuted, fontSize: 11 }}>1%</Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 11 }}>30% max</Text>
                     </View>
 
                     <FL text="Repayment duration" colors={colors} style={{ marginTop: 20 }} />
