@@ -21,7 +21,7 @@ export default function PhoneLogin() {
   const router = useRouter();
   const { mode: rawMode } = useLocalSearchParams<{ mode: "signup" | "signin" }>();
   const mode = rawMode ?? "signup";
-  const [phone, setPhone] = useState("977234567");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -61,7 +61,7 @@ export default function PhoneLogin() {
 
           <Input
             label="Phone number"
-            placeholder="977 234 567"
+            placeholder="XXX XXX XXX"
             keyboardType="phone-pad"
             value={phone}
             onChangeText={setPhone}
