@@ -45,7 +45,11 @@ export default function Splash() {
       <View style={styles.overlay} />
       <Animated.View style={[styles.content, animatedStyle]}>
         <View style={styles.logoCircle}>
-          <Text style={styles.logoText}>C</Text>
+          <Image
+            source={require("@/assets/images/logo-mark.png")}
+            style={styles.logoImg}
+            resizeMode="contain"
+          />
         </View>
         <Text style={styles.brand}>Chuma</Text>
       </Animated.View>
@@ -72,7 +76,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 20,
   },
-  logoText: { color: "#fff", fontSize: 52, fontWeight: "800", letterSpacing: -2 },
+  logoImg: { width: 58, height: 58 },
   brand: { color: "#fff", fontSize: 38, fontWeight: "800", letterSpacing: -0.8 },
   tagline: {
     position: "absolute",

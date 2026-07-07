@@ -17,7 +17,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#0A5C36"
       },
       "edgeToEdgeEnabled": true
     },
@@ -32,9 +32,8 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-image.png",
-          "imageWidth": 300,
-          "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "resizeMode": "cover",
+          "backgroundColor": "#0A5C36"
         }
       ]
     ],
