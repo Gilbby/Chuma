@@ -61,7 +61,7 @@ function formatPayoutDate(iso: string): string {
 export default function Home() {
   const { colors, mode } = useTheme();
   const router = useRouter();
-  const { role } = useRole();
+  const { role, can } = useRole();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -212,11 +212,21 @@ export default function Home() {
   // Soft KYC nudge: prompt anyone not yet verified to complete verification.
   const needsKyc = !!me.kycStatus && me.kycStatus !== "verified";
 
+  // Members don't approve anything, so only surface Approve to roles that hold
+  // at least one approval permission.
+  const canApprove =
+    can("approve.loan") ||
+    can("approve.withdrawal") ||
+    can("approve.rule") ||
+    can("approve.shareout");
+
   const quickActions = [
     { label: "Save", icon: PiggyBank, route: "/contribute" },
     { label: "Loan", icon: HandCoins, route: "/loan" },
     { label: "Repay", icon: RefreshCw, route: "/repay" },
-    { label: "Approve", icon: CheckSquare, route: "/approvals", badge: pendingApprovals },
+    ...(canApprove
+      ? [{ label: "Approve", icon: CheckSquare, route: "/approvals", badge: pendingApprovals }]
+      : []),
   ];
 
   return (
@@ -261,7 +271,8 @@ export default function Home() {
         <View style={styles.metaRow}>
           <StatusBadge label={role} variant="primary" testID="home-role-badge" />
           <Text style={[styles.metaText, { color: colors.textMuted }]}>
-            · {groups.length} groups · {pendingApprovals} approvals
+            · {groups.length} groups
+            {canApprove ? ` · ${pendingApprovals} approvals` : ""}
           </Text>
         </View>
 
