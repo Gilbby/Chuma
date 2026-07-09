@@ -15,7 +15,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { BlurView } from "expo-blur";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { useRole } from "@/src/hooks/useRole";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
@@ -66,7 +65,6 @@ export default function GroupDetails() {
   const [inviteError, setInviteError] = useState("");
   const [inviting, setInviting] = useState(false);
 
-  const { role } = useRole();
   const insets = useSafeAreaInsets();
 
   const [group, setGroup] = useState<Group | null>(null);
@@ -149,7 +147,10 @@ export default function GroupDetails() {
   const locked = group.feeStatus?.locked ?? isGroupLocked(group);
   const monthsOwed = group.feeStatus?.monthsOwed ?? getMonthsOwed(group);
   const amountOwed = group.feeStatus?.amountOwed ?? getAmountOwed(group);
-  const effectiveRole = role ?? group.yourRole;
+  // Privileges inside a group follow the user's role IN THIS GROUP, not their
+  // app-wide menu role — a global Chairperson is only a Member here if that's
+  // how they joined this group.
+  const effectiveRole = group.yourRole;
   const canPayFee =
     effectiveRole === "Chairperson" ||
     effectiveRole === "Treasurer";
@@ -389,7 +390,7 @@ export default function GroupDetails() {
                 <LegendDot color={colors.danger} label="Overdue" colors={colors} />
                 <LegendDot color={colors.warning} label="Pending" colors={colors} />
               </View>
-              {role !== "Member" && (
+              {effectiveRole !== "Member" && (
                 <Text
                   style={{
                     color: colors.textMuted,

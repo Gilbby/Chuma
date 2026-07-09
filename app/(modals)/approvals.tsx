@@ -13,13 +13,15 @@ import { getApprovals, voteOnApproval } from "@/src/services/approvals";
 import { Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
-import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles } from "lucide-react-native";
+import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles, UserMinus, Trash2 } from "lucide-react-native";
 
-const TYPE_ICONS = {
+const TYPE_ICONS: Record<Approval["type"], typeof Banknote> = {
   loan: Banknote,
   withdrawal: Wallet,
   "rule-change": Scale,
   "admin-action": ShieldCheck,
+  "member-removal": UserMinus,
+  "group-deletion": Trash2,
   "share-out": Sparkles,
 };
 
@@ -130,7 +132,8 @@ export default function Approvals() {
           </Card>
         ) : (
           data.map((a) => {
-          const Icon = TYPE_ICONS[a.type];
+          // Fallback guards against any future/unknown approval type crashing the list.
+          const Icon = TYPE_ICONS[a.type] ?? ShieldCheck;
           const progress = a.totalVoters === 0 ? 0 : a.votesFor / a.totalVoters;
           const isPending = a.status === "pending";
           const statusVariant =

@@ -134,7 +134,14 @@ export interface Loan {
 
 export interface Approval {
   id: string;
-  type: "loan" | "withdrawal" | "rule-change" | "admin-action" | "share-out";
+  type:
+    | "loan"
+    | "withdrawal"
+    | "rule-change"
+    | "admin-action"
+    | "member-removal"
+    | "group-deletion"
+    | "share-out";
   title: string;
   description: string;
   requestedBy: string;

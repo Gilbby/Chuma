@@ -207,7 +207,9 @@ export default function Home() {
     .slice()
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
 
-  const pendingApprovals = approvals.length;
+  // Count only pending items so the badge matches the Approval Center header
+  // (the API can return resolved approvals too).
+  const pendingApprovals = approvals.filter((a) => a.status === "pending").length;
   const unread = notifications.filter((n) => !n.read).length;
   // Soft KYC nudge: prompt anyone not yet verified to complete verification.
   const needsKyc = !!me.kycStatus && me.kycStatus !== "verified";
@@ -224,9 +226,10 @@ export default function Home() {
     { label: "Save", icon: PiggyBank, route: "/contribute" },
     { label: "Loan", icon: HandCoins, route: "/loan" },
     { label: "Repay", icon: RefreshCw, route: "/repay" },
+    // Approvers get Approve; everyone else (Members) gets Share-out in its place.
     ...(canApprove
       ? [{ label: "Approve", icon: CheckSquare, route: "/approvals", badge: pendingApprovals }]
-      : []),
+      : [{ label: "Share-out", icon: Gift, route: "/share-out" }]),
   ];
 
   return (
