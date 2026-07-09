@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   Platform,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -91,7 +92,7 @@ export default function ReceiptScreen() {
   .wrap { max-width: 520px; margin: 0 auto; }
   .header { background: #0A5C36; color: #fff; padding: 28px; border-radius: 20px 20px 0 0; }
   .brand { display:flex; align-items:center; gap:12px; margin-bottom: 18px; }
-  .logo { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.18); display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; color:#fff; }
+  .logo { width: 36px; height: 36px; border-radius: 11px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.45); display:inline-flex; align-items:center; justify-content:center; }
   .brand-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
   .label { font-size: 11px; font-weight: 600; letter-spacing: 1.4px; color: rgba(255,255,255,0.75); text-transform: uppercase; }
   .amount { font-size: 38px; font-weight: 800; letter-spacing: -1px; margin-top: 6px; }
@@ -113,7 +114,7 @@ export default function ReceiptScreen() {
   <div class="wrap">
     <div class="header">
       <div class="brand">
-        <span class="logo">C</span>
+        <span class="logo"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALIAAACgCAYAAAColDb4AAAACXBIWXMAAAsSAAALEgHS3X78AAALQUlEQVR4nO2dT4wbVx3Hvx7ylyasKUQFQhRHiSgClDVIVEiuyCwVviC65m6R4URvuMeKQ50TR5IzBxzJByQ4bEBcLKFMDhaRkGC3CAQVIbZKBGlatIaoabZlzOHN7E4cz/83njdvvh/Jysb2m3nr/fjN7/3em/dq8/kcpBqMhi0TgAmgCaDue2kXgA1g0O6Od1deMQnUKLLejIatDgDvsRbx9hmAXrs7HuRcLelQZA0ZDVtNABaEvGdTHOJauzvuSa1UzlBkTZAg7yLfaXfHWxKOsxIocokZDVsNCHktyJHXzwxAoywx86GiK0CS4crbgZB3PcdTrQHoAejneA5pUOQSMBq26hDy9pCvvIuURmSGForik7cDYLPAqpQiVmaLrBi+dNnlouvi0gFAkUk0CXO9q8YsugJxYGhREL50mQX15F3ky+3ueLvoSoTBFnmFuBmHHuTleleFCYAiV5kVpsvypAPgatGVCIMi50CB6bK8uFR0BaJgjCwJhdJleaF0Go4tckYUTJflhQmF03AUOQXuvF4LaqbL8sIsugJhMLSISQ6zy8rIx1WdRMQWOYScZ5eVkQ6AQdGVWAZFXkCTdFlemKDI6uLLOFgoQaqpQMyiKxBEpWPk0bBlQd90WV4oOVwtu0U2cXCHbt39GQAm7sNjF+FDnmbIa1sRZUNRfIJOGTDh+/wdx2lAXMn87AKwDcNYmfBZRW7gQIqwS3LWy/UtCIG38OQXIhZuxsGb40B5s2HCHa52Jb4b9EbHcWYQf7O+YRiTPCuVVmRPjLwGAbwPwHb/TZzyYbosN/xhWCPivWsQjlx2HOcahNC5pO+Sxsh1iG9jHgJ78nqPxPgyDj1Q3jzZaHfHdlSLvIQdAGYeMidpkb0cosxLs0x5LTBdtio6EDHwxHGc64jfsK0DsB3HkS5zXJH7AF6XeN6pe8y0YYPuE3RUx/T9nPQKvQ7RIHYk1idWaDGAvFDiFoTAdprCTJcpxf5wteM4aXK4G4Zh2LIqE9UiDyBP4leRYnI202XKYuIgHNxB8rCuh5QN2jLCRJaZldhAgkqX7H62qtLEgcgTJBd503GcuqxYOUhkE8CPZZwAwBXElHg0bPXAjENZ8Au4hXThXhOSWuVlItchd2JI0mNNkGLQg6wUu90d+8PELaS7rcuEJJGXdfb6kJuhqEk8FlEUx3HqOBiAAsQwtr/VNiFaYH+oeMUwjL6M8y+K3ECyBHesc0g+HikxjuNYEJ3+NUgU2Vj4v5SDLiA1X0jKjWEYA4gGc0fqcX0/15HP0LOVwzFJiXEzFSYkLvriF9mSddAFNqH44h5k9RiGsWsYhrS7sv0x8jbynaswhchg2BHvi3qdkKfwRG5AfiePVJspDlKp2xANVG4T7T2Re5A3AEJIEN5VeQDJYwVejNwMfRchcjgLMUZxFyJDVpd1YK9Fzjs+JmQZU4j0bOaQwxO5urdSk6KZQUIqzkD0fVeE5MkaREewkeUgFJmowBoyTlRbHKImpCguIcOgHEUmKtFPW5AiE5U4i5SpYIpMVMNKU4giE9Uw0xSiyEQ1Ug3MUWSiImbSAgYU39GSVJLEczAMpFiyipCcSZy5YGhBtIAiEy2gyEQLKDLRAopMtIAiEy2gyEQLKDLRAopMVGSStABFJipiJy1AkYlqXEeKFln2XtREbbxlrFTD25vcRsq1/zyRZ+CmM7oxxcEG9N5DWzyRt5F943NSPJ68A2gu7iIMLfTA20l2UGw1ioMil5sZxEqqg4LrUTgUubzcgLjjmDdGgCKXkRmEwNK2LdABilwudiAkjuzIjYatBg72tvNuHSprh95LG9oABu3ueLL4Bm9ZWRvl/SWrwg6EmKGhxGjYspBuF9IycQOA1e6O9z8LilwOIiV2Be6jOvt4zwA0vdaZoYX6hEo8GrbqEPFy1RqiNYjfuwlwroXqeB27IImbELFj1ST2WHevRBRZcSwEdOxciW1wakEHoMgqcw0BKTZK/ASbADt7qjKFiP2eCincmHgCSuznHFtkNekjOEOxBUq8SIMiq4e3O+hTjIatHnjlXApFVo/+sifdkGLpa4R5ZNUIbI0hRusShRT/+o+BybtzvLXr7D93pm7gS58BThzVa49QiqwWQVmKOoTIsXjjXg2/+vMe3vj3B4Hv+dpzR/DyFw/j/Ck9hKbIajEIeN5CjNb44eMahr/7H27eez/yRLfv7+H2/T1869xxfPeFWqJKqghFVocZgme1WVGFHz6u4Ue/eYy//ffDRCf99d1HeG/vGF55sdzdJa/27AkXj73sSXc6ZuRMtp/89oPEEnvcvPc+fv6HcocY5f4a6kVQa2xGFbx9t4bb9/cynfwXbz7CnQflDTEosjoEiRy5n8bP/vhISgV++afgzqHqUGR1CBrJCxX5zoMa/vnICXtLbG7f38PDx+VslSmy+oSK/Jf7cmPbv78j9XArgyKrQ1BoEZp2e/c9uSL/9W05rfuqocjqkOq2/rdm6TIVukGRS86ZNQ4FABRZJcw0hY4flluJM/VyKlHOWleLWdiLX/ms3D9h4xPMWpBsBG0kHroYy/lTc3z6uJw/48VnD+NTH2Nnj2QjKM0WuarQy88fl1KBb3/hiJTjFAFFVofUIn/j+TkuPpstWN44fQwXT5d3vgVFVocgkWMtVviDrx/BhZPpMhgXTh5C96sfSVVWFSiyOpwF0Fh80l3f7EZU4RNH53jtpaOJW+aN08fw2ktHS3/HiIElHx4pjE7A84M4hU8cneOH3zyM7zefiewAXjh5CK++8AxeedEovcSAWNfCBHCz6IoQAGKdt6UhxmjY2kbCFTbvPKjh9/8QWYg33/kQn/vkIXz0cA2ff66mzS1OLhscFlKLdYgr5GTJaz0kbHDOn5rj/CkvL+wPObSSGABjZBXpL3uy3R3biBErVxWKrB6XEdxvsSCWDCALUGQ16S970s1gdBAxbF1BdimymlxGQKev3R1vQ0wwoswu7e54myKryyDoBcr8BLcAhhYqs46Qtd5cmZsQKbsqswVQZNV5HSGLs7S740m7O24CuLKyGqnF/lp5FFl9riLiBtR2d9wHcA7A9VVUSBFmADreFmW1+XzeAHC30CqRKGYQMXHcjSJ7ENkNXbcqm0JIvP95eFsv6DfUox8zCDntuAXcvUY6EC16A+XeRHIH4otst7vjweKLFLl8fA8xJxFVCcbI5eOnED31oFujKglFLiebEBOLrGKroQ4UubysQbTONlIuJaATjJH1YQoxgLKFlKsWlRmKrCc3IIS2sXxus3ZQZP2ZQsi8jdW31BPE+yKZEOnBBsQAUKwbbv1QZKIi55DwSsLOHlERK2kBiky0gCITLaDIREXMpAUoMtECikxUxE5agCITLaDIRAsoMtECiky0gCITLaDIRAsoMtECiky0gCITFYlcv2MRT2SuuUtUIvENAJ7IE7n1ICQTqVtkW249CEnNFBlaZFtqVQhJj52mkF9kLhpNVMBOU8iftUh85yohkpkhpYd+kQdSqkJIelIvLuMtB+BhA7gkoUKEpCHxMgAeiwMi/aw1ISQl15EhDbzYIgOied/MUCFCkjKDWIx8kvYAy4aoe2AGg6yWPjIOyi0TeQKuu0tWxw2I9d4yETRpaAvAtawHJySCHUhqNJfFyH4GENvJEiKbzHGxn6hpnBaqtXcbWQ07EKsJTWQdMM58ZAvV3VmTyMeTOPEMtzDiTqzvA9gAsxkkG9cgwgnpC44nuUPEhlhRnJ1AkpQdiIawl9cJkt7qtAtRmarte0zSsQOxwWUTOU8VjspaRNGA2CLWQrm3hyXymEJIexWS4+Awsorspw4RxDfdB3fmrA7bC4+V838sEwGs6fl+MwAAAABJRU5ErkJggg==" style="width:24px;height:24px;" /></span>
         <span class="brand-name">Chuma</span>
       </div>
       <div class="label">${typeLabel} receipt</div>
@@ -195,7 +196,11 @@ export default function ReceiptScreen() {
           <View style={[styles.band, { backgroundColor: colors.primary }]}>
             <View style={styles.brand}>
               <View style={styles.logoSm}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>C</Text>
+                <Image
+                  source={require("@/assets/images/logo-mark.png")}
+                  style={{ width: 24, height: 24 }}
+                  resizeMode="contain"
+                />
               </View>
               <Text style={styles.brandName}>Chuma</Text>
             </View>
@@ -324,10 +329,12 @@ const styles = StyleSheet.create({
   },
   brand: { flexDirection: "row", alignItems: "center", marginBottom: 18 },
   logoSm: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,

@@ -58,7 +58,11 @@ export default function Welcome() {
     >
       <View style={styles.header}>
         <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-          <Text style={styles.logoText}>C</Text>
+          <Image
+            source={require("@/assets/images/logo-mark.png")}
+            style={styles.logoImg}
+            resizeMode="contain"
+          />
         </View>
         <Text style={[styles.brand, { color: colors.textMain }]}>Chuma</Text>
       </View>
@@ -131,8 +135,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  logo: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  logoText: { color: "#fff", fontWeight: "800", fontSize: 18 },
+  logo: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  logoImg: { width: 30, height: 30 },
   brand: { fontSize: 20, fontWeight: "700", marginLeft: 10, letterSpacing: -0.3 },
   slide: {
     flex: 1,

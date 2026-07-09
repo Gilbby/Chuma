@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 20,
   },
-  logoImg: { width: 58, height: 58 },
+  logoImg: { width: 72, height: 72 },
   brand: { color: "#fff", fontSize: 38, fontWeight: "800", letterSpacing: -0.8 },
   tagline: {
     position: "absolute",

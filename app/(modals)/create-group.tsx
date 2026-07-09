@@ -60,8 +60,6 @@ const LOAN_MULTIPLIERS = [
   { label: "3×", value: "3" },
   { label: "5×", value: "5" },
 ];
-// Selectable max-term options (months) for each repayment tier.
-const TIER_TERM_OPTIONS = [1, 2, 3, 6, 9, 12];
 const PAYMENT_METHODS = ["MTN MoMo", "Airtel Money", "Zamtel Kwacha", "Bank Transfer"];
 
 const APPROVAL_THRESHOLDS: { label: string; value: GroupConstitution["approvalThreshold"] }[] = [
@@ -266,6 +264,20 @@ export default function CreateGroup() {
   const removeInvite = (id: string) => setInvites((prev) => prev.filter((i) => i.id !== id));
 
   const goToStep = (n: number) => { setStep(n); setErrors({}); };
+
+  // Set a repayment band's max term, keeping the ladder valid: every term stays
+  // within 1…cycle, and larger loans never get a shorter term than smaller ones.
+  const setTierMonths = (index: number, months: number) => {
+    const v = Math.max(1, Math.min(cycleMonths, months));
+    setRepaymentTiers((prev) =>
+      prev.map((t, j) => {
+        if (j === index) return { ...t, maxMonths: v };
+        if (j < index && t.maxMonths > v) return { ...t, maxMonths: v }; // smaller bands ≤ this
+        if (j > index && t.maxMonths < v) return { ...t, maxMonths: v }; // larger bands ≥ this
+        return t;
+      })
+    );
+  };
 
   const handleNext = () => {
     if (!validate()) return;
@@ -780,24 +792,28 @@ export default function CreateGroup() {
                             <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 13, flex: 1 }}>
                               {tierBandLabel(tier, prevMax, formatZMW)}
                             </Text>
-                            <View style={styles.tierTerms}>
-                              {TIER_TERM_OPTIONS.map((m) => {
-                                const active = tier.maxMonths === m;
-                                return (
-                                  <Pressable
-                                    key={m}
-                                    onPress={() =>
-                                      setRepaymentTiers((prev) =>
-                                        prev.map((t, j) => (j === i ? { ...t, maxMonths: m } : t))
-                                      )
-                                    }
-                                    style={[styles.tierTermChip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
-                                    testID={`repay-tier-${i}-months-${m}`}
-                                  >
-                                    <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 12 }}>{m}mo</Text>
-                                  </Pressable>
-                                );
-                              })}
+                            <View style={styles.tierStepper}>
+                              <Pressable
+                                onPress={() => setTierMonths(i, tier.maxMonths - 1)}
+                                disabled={tier.maxMonths <= 1}
+                                hitSlop={8}
+                                style={[styles.stepBtn, { borderColor: colors.border, opacity: tier.maxMonths <= 1 ? 0.4 : 1 }]}
+                                testID={`repay-tier-${i}-dec`}
+                              >
+                                <Text style={[styles.stepBtnText, { color: colors.textMain }]}>−</Text>
+                              </Pressable>
+                              <Text style={[styles.tierMonthsValue, { color: colors.textMain }]}>
+                                {tier.maxMonths} mo
+                              </Text>
+                              <Pressable
+                                onPress={() => setTierMonths(i, tier.maxMonths + 1)}
+                                disabled={tier.maxMonths >= cycleMonths}
+                                hitSlop={8}
+                                style={[styles.stepBtn, { borderColor: colors.border, opacity: tier.maxMonths >= cycleMonths ? 0.4 : 1 }]}
+                                testID={`repay-tier-${i}-inc`}
+                              >
+                                <Text style={[styles.stepBtnText, { color: colors.textMain }]}>+</Text>
+                              </Pressable>
                             </View>
                           </View>
                         );
@@ -1281,15 +1297,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     gap: 8,
   },
-  tierTerms: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "flex-end" },
-  tierTermChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 6,
+  tierStepper: { flexDirection: "row", alignItems: "center", gap: 10 },
+  stepBtn: {
+    width: 32,
+    height: 32,
     borderRadius: 999,
     borderWidth: 1,
-    minWidth: 38,
     alignItems: "center",
+    justifyContent: "center",
   },
+  stepBtnText: { fontSize: 18, fontWeight: "700", lineHeight: 20 },
+  tierMonthsValue: { fontSize: 14, fontWeight: "700", minWidth: 46, textAlign: "center" },
   amountWrap: {
     flexDirection: "row",
     alignItems: "center",
