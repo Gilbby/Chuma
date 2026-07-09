@@ -38,6 +38,8 @@ import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
 
+const QUICK_ICON_SIZE = 30;
+
 function formatDueDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
