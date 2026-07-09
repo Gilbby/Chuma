@@ -47,13 +47,12 @@ export default function Loan() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
 
   const [step, setStep] = useState<Step>("request");
-  const [amount, setAmount] = useState("5000");
+  const [amount, setAmount] = useState("");
   const [duration, setDuration] = useState({ months: 6, label: "6 months" });
   const [groups, setGroups] = useState<Group[]>([]);
   const [grp, setGrp] = useState<Group | null>(null);
   const [showGroup, setShowGroup] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [reason, setReason] = useState("");
   const [elig, setElig] = useState<{
     savings: number;
     maxLoan: number;
@@ -152,6 +151,17 @@ export default function Loan() {
   const eligibility = checkEligibility(num, maxLoan);
   const eligible = eligibility.eligible && !lendingClosed;
   const savingsLoanRatio = num > 0 ? mySavings / num : 0;
+
+  // With no amount entered yet there is nothing to judge, so stay neutral rather
+  // than accusing an empty field of being over the limit.
+  const eligibilityBadge =
+    num <= 0
+      ? { label: "Enter an amount", variant: "neutral" as const }
+      : lendingClosed
+        ? { label: "Lending closed", variant: "danger" as const }
+        : eligible
+          ? { label: "Eligible", variant: "success" as const }
+          : { label: "Over limit", variant: "danger" as const };
 
   if (step === "success") {
     return (
@@ -296,47 +306,6 @@ export default function Loan() {
                 </Text>
               )}
 
-              <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
-                PURPOSE (OPTIONAL)
-              </Text>
-              <TextInput
-                value={reason}
-                onChangeText={setReason}
-                placeholder="e.g. School fees, Medical emergency, Business stock"
-                placeholderTextColor={colors.textMuted}
-                multiline={true}
-                numberOfLines={3}
-                maxLength={200}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  padding: 14,
-                  color: colors.textMain,
-                  fontSize: 15,
-                  lineHeight: 22,
-                  minHeight: 90,
-                  textAlignVertical: "top",
-                }}
-                testID="loan-reason-input"
-              />
-              <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4, textAlign: "right" }}>
-                {reason.length}/200
-              </Text>
-
-              <View style={styles.chips}>
-                {[2000, 5000, 10000, 15000].map((v) => (
-                  <Pressable
-                    key={v}
-                    onPress={() => setAmount(String(v))}
-                    style={[styles.chip, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <Text style={{ color: colors.textMain, fontWeight: "600" }}>K {v.toLocaleString()}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
               {/* Eligibility */}
               <Card padding={16} style={{ marginTop: 18 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -344,8 +313,9 @@ export default function Loan() {
                     ELIGIBILITY
                   </Text>
                   <StatusBadge
-                    label={eligible ? "Eligible" : "Over limit"}
-                    variant={eligible ? "success" : "danger"}
+                    label={eligibilityBadge.label}
+                    variant={eligibilityBadge.variant}
+                    testID="loan-eligibility-badge"
                   />
                 </View>
                 <Text style={{ color: colors.textMain, fontSize: 14, marginTop: 10 }}>
@@ -353,7 +323,7 @@ export default function Loan() {
                   <Text style={{ fontWeight: "700" }}>{formatZMW(maxLoan, { compact: true })}</Text> ({grp.loanMaxMultiplier}× your savings of {formatZMW(mySavings)}).
                 </Text>
                 <View style={{ marginTop: 12 }}>
-                  <ProgressBar progress={Math.min(1, num / maxLoan)} />
+                  <ProgressBar progress={maxLoan > 0 ? Math.min(1, num / maxLoan) : 0} />
                   <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6 }}>
                     Savings-to-loan ratio: {savingsLoanRatio.toFixed(2)}x
                   </Text>
@@ -535,10 +505,7 @@ export default function Loan() {
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 <Row label="Amount" value={formatZMW(num)} colors={colors} />
                 <Row label="Duration" value={effectiveDuration.label} colors={colors} />
-                <Row label="Group" value={grp.name} colors={colors} last={reason.trim() === ""} />
-                {reason.trim() !== "" && (
-                  <Row label="Purpose" value={reason.trim()} colors={colors} last />
-                )}
+                <Row label="Group" value={grp.name} colors={colors} last />
               </Card>
 
               {submitError ? (
@@ -558,7 +525,6 @@ export default function Loan() {
                       groupId: grp.id,
                       amount: num,
                       durationMonths: effectiveDuration.months,
-                      reason: reason.trim() || undefined,
                     });
                     setStep("success");
                   } catch (e: any) {
@@ -625,15 +591,6 @@ const styles = StyleSheet.create({
   currency: { fontSize: 28, fontWeight: "700" },
   amountInput: { flex: 1, fontSize: 44, fontWeight: "700", letterSpacing: -1, padding: 0 },
   errText: { fontSize: 12, marginTop: 8, fontWeight: "500" },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginRight: 8,
-    marginBottom: 8,
-  },
   durChip: {
     paddingHorizontal: 16,
     paddingVertical: 12,
