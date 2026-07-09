@@ -29,7 +29,6 @@ import {
   loanTermInfo,
 } from "@/src/services/loans";
 import { getRequiredApprovals } from "@/src/services/approvals";
-import { usePricingPreview, PayoutPreview } from "@/src/hooks/usePricingPreview";
 import { formatZMW } from "@/src/utils/currency";
 import { Group } from "@/src/types";
 import { Check, ChevronDown, Clock, Info } from "lucide-react-native";
@@ -98,15 +97,6 @@ export default function Loan() {
   };
 
   const num = parseFloat(amount) || 0;
-
-  // Disclosure only: what the member would actually receive after fees if the
-  // loan is approved. Server computes the fees; the client never does. Debounced
-  // so typing an amount doesn't fire a request per keystroke.
-  const {
-    data: loanPayout,
-    loading: loanPayoutLoading,
-    error: loanPayoutError,
-  } = usePricingPreview<PayoutPreview>("payout", num, { enabled: num > 0 });
 
   if (groupsLoading || eligLoading || !grp) {
     return (
@@ -329,43 +319,6 @@ export default function Loan() {
                   </Text>
                 </View>
               </Card>
-
-              {/* What you'll actually receive after fees (disclosure only) */}
-              {num > 0 && (
-                <Card padding={16} style={{ marginTop: 14 }} testID="loan-net-receive">
-                  {loanPayoutLoading && !loanPayout ? (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      <ActivityIndicator color={colors.primary} />
-                      <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                        Calculating what you&apos;ll receive…
-                      </Text>
-                    </View>
-                  ) : loanPayoutError ? (
-                    <Text style={{ color: colors.textMuted, fontSize: 13 }} testID="loan-net-error">
-                      Couldn&apos;t load the disbursement breakdown. Try again shortly.
-                    </Text>
-                  ) : loanPayout?.tooSmall ? (
-                    <Text style={{ color: colors.textMuted, fontSize: 13 }} testID="loan-net-toosmall">
-                      This amount is too small to borrow after fees.
-                    </Text>
-                  ) : loanPayout ? (
-                    <>
-                      <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                        <Info size={16} color={colors.primary} style={{ marginTop: 2 }} />
-                        <Text style={{ flex: 1, color: colors.textMain, fontSize: 14, marginLeft: 8, lineHeight: 20 }}>
-                          If approved, you&apos;ll receive{" "}
-                          <Text style={{ fontWeight: "700" }}>{formatZMW(loanPayout.netReceived)}</Text> after fees.
-                        </Text>
-                      </View>
-                      <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                      <Row label="Requested" value={formatZMW(loanPayout.owed)} colors={colors} />
-                      <Row label="Transaction fee" value={formatZMW(loanPayout.transactionFee)} colors={colors} />
-                      <Row label="Platform fee" value={formatZMW(loanPayout.platformFee)} colors={colors} />
-                      <Row label="You receive" value={formatZMW(loanPayout.netReceived)} colors={colors} last />
-                    </>
-                  ) : null}
-                </Card>
-              )}
 
               {/* Duration — options capped by the group's size-based tier */}
               <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
