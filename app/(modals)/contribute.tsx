@@ -581,8 +581,11 @@ export default function Contribute() {
                 ) : (
                   <>
                     <ConfirmRow label="Contribution" value={formatZMW(pricing?.base ?? num)} colors={colors} />
-                    <ConfirmRow label="Transaction fee" value={formatZMW(pricing?.feesCovered ?? 0)} colors={colors} />
-                    <ConfirmRow label="Platform fee" value={formatZMW(pricing?.platformFee ?? 0)} colors={colors} />
+                    <ConfirmRow
+                      label="Transaction fees"
+                      value={formatZMW((pricing?.feesCovered ?? 0) + (pricing?.platformFee ?? 0))}
+                      colors={colors}
+                    />
                   </>
                 )}
                 <ConfirmRow label="Group" value={selectedGroup.name} colors={colors} />
