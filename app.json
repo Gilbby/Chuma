@@ -33,7 +33,14 @@
         {
           "image": "./assets/images/splash-image.png",
           "resizeMode": "cover",
-          "backgroundColor": "#0A5C36"
+          "backgroundColor": "#0A5C36",
+          "enableFullScreenImage_legacy": true,
+          "android": {
+            "image": "./assets/images/adaptive-icon.png",
+            "imageWidth": 288,
+            "resizeMode": "contain",
+            "backgroundColor": "#0A5C36"
+          }
         }
       ]
     ],
