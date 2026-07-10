@@ -227,7 +227,8 @@ export default function Home() {
   const quickActions = [
     { label: "Payments", icon: PiggyBank, route: "/contribute" },
     { label: "Loan", icon: HandCoins, route: "/loan" },
-    { label: "Repay", icon: RefreshCw, route: "/repay" },
+    // Repay now lives on the unified payment screen (loans show among the dues).
+    { label: "Repay", icon: RefreshCw, route: "/contribute" },
     // Approvers get Approve; everyone else (Members) gets Share-out in its place.
     ...(canApprove
       ? [{ label: "Approve", icon: CheckSquare, route: "/approvals", badge: pendingApprovals }]
