@@ -13,6 +13,7 @@ import { getGroups, acceptInvite } from "@/src/services/groups";
 import { getNotifications, markNotificationRead } from "@/src/services/notifications";
 import { Group, Notice } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
+import { formatDate } from "@/src/utils/date";
 import { Users, Plus, ChevronRight } from "lucide-react-native";
 
 export default function Groups() {
@@ -206,8 +207,15 @@ export default function Groups() {
 
               <View style={{ flexDirection: "row", marginTop: 14 }}>
                 <StatusBadge label={g.yourRole} variant="primary" />
-                <View style={{ width: 8 }} />
-                <StatusBadge label={`Share-out · ${g.shareOutDate}`} variant="neutral" />
+                {formatDate(g.shareOutDate) ? (
+                  <>
+                    <View style={{ width: 8 }} />
+                    <StatusBadge
+                      label={`Share-out · ${formatDate(g.shareOutDate)}`}
+                      variant="neutral"
+                    />
+                  </>
+                ) : null}
               </View>
             </Card>
           </Pressable>

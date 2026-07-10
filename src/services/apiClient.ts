@@ -9,6 +9,8 @@ type Options = {
   auth?: boolean;
 };
 
+export type ApiError = Error & { status?: number };
+
 const REQUEST_TIMEOUT_MS = 15_000;
 
 // Debounce the redirect so a burst of parallel 401s only navigates once
@@ -75,7 +77,9 @@ export async function api<T = any>(path: string, opts: Options = {}): Promise<T>
       await onSessionExpired();
       throw new Error("Session expired. Please sign in again.");
     }
-    throw new Error(data?.error || `Request failed (${res.status})`);
+    const err = new Error(data?.error || `Request failed (${res.status})`) as ApiError;
+    err.status = res.status;
+    throw err;
   }
 
   return data as T;

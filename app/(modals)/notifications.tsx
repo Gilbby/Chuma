@@ -145,23 +145,36 @@ export default function Notifications() {
     setItems((p) => p.map((n) => ({ ...n, read: true })));
   };
 
-  const handleAcceptInvite = async (n: Notice) => {
-    try {
-      if (n.groupId) await acceptInvite(n.groupId);
-      await markNotificationRead(n.id);
-      setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)));
-      setDismissed((d) => [...d, n.id]);
-      Alert.alert("Joined", `You joined ${n.groupName}.`);
-    } catch (e: any) {
-      Alert.alert("Could not join", e?.message || "Please try again.");
-    }
-  };
-
-  const handleDeclineInvite = async (n: Notice) => {
+  const clearInvite = async (n: Notice) => {
     try { await markNotificationRead(n.id); } catch {}
     setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, read: true } : i)));
     setDismissed((d) => [...d, n.id]);
   };
+
+  const handleAcceptInvite = async (n: Notice) => {
+    try {
+      const res = n.groupId ? await acceptInvite(n.groupId) : { alreadyMember: false };
+      await clearInvite(n);
+      Alert.alert(
+        res.alreadyMember ? "Already a member" : "Joined",
+        res.alreadyMember
+          ? `You're already a member of ${n.groupName}.`
+          : `You joined ${n.groupName}.`
+      );
+    } catch (e: any) {
+      // The invite no longer exists (revoked, or the group dropped you). Clear
+      // the notification instead of leaving an invitation that can never be
+      // accepted sitting in the list.
+      if (e?.status === 404 || e?.status === 403) {
+        await clearInvite(n);
+        Alert.alert("Invitation unavailable", e?.message || "This invitation is no longer valid.");
+        return;
+      }
+      Alert.alert("Could not join", e?.message || "Please try again.");
+    }
+  };
+
+  const handleDeclineInvite = (n: Notice) => clearInvite(n);
 
   const handleCashReceipt = async (n: Notice, received: boolean) => {
     try {

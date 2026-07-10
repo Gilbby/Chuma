@@ -30,6 +30,7 @@ import {
 } from "@/src/services/loans";
 import { getRequiredApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
+import { formatDate } from "@/src/utils/date";
 import { Group } from "@/src/types";
 import { Check, ChevronDown, Clock, Info } from "lucide-react-native";
 
@@ -256,7 +257,8 @@ export default function Loan() {
                   <Text style={{ color: colors.textMain, fontSize: 13, lineHeight: 19, flex: 1 }}>
                     Lending is closed for this cycle. New loans stop within {windowMonths}{" "}
                     {windowMonths === 1 ? "month" : "months"} of share-out so every loan is repaid
-                    before the group shares out{grp.shareOutDate ? ` on ${grp.shareOutDate}` : ""}.
+                    before the group shares out
+                    {formatDate(grp.shareOutDate) ? ` on ${formatDate(grp.shareOutDate)}` : ""}.
                   </Text>
                 </View>
               )}

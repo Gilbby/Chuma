@@ -10,6 +10,8 @@ import {
   Alert,
   TextInput,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
@@ -28,6 +30,7 @@ import { getApprovals } from "@/src/services/approvals";
 import { getGroupTransactions } from "@/src/services/transactions";
 import { getLoans } from "@/src/services/loans";
 import { formatZMW } from "@/src/utils/currency";
+import { formatDate } from "@/src/utils/date";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { Member, Group, Approval, TxnItem, Loan } from "@/src/types";
 import * as Clipboard from "expo-clipboard";
@@ -52,6 +55,11 @@ import {
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
+
+/** Last 9 digits — compares +260971234567, 0971234567 and 971234567 as equal. */
+function phoneKey(phone?: string) {
+  return String(phone ?? "").replace(/\D/g, "").slice(-9);
+}
 
 export default function GroupDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -221,7 +229,7 @@ export default function GroupDetails() {
             <RuleRow
               icon={<Calendar size={18} color={colors.primary} />}
               label="Share-out"
-              value={group.shareOutDate}
+              value={formatDate(group.shareOutDate) || "Not set"}
               colors={colors}
             />
           </Card>
@@ -814,12 +822,15 @@ export default function GroupDetails() {
         animationType="slide"
         onRequestClose={() => { setInviteOpen(false); setInvitePhone(""); setInviteError(""); }}
       >
-        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1, justifyContent: "flex-end" }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <Pressable
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
             onPress={() => { setInviteOpen(false); setInvitePhone(""); setInviteError(""); }}
           />
-          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
             <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 18, marginBottom: 4 }}>
               Invite a member
@@ -878,6 +889,20 @@ export default function GroupDetails() {
                   setInviteError("Enter a 9-digit number after +260");
                   return;
                 }
+                // Catch it here as well as on the server, so the admin sees the
+                // problem without waiting on a round trip.
+                const existing = (group.members ?? []).find(
+                  (m: any) =>
+                    m.status !== "removed" && phoneKey(m.phone) === phoneKey(invitePhone)
+                ) as any;
+                if (existing) {
+                  setInviteError(
+                    existing.status === "pending"
+                      ? `${existing.name || "This number"} has already been invited and hasn't responded yet.`
+                      : `${existing.name || "This number"} is already a member of this group.`
+                  );
+                  return;
+                }
                 const full = `+260${invitePhone}`;
                 setInviting(true);
                 setInviteError("");
@@ -900,7 +925,7 @@ export default function GroupDetails() {
               testID="members-invite-send-btn"
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {locked && (

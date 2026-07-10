@@ -29,8 +29,13 @@ export async function getGroupById(id: string): Promise<Group | undefined> {
   return res.group ? mapGroup(res.group, user?._id) : undefined;
 }
 
-export async function acceptInvite(groupId: string): Promise<void> {
-  await api(`/groups/${groupId}/accept`, { method: "POST" });
+export async function acceptInvite(
+  groupId: string
+): Promise<{ alreadyMember: boolean }> {
+  const res = await api<{ alreadyMember?: boolean }>(`/groups/${groupId}/accept`, {
+    method: "POST",
+  });
+  return { alreadyMember: !!res?.alreadyMember };
 }
 
 export async function createGroup(payload: any): Promise<{ group: any; transaction?: any }> {
