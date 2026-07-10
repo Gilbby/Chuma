@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { getToken } from "@/src/utils/authToken";
 
 const SPLASH_BG =
   "https://static.prod-images.emergentagent.com/jobs/ad57d3a5-0066-4217-af01-a981f77ed10e/images/3aaee2b2f25053386a7dc86ee27194d3ead5308fa01ae8ad39f426e0ff785d7b.png";
@@ -26,7 +27,15 @@ export default function Splash() {
       withTiming(1.05, { duration: 700, easing: Easing.out(Easing.cubic) }),
       withTiming(1, { duration: 350 }),
     );
-    const t = setTimeout(() => router.replace("/welcome"), 1900);
+    const t = setTimeout(async () => {
+      // Restore a persisted session: if a JWT is already stored, go straight
+      // into the app instead of forcing sign-in again. An expired/invalid
+      // token is handled by apiClient's 401 interceptor (clears it + bounces
+      // to /welcome), so we intentionally don't block on a network check here
+      // — that keeps the app usable on spotty connectivity.
+      const token = await getToken();
+      router.replace(token ? "/(tabs)" : "/welcome");
+    }, 1900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
