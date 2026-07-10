@@ -22,19 +22,32 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { getGroups } from "@/src/services/groups";
 import { submitContribution } from "@/src/services/transactions";
+import { getPenalties, payPenalties } from "@/src/services/penalties";
 import { api } from "@/src/services/apiClient";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { detectNetwork } from "@/src/services/mobileMoney";
-import { Group } from "@/src/types";
+import { Group, Penalty } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, ChevronDown, Receipt, AlertTriangle, Lock, Clock } from "lucide-react-native";
+import { Check, ChevronDown, Receipt, AlertTriangle, Lock, Clock, Plus } from "lucide-react-native";
 
 type Step = "entry" | "confirm" | "success";
 
-const TYPES = [
-  { label: "Cycle contribution", description: "Regular required savings contribution for the active group cycle." },
-  { label: "Top-up", description: "Optional extra savings added above the required cycle contribution." },
-];
+const GROUP_SAVING_TYPE = {
+  label: "Group saving",
+  description: "Regular required savings for the active group cycle.",
+};
+
+const TOPUP_TYPE = {
+  label: "Top-up",
+  description: "Optional extra savings added above the required cycle amount.",
+};
+
+const PENALTIES_TYPE = {
+  label: "Penalties",
+  description: "Clear outstanding penalties issued by this group.",
+};
+
+const TYPES = [GROUP_SAVING_TYPE, TOPUP_TYPE, PENALTIES_TYPE];
 
 export default function Contribute() {
   const { colors } = useTheme();
@@ -47,7 +60,9 @@ export default function Contribute() {
   }>();
   const isPenalty = lockedType === "penalty";
   const [step, setStep] = useState<Step>("entry");
-  const [amount, setAmount] = useState(lockedAmount ? lockedAmount : "500");
+  // Prefilled with the group's cycle amount once groups load (see `load`), so
+  // there is nothing to suggest — the field already holds it.
+  const [amount, setAmount] = useState(lockedAmount ? lockedAmount : "");
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -58,6 +73,11 @@ export default function Contribute() {
   );
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
+  // Unpaid penalties the member owes in the SELECTED group, and the subset they
+  // have ticked to pay now. The amount field is the sum of the ticked ones.
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [penaltiesLoading, setPenaltiesLoading] = useState(false);
+  const [selectedPenaltyIds, setSelectedPenaltyIds] = useState<string[]>([]);
   const [payerPhone, setPayerPhone] = useState("");
   const [payCash, setPayCash] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -86,16 +106,62 @@ export default function Contribute() {
         getCurrentUser<{ phone?: string }>(),
       ]);
       setGroups(fetchedGroups);
-      setSelectedGroup(fetchedGroups.find((g) => g.id === groupId) ?? fetchedGroups[0] ?? null);
+      const group = fetchedGroups.find((g) => g.id === groupId) ?? fetchedGroups[0] ?? null;
+      setSelectedGroup(group);
+      // Prefill the cycle amount. A penalty carries its own locked amount, which
+      // must never be overwritten.
+      if (!lockedAmount && group?.contributionAmount) {
+        setAmount(String(group.contributionAmount));
+      }
       setPayerPhone(user?.phone ?? "");
     } finally {
       setGroupsLoading(false);
     }
-  }, [groupId]);
+  }, [groupId, lockedAmount]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const isPenaltiesMode = type.label === PENALTIES_TYPE.label;
+
+  // Pending penalties for the selected group only — a member can owe penalties
+  // in several groups, but one payment settles one group's.
+  useEffect(() => {
+    const gid = selectedGroup?.id;
+    if (!gid) return;
+    let cancelled = false;
+    setPenaltiesLoading(true);
+    getPenalties({ mine: true, groupId: gid })
+      .then((all) => {
+        if (cancelled) return;
+        setPenalties(all.filter((p) => p.status === "pending"));
+      })
+      .catch(() => {
+        if (!cancelled) setPenalties([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPenaltiesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGroup?.id]);
+
+  const penaltyTotal = penalties
+    .filter((p) => selectedPenaltyIds.includes(p.id))
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  // In penalties mode the amount is DERIVED from the ticked penalties — the
+  // field is read-only, so this is the only thing that may write it.
+  useEffect(() => {
+    if (isPenaltiesMode) setAmount(penaltyTotal > 0 ? String(penaltyTotal) : "");
+  }, [isPenaltiesMode, penaltyTotal]);
+
+  const togglePenalty = (id: string) =>
+    setSelectedPenaltyIds((ids) =>
+      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
+    );
 
   const detectedNetwork = detectNetwork(payerPhone).network;
   const paymentMethodLabel = payCash ? "Cash" : detectedNetwork;
@@ -114,10 +180,13 @@ export default function Contribute() {
 
   const num = parseFloat(amount.replace(/,/g, "")) || 0;
   const minError =
-    !!selectedGroup && num > 0 && num < selectedGroup.contributionAmount && type.label === "Cycle contribution"
+    !!selectedGroup && num > 0 && num < selectedGroup.contributionAmount && type.label === GROUP_SAVING_TYPE.label
       ? `Minimum K ${selectedGroup.contributionAmount} for this cycle`
       : "";
-  const displayError = (submitAttempted && num <= 0 ? "Enter a valid amount" : "") || minError;
+  const emptyError = isPenaltiesMode
+    ? "Select at least one penalty to pay"
+    : "Enter a valid amount";
+  const displayError = (submitAttempted && num <= 0 ? emptyError : "") || minError;
 
   // Review → Confirm: fetch the REAL server-computed breakdown first, and only
   // advance once it returns. Cash is priced identically by the backend (it
@@ -125,6 +194,13 @@ export default function Contribute() {
   const goToConfirm = async () => {
     if (num <= 0) {
       setSubmitAttempted(true);
+      return;
+    }
+    // A penalty is collected at face value — no contribution gross-up applies,
+    // so there is no /pricing/preview to fetch.
+    if (isPenaltiesMode) {
+      setPricing(null);
+      setStep("confirm");
       return;
     }
     setPricingLoading(true);
@@ -151,7 +227,7 @@ export default function Contribute() {
   if (groupsLoading || !selectedGroup) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-        <ScreenHeader title="Make contribution" />
+        <ScreenHeader title="Make Payment" />
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -169,6 +245,7 @@ export default function Contribute() {
         receiptId={serverTxn?.receiptId ?? receiptId.current}
         status={serverTxn?.status ?? "completed"}
         isCash={payCash}
+        typeLabel={type.label}
       />
     );
   }
@@ -180,7 +257,7 @@ export default function Contribute() {
       testID="contribute-screen"
     >
       <ScreenHeader
-        title={step === "entry" ? "Make contribution" : "Confirm contribution"}
+        title={step === "entry" ? "Make Payment" : "Confirm payment"}
         onBack={step === "confirm" ? () => setStep("entry") : undefined}
       />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -192,7 +269,7 @@ export default function Contribute() {
               <View
                 style={[
                   styles.amountWrap,
-                  { backgroundColor: isPenalty ? colors.surfaceSecondary : colors.surface, borderColor: displayError ? colors.danger : colors.border },
+                  { backgroundColor: isPenalty || isPenaltiesMode ? colors.surfaceSecondary : colors.surface, borderColor: displayError ? colors.danger : colors.border },
                 ]}
               >
                 <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
@@ -203,36 +280,96 @@ export default function Contribute() {
                   keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
                   placeholder="0"
                   placeholderTextColor={colors.textMuted}
-                  editable={!isPenalty}
+                  // Penalties mode: the total is the sum of the ticked penalties.
+                  editable={!isPenalty && !isPenaltiesMode}
                   testID={isPenalty ? "contribute-amount-locked" : "contribute-amount-input"}
                 />
+                {isPenaltiesMode && <Lock size={16} color={colors.textMuted} />}
               </View>
               {displayError ? (
                 <Text style={[styles.errText, { color: colors.danger }]}>{displayError}</Text>
-              ) : (
-                <Text style={[styles.helper, { color: colors.textMuted }]}>
-                  Suggested: {formatZMW(selectedGroup.contributionAmount)}
-                </Text>
+              ) : null}
+
+              {/* Penalty breakdown — tick each penalty to add it to the total */}
+              {isPenaltiesMode && (
+                <View style={{ marginTop: 20 }} testID="contribute-penalty-list">
+                  <Text style={[styles.label, { color: colors.textMuted }]}>
+                    Outstanding penalties
+                  </Text>
+                  {penaltiesLoading ? (
+                    <Card padding={16}>
+                      <ActivityIndicator color={colors.primary} />
+                    </Card>
+                  ) : penalties.length === 0 ? (
+                    <Card padding={16}>
+                      <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
+                        No outstanding penalties in {selectedGroup.name}.
+                      </Text>
+                    </Card>
+                  ) : (
+                    <Card padding={4}>
+                      {penalties.map((p, i) => {
+                        const picked = selectedPenaltyIds.includes(p.id);
+                        return (
+                          <Pressable
+                            key={p.id}
+                            onPress={() => togglePenalty(p.id)}
+                            style={({ pressed }) => [
+                              styles.penaltyRow,
+                              { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+                            ]}
+                            testID={`contribute-penalty-${p.id}`}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: picked }}
+                          >
+                            <View
+                              style={[
+                                styles.penaltyToggle,
+                                {
+                                  backgroundColor: picked ? colors.primary : "transparent",
+                                  borderColor: picked ? colors.primary : colors.border,
+                                },
+                              ]}
+                            >
+                              {picked ? (
+                                <Check size={16} color="#fff" strokeWidth={3} />
+                              ) : (
+                                <Plus size={16} color={colors.textMuted} strokeWidth={2.5} />
+                              )}
+                            </View>
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                              <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>
+                                {p.reason}
+                              </Text>
+                              <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                                {new Date(p.createdAt).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </Text>
+                            </View>
+                            <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
+                              {formatZMW(p.amount)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                      {selectedPenaltyIds.length > 0 && (
+                        <View style={[styles.penaltyTotal, { borderTopColor: colors.border }]}>
+                          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                            {selectedPenaltyIds.length} selected
+                          </Text>
+                          <Text style={{ color: colors.textMain, fontWeight: "700" }}>
+                            {formatZMW(penaltyTotal)}
+                          </Text>
+                        </View>
+                      )}
+                    </Card>
+                  )}
+                </View>
               )}
 
-              {/* Quick amount chips */}
-              <View style={styles.chips}>
-                {[200, 500, 1000, 2000, 5000].map((v) => (
-                  <Pressable
-                    key={v}
-                    onPress={() => setAmount(String(v))}
-                    style={[
-                      styles.chip,
-                      { backgroundColor: colors.surface, borderColor: colors.border },
-                    ]}
-                    testID={`contribute-quick-${v}`}
-                  >
-                    <Text style={{ color: colors.textMain, fontWeight: "600" }}>
-                      K {v.toLocaleString()}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
 
               {/* Group picker */}
               <Picker
@@ -249,6 +386,14 @@ export default function Contribute() {
                       key={g.id}
                       onPress={() => {
                         setSelectedGroup(g);
+                        // Penalties belong to a group — a switch invalidates them.
+                        setSelectedPenaltyIds([]);
+                        // Each group has its own cycle amount — follow the switch,
+                        // except for a locked penalty, or penalties mode where the
+                        // amount is derived from the ticked penalties.
+                        if (!lockedAmount && !isPenaltiesMode && g.contributionAmount) {
+                          setAmount(String(g.contributionAmount));
+                        }
                         setShowGroupPicker(false);
                       }}
                       style={({ pressed }) => [
@@ -285,7 +430,7 @@ export default function Contribute() {
                 >
                   <View>
                     <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 }}>
-                      CONTRIBUTION TYPE
+                      PAYMENT TYPE
                     </Text>
                     <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600", marginTop: 4 }}>
                       {type.label}
@@ -295,7 +440,7 @@ export default function Contribute() {
                 </View>
               ) : (
               <Picker
-                label="Contribution type"
+                label="Payment type"
                 value={type.label}
                 onPress={() => setShowTypePicker((s) => !s)}
                 colors={colors}
@@ -308,6 +453,20 @@ export default function Contribute() {
                       key={t.label}
                       onPress={() => {
                         setType(t);
+                        setSubmitAttempted(false);
+                        // Penalties are mobile-money only; the cash toggle is
+                        // hidden, so it must not stay on from a previous type.
+                        if (t.label === PENALTIES_TYPE.label) setPayCash(false);
+                        // Leaving penalties mode hands the field back to the
+                        // member, prefilled with the cycle amount again.
+                        if (t.label !== PENALTIES_TYPE.label) {
+                          setSelectedPenaltyIds([]);
+                          setAmount(
+                            selectedGroup?.contributionAmount
+                              ? String(selectedGroup.contributionAmount)
+                              : ""
+                          );
+                        }
                         setShowTypePicker(false);
                       }}
                       style={({ pressed }) => [
@@ -347,20 +506,24 @@ export default function Contribute() {
                 </Text>
               )}
 
-              <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Pay with cash</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                    Recorded by an admin, no mobile money charge
-                  </Text>
+              {/* Penalties are collected by mobile money only — the penalty
+                  endpoint has no admin-recorded cash path. */}
+              {!isPenaltiesMode && (
+                <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Pay with cash</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                      Recorded by an admin, no mobile money charge
+                    </Text>
+                  </View>
+                  <Switch
+                    value={payCash}
+                    onValueChange={setPayCash}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    testID="contribute-cash-toggle"
+                  />
                 </View>
-                <Switch
-                  value={payCash}
-                  onValueChange={setPayCash}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  testID="contribute-cash-toggle"
-                />
-              </View>
+              )}
 
               {/* Cycle progress */}
               <View style={{ marginTop: 20 }}>
@@ -391,7 +554,12 @@ export default function Contribute() {
               <Button
                 label="Review"
                 loading={pricingLoading}
-                disabled={!!minError || networkUnknown || pricingLoading}
+                disabled={
+                  !!minError ||
+                  networkUnknown ||
+                  pricingLoading ||
+                  (isPenaltiesMode && selectedPenaltyIds.length === 0)
+                }
                 onPress={goToConfirm}
                 testID="contribute-review-btn"
               />
@@ -404,9 +572,19 @@ export default function Contribute() {
                   {formatZMW(pricing?.depositAmount ?? num)}
                 </Text>
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                <ConfirmRow label="Contribution" value={formatZMW(pricing?.base ?? num)} colors={colors} />
-                <ConfirmRow label="Transaction fee" value={formatZMW(pricing?.feesCovered ?? 0)} colors={colors} />
-                <ConfirmRow label="Platform fee" value={formatZMW(pricing?.platformFee ?? 0)} colors={colors} />
+                {isPenaltiesMode ? (
+                  penalties
+                    .filter((p) => selectedPenaltyIds.includes(p.id))
+                    .map((p) => (
+                      <ConfirmRow key={p.id} label={p.reason} value={formatZMW(p.amount)} colors={colors} />
+                    ))
+                ) : (
+                  <>
+                    <ConfirmRow label="Contribution" value={formatZMW(pricing?.base ?? num)} colors={colors} />
+                    <ConfirmRow label="Transaction fee" value={formatZMW(pricing?.feesCovered ?? 0)} colors={colors} />
+                    <ConfirmRow label="Platform fee" value={formatZMW(pricing?.platformFee ?? 0)} colors={colors} />
+                  </>
+                )}
                 <ConfirmRow label="Group" value={selectedGroup.name} colors={colors} />
                 <ConfirmRow label="Type" value={type.label} colors={colors} />
                 <ConfirmRow
@@ -437,14 +615,23 @@ export default function Contribute() {
                   setSubmitting(true);
                   setSubmitError("");
                   try {
-                    const res = await submitContribution({
-                      groupId: selectedGroup.id,
-                      amount: num,
-                      contributionType: type.label === "Top-up" ? "topup" : "cycle",
-                      paymentMethod: paymentMethodLabel,
-                      payerPhone,
-                    });
-                    setServerTxn(res.transaction);
+                    if (isPenaltiesMode) {
+                      // One deposit clears every ticked penalty — settlement marks
+                      // each paid and routes it per the group's constitution.
+                      const res = await payPenalties(selectedPenaltyIds, payerPhone);
+                      setServerTxn(res.transaction);
+                    } else {
+                      const res = await submitContribution({
+                        groupId: selectedGroup.id,
+                        amount: num,
+                        // API contract — the wire values stay "topup"/"cycle"
+                        // regardless of what the labels are called on screen.
+                        contributionType: type.label === TOPUP_TYPE.label ? "topup" : "cycle",
+                        paymentMethod: paymentMethodLabel,
+                        payerPhone,
+                      });
+                      setServerTxn(res.transaction);
+                    }
                     setStep("success");
                   } catch (e: any) {
                     setSubmitError(e?.message || "Payment failed. Please try again.");
@@ -530,6 +717,7 @@ const SuccessScreen = ({
   receiptId,
   status,
   isCash,
+  typeLabel,
 }: {
   amount: number;
   group: string;
@@ -538,15 +726,22 @@ const SuccessScreen = ({
   receiptId: string;
   status: "completed" | "pending" | string;
   isCash: boolean;
+  typeLabel: string;
 }) => {
   const pending = status === "pending";
+  // Penalties clear a debt; they never credit the member's savings.
+  const isPenalties = typeLabel === PENALTIES_TYPE.label;
   const title = !pending
-    ? "Contribution received"
+    ? isPenalties
+      ? "Penalties paid"
+      : "Payment received"
     : isCash
       ? "Awaiting treasurer confirmation"
       : "Payment processing";
   const message = !pending
-    ? `Your contribution of ${formatZMW(amount)} to ${group} has been recorded and your savings updated.`
+    ? isPenalties
+      ? `Your penalty payment of ${formatZMW(amount)} to ${group} has been recorded.`
+      : `Your payment of ${formatZMW(amount)} to ${group} has been recorded and your savings updated.`
     : isCash
       ? `Your ${formatZMW(amount)} cash contribution to ${group} has been recorded. Your savings will update once the treasurer confirms receiving the cash.`
       : `Approve the ${formatZMW(amount)} payment on your phone. Your savings in ${group} will update as soon as the payment is confirmed — usually within seconds.`;
@@ -613,7 +808,7 @@ const SuccessScreen = ({
                   type: "contribution",
                   group,
                   date: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
-                  note: "Cycle contribution",
+                  note: typeLabel,
                   status,
                   direction: "out",
                   txnId: receiptId,
@@ -644,16 +839,30 @@ const styles = StyleSheet.create({
   },
   currency: { fontSize: 28, fontWeight: "700" },
   amountInput: { flex: 1, fontSize: 44, fontWeight: "700", letterSpacing: -1, padding: 0 },
-  helper: { fontSize: 12, marginTop: 8 },
   errText: { fontSize: 12, marginTop: 8, fontWeight: "500" },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginRight: 8,
-    marginBottom: 8,
+  penaltyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  penaltyToggle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  penaltyTotal: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    marginHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   picker: {
     flexDirection: "row",

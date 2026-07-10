@@ -169,6 +169,20 @@ export async function recordViolation(input: {
   return mapPenalty(res.penalty);
 }
 
+/**
+ * Pay several penalties in ONE deposit — a single mobile-money prompt and a
+ * single transaction fee. All must belong to the same group.
+ */
+export async function payPenalties(
+  penaltyIds: string[],
+  payerPhone?: string
+): Promise<{ message?: string; penalties?: any[]; transaction?: any }> {
+  return api("/penalties/pay", {
+    method: "POST",
+    body: { penaltyIds, ...(payerPhone ? { payerPhone } : {}) },
+  });
+}
+
 export async function payPenalty(
   penaltyId: string,
   payerPhone?: string

@@ -225,7 +225,7 @@ export default function Home() {
     can("approve.shareout");
 
   const quickActions = [
-    { label: "Save", icon: PiggyBank, route: "/contribute" },
+    { label: "Payments", icon: PiggyBank, route: "/contribute" },
     { label: "Loan", icon: HandCoins, route: "/loan" },
     { label: "Repay", icon: RefreshCw, route: "/repay" },
     // Approvers get Approve; everyone else (Members) gets Share-out in its place.
