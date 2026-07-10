@@ -10,6 +10,16 @@ function mapNotice(raw: any): Notice {
   };
 }
 
+/**
+ * An invite the user can still act on. Notifications written before
+ * "invite_accepted" existed have type "invite" even when they are really the
+ * inviter's own "X accepted" confirmation — those carry no `invitedBy`, so they
+ * are excluded here rather than rendered with dead Accept/Decline buttons.
+ */
+export function isActionableInvite(n: Notice): boolean {
+  return n.type === "invite" && !n.read && !!n.invitedBy && !!n.groupId;
+}
+
 export async function getNotifications(): Promise<Notice[]> {
   const res = await api<{ notifications: any[] }>("/notifications");
   return (res.notifications ?? []).map(mapNotice);

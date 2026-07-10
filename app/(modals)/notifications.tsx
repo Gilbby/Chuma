@@ -7,7 +7,7 @@ import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Notice, Group } from "@/src/types";
-import { getNotifications, markAllNotificationsRead, markNotificationRead } from "@/src/services/notifications";
+import { getNotifications, markAllNotificationsRead, markNotificationRead, isActionableInvite } from "@/src/services/notifications";
 import { confirmCashContribution, retryPayout } from "@/src/services/transactions";
 import { getGroups, acceptInvite } from "@/src/services/groups";
 import { getGraceInfo, getAmountOwed, getMonthsOwed } from "@/src/services/groupFees";
@@ -32,6 +32,7 @@ const ICONS = {
   security: ShieldAlert,
   repayment: RefreshCw,
   invite: Users,
+  invite_accepted: Users,
   penalty: AlertTriangle,
   kyc: ShieldCheck,
 };
@@ -56,6 +57,7 @@ const TINTS: Record<Notice["type"], "primary" | "info" | "success" | "warning" |
   security: "warning",
   repayment: "info",
   invite: "primary",
+  invite_accepted: "success",
   penalty: "warning",
   kyc: "warning",
 };
@@ -370,7 +372,7 @@ const NotifCard = ({
               ]}
             />
           )}
-          {n.type === "invite" && !n.read && (
+          {isActionableInvite(n) && (
             <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
               <Button
                 label="Decline"

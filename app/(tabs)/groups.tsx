@@ -10,7 +10,11 @@ import { ErrorState } from "@/src/components/common";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { getGroups, acceptInvite } from "@/src/services/groups";
-import { getNotifications, markNotificationRead } from "@/src/services/notifications";
+import {
+  getNotifications,
+  markNotificationRead,
+  isActionableInvite,
+} from "@/src/services/notifications";
 import { Group, Notice } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
@@ -32,7 +36,7 @@ export default function Groups() {
     try {
       const [g, notifs] = await Promise.all([getGroups(), getNotifications()]);
       setGroups(g);
-      setInvites(notifs.filter((n) => n.type === "invite" && !n.read));
+      setInvites(notifs.filter(isActionableInvite));
     } catch (e) {
       setError(true);
     } finally {

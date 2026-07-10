@@ -173,7 +173,17 @@ export interface Penalty {
 
 export interface Notice {
   id: string;
-  type: "loan" | "contribution" | "governance" | "security" | "repayment" | "invite" | "penalty" | "kyc";
+  /** "invite" is actionable; "invite_accepted" is the inviter's confirmation. */
+  type:
+    | "loan"
+    | "contribution"
+    | "governance"
+    | "security"
+    | "repayment"
+    | "invite"
+    | "invite_accepted"
+    | "penalty"
+    | "kyc";
   title: string;
   body: string;
   date: string;
