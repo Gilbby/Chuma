@@ -23,6 +23,7 @@ import {
   Info,
   TrendingUp,
   TrendingDown,
+  FileText,
 } from "lucide-react-native";
 import { getGroups } from "@/src/services/groups";
 import { getPenalties } from "@/src/services/penalties";
@@ -271,6 +272,13 @@ export default function Profile() {
         )}
 
         <Section title="Activity" colors={colors}>
+          <Row
+            icon={<FileText size={20} color={colors.primary} />}
+            label="Account statement"
+            colors={colors}
+            onPress={() => router.push("/statement")}
+            testID="profile-statement-row"
+          />
           <Row
             icon={<Users size={20} color={colors.primary} />}
             label="My groups"

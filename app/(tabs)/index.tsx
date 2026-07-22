@@ -14,7 +14,7 @@ import {
   Bell,
   PiggyBank,
   HandCoins,
-  RefreshCw,
+  FileText,
   CheckSquare,
   Gift,
   ShieldCheck,
@@ -227,8 +227,9 @@ export default function Home() {
   const quickActions = [
     { label: "Payments", icon: PiggyBank, route: "/contribute" },
     { label: "Loan", icon: HandCoins, route: "/loan" },
-    // Repay now lives on the unified payment screen (loans show among the dues).
-    { label: "Repay", icon: RefreshCw, route: "/contribute" },
+    // Repay now lives on the unified payment screen (loans show among the dues),
+    // reached from Payments — so the freed slot surfaces the account statement.
+    { label: "Statements", icon: FileText, route: "/statement" },
     // Approvers get Approve; everyone else (Members) gets Share-out in its place.
     ...(canApprove
       ? [{ label: "Approve", icon: CheckSquare, route: "/approvals", badge: pendingApprovals }]

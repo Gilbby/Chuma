@@ -1,0 +1,731 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Modal,
+  FlatList,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useTheme } from "@/src/theme/ThemeContext";
+import { ScreenHeader, ErrorState, ExportSheet } from "@/src/components/common";
+import { Card } from "@/src/components/ui/Card";
+import { Button } from "@/src/components/ui/Button";
+import { SkeletonGroup } from "@/src/components/ui";
+import { getGroups } from "@/src/services/groups";
+import { getStatement, Statement } from "@/src/services/statement";
+import { exportStatementPdf, exportStatementCsv } from "@/src/utils/exports";
+import { formatZMW } from "@/src/utils/currency";
+import { Group } from "@/src/types";
+import { Download, Calendar, ChevronDown, Check } from "lucide-react-native";
+
+// ─── Period presets ──────────────────────────────────────────────────────────
+// A statement always covers a closed range. `to` is pushed to the last
+// millisecond of its day so a transaction made this afternoon still lands
+// inside "This month".
+
+type PresetKey = "this-month" | "last-month" | "3months" | "year" | "custom";
+
+const endOfDay = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+function presetRange(key: Exclude<PresetKey, "custom">): { from: Date; to: Date } {
+  const now = new Date();
+  switch (key) {
+    case "this-month":
+      return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: endOfDay(now) };
+    case "last-month":
+      return {
+        from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+        to: endOfDay(new Date(now.getFullYear(), now.getMonth(), 0)),
+      };
+    case "3months":
+      return { from: new Date(now.getFullYear(), now.getMonth() - 2, 1), to: endOfDay(now) };
+    case "year":
+      return { from: new Date(now.getFullYear(), 0, 1), to: endOfDay(now) };
+  }
+}
+
+const PRESETS: { key: PresetKey; label: string }[] = [
+  { key: "this-month", label: "This month" },
+  { key: "last-month", label: "Last month" },
+  { key: "3months", label: "Last 3 months" },
+  { key: "year", label: "This year" },
+  { key: "custom", label: "Custom" },
+];
+
+const fmtDay = (d: string | Date) =>
+  new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+const fmtShort = (d: string | Date) =>
+  new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+const fmtMonth = (d: Date) =>
+  d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+
+/** The trailing 24 calendar months, newest first — the custom-range choices. */
+function recentMonths(count = 24): Date[] {
+  const now = new Date();
+  return Array.from({ length: count }, (_, i) => new Date(now.getFullYear(), now.getMonth() - i, 1));
+}
+
+export default function StatementScreen() {
+  const { colors } = useTheme();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ groupId?: string }>();
+
+  const [preset, setPreset] = useState<PresetKey>("this-month");
+  const [range, setRange] = useState(() => presetRange("this-month"));
+  const [groupId, setGroupId] = useState<string | null>(params.groupId ?? null);
+
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [statement, setStatement] = useState<Statement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+  const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
+  const [customStart, setCustomStart] = useState<Date | null>(null);
+
+  useEffect(() => {
+    getGroups()
+      .then(setGroups)
+      .catch(() => setGroups([]));
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      setStatement(await getStatement({ from: range.from, to: range.to, groupId }));
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [range, groupId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const groupLabel = groupId
+    ? groups.find((g) => g.id === groupId)?.name ?? "Selected group"
+    : "All groups";
+  const periodLabel = `${fmtDay(range.from)} – ${fmtDay(range.to)}`;
+
+  const choosePreset = (key: PresetKey) => {
+    if (key === "custom") {
+      setCustomStart(null);
+      setPeriodPickerOpen(true);
+      return;
+    }
+    setPreset(key);
+    setRange(presetRange(key));
+  };
+
+  // Two taps: first month = start, second = end (inclusive). Tapping the same
+  // month twice gives that single month.
+  const chooseMonth = (month: Date) => {
+    if (!customStart) {
+      setCustomStart(month);
+      return;
+    }
+    const [a, b] = customStart <= month ? [customStart, month] : [month, customStart];
+    const to = endOfDay(new Date(b.getFullYear(), b.getMonth() + 1, 0));
+    const now = new Date();
+    setRange({ from: a, to: to > now ? endOfDay(now) : to });
+    setPreset("custom");
+    setCustomStart(null);
+    setPeriodPickerOpen(false);
+  };
+
+  const months = useMemo(() => recentMonths(), []);
+
+  return (
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={["top"]}
+      testID="statement-screen"
+    >
+      <ScreenHeader
+        title="Statement"
+        subtitle={periodLabel}
+        rightAction={
+          <Pressable
+            onPress={() => setExportOpen(true)}
+            disabled={!statement}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: statement ? 1 : 0.4,
+            }}
+            testID="statement-export-btn"
+          >
+            <Download size={18} color={colors.primary} />
+          </Pressable>
+        }
+      />
+
+      {/* Scope: which group, which period */}
+      <View style={styles.scopeRow}>
+        <Pressable
+          onPress={() => setGroupPickerOpen(true)}
+          style={[styles.scopeBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          testID="statement-group-btn"
+        >
+          <Text style={[styles.scopeText, { color: colors.textMain }]} numberOfLines={1}>
+            {groupLabel}
+          </Text>
+          <ChevronDown size={16} color={colors.textMuted} />
+        </Pressable>
+      </View>
+
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={PRESETS}
+        keyExtractor={(p) => p.key}
+        contentContainerStyle={styles.chipRow}
+        style={{ flexGrow: 0 }}
+        renderItem={({ item }) => {
+          const active = item.key === preset;
+          return (
+            <Pressable
+              onPress={() => choosePreset(item.key)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primary : colors.surface,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}
+              testID={`statement-preset-${item.key}`}
+            >
+              {item.key === "custom" ? (
+                <Calendar size={13} color={active ? "#fff" : colors.textMuted} />
+              ) : null}
+              <Text style={[styles.chipText, { color: active ? "#fff" : colors.textMain }]}>
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        }}
+      />
+
+      {loading ? (
+        <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
+          <SkeletonGroup count={4} height={110} />
+        </View>
+      ) : error || !statement ? (
+        <ErrorState onRetry={load} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Balance summary */}
+          <Card padding={18} testID="statement-summary">
+            <Text style={[styles.eyebrow, { color: colors.textMuted }]}>CLOSING SAVINGS BALANCE</Text>
+            <Text style={[styles.balance, { color: colors.textMain }]}>
+              {formatZMW(statement.closingBalance)}
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+              {statement.group ? statement.group.name : "Across all your groups"} · as at{" "}
+              {fmtDay(statement.period.to)}
+            </Text>
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <SummaryRow
+              k="Opening balance"
+              v={formatZMW(statement.openingBalance)}
+              colors={colors}
+            />
+            <SummaryRow
+              k="Savings in"
+              v={`+${formatZMW(statement.savingsIn)}`}
+              tint={colors.success}
+              colors={colors}
+            />
+            <SummaryRow
+              k="Savings out"
+              v={`−${formatZMW(statement.savingsOut)}`}
+              tint={statement.savingsOut > 0 ? colors.danger : undefined}
+              colors={colors}
+            />
+            <SummaryRow
+              k="Closing balance"
+              v={formatZMW(statement.closingBalance)}
+              bold
+              colors={colors}
+            />
+          </Card>
+
+          {/* Savings ledger — the running-balance account */}
+          <SectionTitle colors={colors}>SAVINGS ACCOUNT</SectionTitle>
+          <Card padding={0}>
+            <LedgerRow
+              date={fmtShort(statement.period.from)}
+              title="Opening balance"
+              amount={null}
+              balance={statement.openingBalance}
+              colors={colors}
+              muted
+            />
+            {statement.lines.length === 0 ? (
+              <View style={{ padding: 16 }}>
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                  No savings movement in this period.
+                </Text>
+              </View>
+            ) : (
+              statement.lines.map((l) => (
+                <LedgerRow
+                  key={l.id}
+                  date={fmtShort(l.date)}
+                  title={l.description}
+                  subtitle={statement.group ? l.note : l.groupName}
+                  amount={l.delta}
+                  balance={l.balance}
+                  colors={colors}
+                  onPress={
+                    l.receiptId
+                      ? () =>
+                          router.push({
+                            pathname: "/receipt",
+                            params: {
+                              amount: String(Math.abs(l.delta)),
+                              type: l.type === "combined" ? "contribution" : l.type,
+                              group: l.groupName,
+                              date: fmtDay(l.date),
+                              note: l.note,
+                              status: l.status,
+                              direction: l.delta >= 0 ? "out" : "in",
+                              txnId: l.receiptId,
+                            },
+                          })
+                      : undefined
+                  }
+                />
+              ))
+            )}
+            <LedgerRow
+              date={fmtShort(statement.period.to)}
+              title="Closing balance"
+              amount={null}
+              balance={statement.closingBalance}
+              colors={colors}
+              bold
+              last
+            />
+          </Card>
+
+          {/* Everything else that moved money in the period */}
+          <SectionTitle colors={colors}>ALL ACTIVITY</SectionTitle>
+          <Card padding={0}>
+            {statement.activity.length === 0 ? (
+              <View style={{ padding: 16 }}>
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                  No transactions in this period.
+                </Text>
+              </View>
+            ) : (
+              statement.activity.map((a, i) => (
+                <View
+                  key={a.id}
+                  style={[
+                    styles.activityRow,
+                    i < statement.activity.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 13 }}>
+                      {a.description}
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                      {fmtShort(a.date)}
+                      {a.groupName ? ` · ${a.groupName}` : ""}
+                      {a.status !== "completed" ? ` · ${a.status}` : ""}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      color:
+                        a.status !== "completed"
+                          ? colors.textMuted
+                          : a.direction === "in"
+                            ? colors.success
+                            : colors.textMain,
+                      fontWeight: "700",
+                      fontSize: 13,
+                    }}
+                  >
+                    {a.direction === "in" ? "+" : "−"}
+                    {formatZMW(a.amount)}
+                  </Text>
+                </View>
+              ))
+            )}
+          </Card>
+
+          {/* Cash totals */}
+          <Card padding={18} style={{ marginTop: 12 }}>
+            <SummaryRow
+              k="Money in"
+              v={`+${formatZMW(statement.totals.moneyIn)}`}
+              tint={colors.success}
+              colors={colors}
+            />
+            <SummaryRow
+              k="Money out"
+              v={`−${formatZMW(statement.totals.moneyOut)}`}
+              colors={colors}
+            />
+            {statement.totals.pending > 0 ? (
+              <SummaryRow
+                k="Pending"
+                v={formatZMW(statement.totals.pending)}
+                tint={colors.warning}
+                colors={colors}
+              />
+            ) : null}
+            <SummaryRow
+              k="Net"
+              v={`${statement.totals.net < 0 ? "−" : "+"}${formatZMW(Math.abs(statement.totals.net))}`}
+              bold
+              colors={colors}
+            />
+          </Card>
+
+          <Text style={[styles.note, { color: colors.textMuted }]}>
+            Statement no. {statement.statementId} · issued {fmtDay(statement.generatedAt)}.
+            {"\n"}The balance is your savings stake. Loans, repayments, penalties and fees appear
+            under All activity and do not change it.
+          </Text>
+
+          <Button
+            label="Export statement"
+            icon={<Download size={18} color="#fff" />}
+            onPress={() => setExportOpen(true)}
+            style={{ marginTop: 16 }}
+            testID="statement-export-cta"
+          />
+        </ScrollView>
+      )}
+
+      <ExportSheet
+        visible={exportOpen}
+        onClose={() => setExportOpen(false)}
+        title="Export statement"
+        subtitle={periodLabel}
+        pdfHint="Bank-style statement, ready to print or share"
+        csvHint="Spreadsheet format, opens in Excel or Sheets"
+        onPdf={() => statement && exportStatementPdf(statement)}
+        onCsv={() => statement && exportStatementCsv(statement)}
+      />
+
+      {/* Group scope picker */}
+      <Modal
+        visible={groupPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setGroupPickerOpen(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
+          onPress={() => setGroupPickerOpen(false)}
+        />
+        <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+          <View style={[styles.grabber, { backgroundColor: colors.border }]} />
+          <Text style={[styles.sheetTitle, { color: colors.textMain }]}>Statement for</Text>
+          <Card padding={0}>
+            <PickerRow
+              label="All groups"
+              selected={groupId === null}
+              onPress={() => {
+                setGroupId(null);
+                setGroupPickerOpen(false);
+              }}
+              colors={colors}
+              testID="statement-group-all"
+            />
+            {groups.map((g) => (
+              <PickerRow
+                key={g.id}
+                label={g.name}
+                selected={groupId === g.id}
+                onPress={() => {
+                  setGroupId(g.id);
+                  setGroupPickerOpen(false);
+                }}
+                colors={colors}
+                testID={`statement-group-${g.id}`}
+              />
+            ))}
+          </Card>
+          <Button
+            label="Cancel"
+            variant="ghost"
+            style={{ marginTop: 16 }}
+            onPress={() => setGroupPickerOpen(false)}
+          />
+        </View>
+      </Modal>
+
+      {/* Custom period picker — pick a start month, then an end month */}
+      <Modal
+        visible={periodPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPeriodPickerOpen(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
+          onPress={() => setPeriodPickerOpen(false)}
+        />
+        <View style={[styles.sheet, { backgroundColor: colors.background, maxHeight: "70%" }]}>
+          <View style={[styles.grabber, { backgroundColor: colors.border }]} />
+          <Text style={[styles.sheetTitle, { color: colors.textMain }]}>
+            {customStart ? "Pick the last month" : "Pick the first month"}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 16 }}>
+            {customStart
+              ? `From ${fmtMonth(customStart)} to…`
+              : "Choose the month your statement should start"}
+          </Text>
+          <ScrollView style={{ maxHeight: 320 }}>
+            <Card padding={0}>
+              {months.map((m) => (
+                <PickerRow
+                  key={m.toISOString()}
+                  label={fmtMonth(m)}
+                  selected={!!customStart && m.getTime() === customStart.getTime()}
+                  onPress={() => chooseMonth(m)}
+                  colors={colors}
+                  testID={`statement-month-${m.getFullYear()}-${m.getMonth() + 1}`}
+                />
+              ))}
+            </Card>
+          </ScrollView>
+          <Button
+            label="Cancel"
+            variant="ghost"
+            style={{ marginTop: 16 }}
+            onPress={() => {
+              setCustomStart(null);
+              setPeriodPickerOpen(false);
+            }}
+          />
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+// ─── Pieces ──────────────────────────────────────────────────────────────────
+
+type Colors = ReturnType<typeof useTheme>["colors"];
+
+const SectionTitle: React.FC<{ children: React.ReactNode; colors: Colors }> = ({
+  children,
+  colors,
+}) => <Text style={[styles.section, { color: colors.textMuted }]}>{children}</Text>;
+
+const SummaryRow: React.FC<{
+  k: string;
+  v: string;
+  colors: Colors;
+  tint?: string;
+  bold?: boolean;
+}> = ({ k, v, colors, tint, bold }) => (
+  <View style={styles.summaryRow}>
+    <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: bold ? "700" : "400" }}>
+      {k}
+    </Text>
+    <Text
+      style={{
+        color: tint ?? colors.textMain,
+        fontSize: bold ? 15 : 13,
+        fontWeight: bold ? "800" : "600",
+      }}
+    >
+      {v}
+    </Text>
+  </View>
+);
+
+const LedgerRow: React.FC<{
+  date: string;
+  title: string;
+  subtitle?: string;
+  amount: number | null;
+  balance: number;
+  colors: Colors;
+  muted?: boolean;
+  bold?: boolean;
+  last?: boolean;
+  onPress?: () => void;
+}> = ({ date, title, subtitle, amount, balance, colors, muted, bold, last, onPress }) => (
+  <Pressable
+    onPress={onPress}
+    disabled={!onPress}
+    style={[
+      styles.ledgerRow,
+      !last && { borderBottomWidth: 1, borderBottomColor: colors.border },
+    ]}
+  >
+    <Text style={{ color: colors.textMuted, fontSize: 11, width: 52 }}>{date}</Text>
+    <View style={{ flex: 1, paddingRight: 8 }}>
+      <Text
+        style={{
+          color: muted ? colors.textMuted : colors.textMain,
+          fontSize: 13,
+          fontWeight: bold ? "800" : "600",
+        }}
+        numberOfLines={1}
+      >
+        {title}
+      </Text>
+      {subtitle ? (
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+          {subtitle}
+        </Text>
+      ) : null}
+    </View>
+    <View style={{ alignItems: "flex-end", minWidth: 92 }}>
+      {amount === null ? (
+        <Text style={{ color: colors.textMuted, fontSize: 12 }}>—</Text>
+      ) : (
+        <Text
+          style={{
+            color: amount < 0 ? colors.danger : colors.success,
+            fontSize: 13,
+            fontWeight: "700",
+          }}
+        >
+          {amount < 0 ? "−" : "+"}
+          {formatZMW(Math.abs(amount))}
+        </Text>
+      )}
+      <Text
+        style={{
+          color: colors.textMain,
+          fontSize: 12,
+          fontWeight: bold ? "800" : "500",
+          marginTop: 2,
+        }}
+      >
+        {formatZMW(balance)}
+      </Text>
+    </View>
+  </Pressable>
+);
+
+const PickerRow: React.FC<{
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  colors: Colors;
+  testID?: string;
+}> = ({ label, selected, onPress, colors, testID }) => (
+  <Pressable
+    onPress={onPress}
+    testID={testID}
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    }}
+  >
+    <Text
+      style={{
+        color: colors.textMain,
+        fontSize: 14,
+        fontWeight: selected ? "700" : "500",
+      }}
+    >
+      {label}
+    </Text>
+    {selected ? <Check size={18} color={colors.primary} /> : null}
+  </Pressable>
+);
+
+const styles = StyleSheet.create({
+  scopeRow: { paddingHorizontal: 20, marginBottom: 10 },
+  scopeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+  },
+  scopeText: { fontSize: 14, fontWeight: "600", flex: 1 },
+  chipRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 12 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 13, fontWeight: "600" },
+  content: { paddingHorizontal: 20, paddingBottom: 40 },
+  eyebrow: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2 },
+  balance: { fontSize: 30, fontWeight: "800", letterSpacing: -0.8, marginTop: 6 },
+  divider: { height: 1, marginVertical: 14 },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  section: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    marginTop: 22,
+    marginBottom: 8,
+  },
+  ledgerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  note: { fontSize: 11, lineHeight: 17, marginTop: 18, textAlign: "center" },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+  },
+  grabber: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  sheetTitle: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
+});

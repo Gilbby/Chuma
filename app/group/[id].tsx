@@ -43,6 +43,7 @@ import {
   Crown,
   ClipboardCheck,
   FileBarChart,
+  FileText,
   Scale,
   CircleDollarSign,
   Phone,
@@ -520,7 +521,10 @@ export default function GroupDetails() {
 
         {tab === "reports" && (
           <View style={{ paddingHorizontal: 20 }}>
-            <Pressable onPress={() => router.push("/reports")} testID="group-reports-btn">
+            <Pressable
+              onPress={() => router.push({ pathname: "/reports", params: { groupId: id } })}
+              testID="group-reports-btn"
+            >
               <Card padding={18}>
                 <View style={styles.rowBetween}>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -533,6 +537,30 @@ export default function GroupDetails() {
                       </Text>
                       <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
                         Savings trends, loan analytics, repayment rates
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={20} color={colors.textMuted} />
+                </View>
+              </Card>
+            </Pressable>
+            <View style={{ height: 12 }} />
+            <Pressable
+              onPress={() => router.push({ pathname: "/statement", params: { groupId: id } })}
+              testID="group-statement-btn"
+            >
+              <Card padding={18}>
+                <View style={styles.rowBetween}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={[styles.iconSm, { backgroundColor: colors.primarySoft }]}>
+                      <FileText size={20} color={colors.primary} />
+                    </View>
+                    <View style={{ marginLeft: 12 }}>
+                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
+                        My statement
+                      </Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                        Savings balance and activity for this group
                       </Text>
                     </View>
                   </View>
