@@ -282,7 +282,6 @@ export default function Contribute() {
         receiptId={serverTxn?.receiptId ?? receiptId.current}
         status={serverTxn?.status ?? "completed"}
         isCash={payCash}
-        networkFee={payCash ? 0 : pricing?.networkFee ?? 0}
       />
     );
   }
@@ -838,7 +837,6 @@ const SuccessScreen = ({
   receiptId,
   status,
   isCash,
-  networkFee,
 }: {
   amount: number;
   group: string;
@@ -847,7 +845,6 @@ const SuccessScreen = ({
   receiptId: string;
   status: "completed" | "pending" | string;
   isCash: boolean;
-  networkFee: number;
 }) => {
   const pending = status === "pending";
   const title = !pending
@@ -936,7 +933,6 @@ const SuccessScreen = ({
                   status,
                   direction: "out",
                   txnId: receiptId,
-                  networkFee: String(networkFee),
                 },
               })
             }

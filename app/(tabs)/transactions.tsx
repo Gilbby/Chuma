@@ -312,7 +312,6 @@ export default function TransactionsScreen() {
                     status: item.status,
                     direction: item.direction,
                     id: item.id,
-                    networkFee: String(item.networkFee ?? 0),
                   },
                 })
               }
