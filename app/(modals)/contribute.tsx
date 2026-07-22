@@ -85,6 +85,7 @@ export default function Contribute() {
     platformFee: number;
     depositAmount: number;
     feesCovered: number;
+    networkFee?: number;
   } | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [pricingError, setPricingError] = useState<string | null>(null);
@@ -246,6 +247,7 @@ export default function Contribute() {
         platformFee: number;
         depositAmount: number;
         feesCovered: number;
+        networkFee?: number;
       }>("/pricing/preview", {
         method: "POST",
         body: { kind: "contribution", amount: num },
@@ -280,6 +282,7 @@ export default function Contribute() {
         receiptId={serverTxn?.receiptId ?? receiptId.current}
         status={serverTxn?.status ?? "completed"}
         isCash={payCash}
+        networkFee={payCash ? 0 : pricing?.networkFee ?? 0}
       />
     );
   }
@@ -640,9 +643,23 @@ export default function Contribute() {
                       colors={colors}
                     />
                   )}
+                  {!payCash && (pricing?.networkFee ?? 0) > 0 && (
+                    <ConfirmRow
+                      label="Your network fee"
+                      value={formatZMW(pricing?.networkFee ?? 0)}
+                      colors={colors}
+                    />
+                  )}
                   <ConfirmRow label="Group" value={selectedGroup.name} colors={colors} />
                   <ConfirmRow label="From" value={paymentMethodLabel} colors={colors} last />
                 </Card>
+
+                {!payCash && (pricing?.networkFee ?? 0) > 0 ? (
+                  <Text style={[styles.confirmLabel, { color: colors.textMuted, marginTop: 8 }]}>
+                    Your mobile network charges an extra {formatZMW(pricing?.networkFee ?? 0)} to send
+                    this, deducted from your wallet separately — it doesn't go to the group or Chuma.
+                  </Text>
+                ) : null}
 
                 {submitError ? (
                   <Text style={[styles.errText, { color: colors.danger, marginTop: 12 }]}>{submitError}</Text>
@@ -821,6 +838,7 @@ const SuccessScreen = ({
   receiptId,
   status,
   isCash,
+  networkFee,
 }: {
   amount: number;
   group: string;
@@ -829,6 +847,7 @@ const SuccessScreen = ({
   receiptId: string;
   status: "completed" | "pending" | string;
   isCash: boolean;
+  networkFee: number;
 }) => {
   const pending = status === "pending";
   const title = !pending
@@ -917,6 +936,7 @@ const SuccessScreen = ({
                   status,
                   direction: "out",
                   txnId: receiptId,
+                  networkFee: String(networkFee),
                 },
               })
             }

@@ -112,6 +112,7 @@ export interface TxnItem {
   date: string;
   note?: string;
   direction: "in" | "out";
+  networkFee?: number; // member's own MMO fee on money-in (display-only, stored on the txn)
 }
 
 export interface Loan {

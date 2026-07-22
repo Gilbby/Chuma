@@ -47,6 +47,7 @@ interface ReceiptParams {
   txnId?: string;
   status?: string;
   direction?: string;
+  networkFee?: string;
 }
 
 export default function ReceiptScreen() {
@@ -69,6 +70,7 @@ export default function ReceiptScreen() {
       note: params.note ?? "",
       status: (params.status ?? "completed") as "completed" | "pending" | "failed",
       direction: (params.direction ?? "out") as "in" | "out",
+      networkFee: parseFloat(params.networkFee ?? "0"), // member's own MMO fee (display-only)
       txnId,
     };
   }, [params]);
@@ -127,6 +129,7 @@ export default function ReceiptScreen() {
       <div class="row"><span class="k">Group</span><span class="v">${data.groupName}</span></div>
       <div class="row"><span class="k">Date</span><span class="v">${data.date}</span></div>
       ${data.note ? `<div class="row"><span class="k">Note</span><span class="v">${data.note}</span></div>` : ""}
+      ${data.networkFee > 0 ? `<div class="row"><span class="k">Your network fee</span><span class="v">${formatZMW(data.networkFee)}</span></div>` : ""}
       <div class="row"><span class="k">Member</span><span class="v">Gilbert · +260 977 234 567</span></div>
       ${data.status === "completed" ? '<div style="text-align:center;"><span class="stamp">PAID</span></div>' : ""}
       <div class="foot">
@@ -257,6 +260,11 @@ export default function ReceiptScreen() {
             {data.note ? (
               <Row k="Note" colors={colors}>
                 <Text style={[styles.val, { color: colors.textMain }]}>{data.note}</Text>
+              </Row>
+            ) : null}
+            {data.networkFee > 0 ? (
+              <Row k="Your network fee" colors={colors}>
+                <Text style={[styles.val, { color: colors.textMain }]}>{formatZMW(data.networkFee)}</Text>
               </Row>
             ) : null}
             <Row k="Member" colors={colors} last>

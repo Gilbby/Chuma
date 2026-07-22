@@ -20,6 +20,9 @@ export type ContributionPreview = {
   platformFee: number;
   depositAmount: number;
   feesCovered: number;
+  // The member's OWN network fee (charged by their MMO to their wallet, not
+  // collected by us). Display-only heads-up. May be absent on older responses.
+  networkFee?: number;
 };
 
 /**
