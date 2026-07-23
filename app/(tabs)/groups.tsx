@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { useRole } from "@/src/hooks/useRole";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
@@ -23,6 +24,7 @@ import { Users, Plus, ChevronRight } from "lucide-react-native";
 export default function Groups() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { can } = useRole();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [invites, setInvites] = useState<Notice[]>([]);
@@ -77,13 +79,15 @@ export default function Groups() {
             {groups.length} active chuma groups
           </Text>
         </View>
-        <Pressable
-          style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          onPress={() => router.push("/(modals)/create-group")}
-          testID="groups-add-btn"
-        >
-          <Plus size={20} color="#fff" strokeWidth={2.4} />
-        </Pressable>
+        {can("create.group") && (
+          <Pressable
+            style={[styles.addBtn, { backgroundColor: colors.primary }]}
+            onPress={() => router.push("/(modals)/create-group")}
+            testID="groups-add-btn"
+          >
+            <Plus size={20} color="#fff" strokeWidth={2.4} />
+          </Pressable>
+        )}
       </View>
 
       {loading ? (

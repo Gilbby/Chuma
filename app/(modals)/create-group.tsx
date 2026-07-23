@@ -15,17 +15,19 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as Contacts from "expo-contacts";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { useRole } from "@/src/hooks/useRole";
 import { createGroup, inviteMember } from "@/src/services/groups";
 import { defaultTiersForCycle, tierBandLabel } from "@/src/services/loans";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, Camera, X, CreditCard } from "lucide-react-native";
+import { Check, Camera, X, CreditCard, Contact } from "lucide-react-native";
 import Slider from "@react-native-community/slider";
 import type { GroupType, GroupConstitution, LoanRepaymentTier } from "@/src/types";
 
@@ -95,6 +97,7 @@ interface Invite {
 export default function CreateGroup() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { can } = useRole();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const scrollRef = useRef<ScrollView>(null);
@@ -201,6 +204,59 @@ export default function CreateGroup() {
 
   const handlePhoneInput = (text: string, setter: (v: string) => void) =>
     setter(text.replace(/\D/g, "").slice(0, 9));
+
+  // Strip a contact's number down to the 9-digit local part the inputs expect,
+  // dropping any +260 country code / leading 0 the contact may carry.
+  const toLocalZambian = (raw: string): string => {
+    let d = raw.replace(/\D/g, "");
+    if (d.startsWith("00")) d = d.slice(2);
+    if (d.startsWith("260")) d = d.slice(3);
+    else if (d.startsWith("0")) d = d.slice(1);
+    return d.slice(0, 9);
+  };
+
+  // Pick the best number off a contact: prefer one that normalises to a valid
+  // 9-digit Zambian number, else fall back to the first one listed.
+  const bestLocalNumber = (nums?: Contacts.PhoneNumber[]): string | null => {
+    if (!nums || nums.length === 0) return null;
+    const candidates = nums.map((n) => toLocalZambian(n.number || n.digits || ""));
+    return candidates.find(isValidZambianPhone) || candidates[0] || null;
+  };
+
+  // Open the OS contact picker and fill a phone field from the chosen contact.
+  // (Not available on web — the button is hidden there.) On Android the module
+  // re-queries the picked contact via ContactsContract, which needs READ_CONTACTS,
+  // so the picker crashes on selection without it; request first. iOS's system
+  // picker hands the contact back directly and needs no permission.
+  const pickContact = async (setter: (v: string) => void, errKey: string) => {
+    try {
+      if (Platform.OS === "android") {
+        const { status } = await Contacts.requestPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Contacts access needed",
+            "Allow Chuma to read your contacts to pick a number, or type it in manually."
+          );
+          return;
+        }
+      }
+      const contact = await Contacts.presentContactPickerAsync();
+      if (!contact) return; // user cancelled
+      const local = bestLocalNumber(contact.phoneNumbers);
+      if (!local) {
+        Alert.alert("No phone number", `${contact.name || "That contact"} has no phone number saved.`);
+        return;
+      }
+      setter(local);
+      if (isValidZambianPhone(local)) {
+        clearErr(errKey);
+      } else {
+        setErrors((prev) => ({ ...prev, [errKey]: "That contact isn't a valid Zambian number — check it" }));
+      }
+    } catch (e: any) {
+      Alert.alert("Couldn't open contacts", e?.message || "Please try again.");
+    }
+  };
 
   const clearErr = (key: string) =>
     setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
@@ -352,6 +408,12 @@ export default function CreateGroup() {
       setPaying(false);
     }
   };
+
+  // Only a Chairperson may create a group. Guards against direct navigation
+  // (e.g. deep link) — the entry button on the Groups screen is already hidden.
+  if (!can("create.group")) {
+    return <Redirect href="/(tabs)/groups" />;
+  }
 
   // ─── Post-creation invite screen ────────────────────────────────────────────
 
@@ -949,6 +1011,16 @@ export default function CreateGroup() {
                     maxLength={9}
                     testID="create-group-treasurer"
                   />
+                  {Platform.OS !== "web" && (
+                    <Pressable
+                      onPress={() => pickContact(setTreasurerPhone, "treasurerPhone")}
+                      hitSlop={8}
+                      style={[styles.contactBtn, { borderLeftColor: colors.border }]}
+                      testID="create-group-treasurer-contact"
+                    >
+                      <Contact size={20} color={colors.primary} />
+                    </Pressable>
+                  )}
                 </View>
                 {errors.treasurerPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.treasurerPhone}</Text> : null}
 
@@ -965,6 +1037,16 @@ export default function CreateGroup() {
                     maxLength={9}
                     testID="create-group-secretary"
                   />
+                  {Platform.OS !== "web" && (
+                    <Pressable
+                      onPress={() => pickContact(setSecretaryPhone, "secretaryPhone")}
+                      hitSlop={8}
+                      style={[styles.contactBtn, { borderLeftColor: colors.border }]}
+                      testID="create-group-secretary-contact"
+                    >
+                      <Contact size={20} color={colors.primary} />
+                    </Pressable>
+                  )}
                 </View>
                 {errors.secretaryPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.secretaryPhone}</Text> : null}
 
@@ -1329,6 +1411,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   inlineInput: { fontSize: 15, fontWeight: "500", padding: 0, minWidth: 32 },
+  contactBtn: {
+    alignSelf: "stretch",
+    justifyContent: "center",
+    paddingLeft: 12,
+    borderLeftWidth: 1,
+  },
   optionRow: {
     flexDirection: "row",
     alignItems: "center",

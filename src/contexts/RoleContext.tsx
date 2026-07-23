@@ -3,6 +3,7 @@ import { storage } from "@/src/utils/storage";
 import { Role } from "@/src/types";
 
 type Permission =
+  | "create.group"
   | "approve.loan"
   | "approve.withdrawal"
   | "approve.rule"
@@ -24,6 +25,7 @@ const STORAGE_KEY = "chuma.demo.role";
 
 const RULES: Record<Role, Permission[]> = {
   Chairperson: [
+    "create.group",
     "approve.loan",
     "approve.withdrawal",
     "approve.rule",

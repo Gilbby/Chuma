@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, Modal, Pressable } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
@@ -31,21 +32,25 @@ export const ExportSheet: React.FC<Props> = ({
   onCsv,
 }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const run = (fn: () => void) => () => {
     onClose();
     fn();
   };
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={onClose} />
-      <View
-        style={{
-          backgroundColor: colors.background,
-          borderTopLeftRadius: 24,
-          borderTopRightRadius: 24,
-          padding: 24,
-        }}
-      >
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={onClose} />
+        <View
+          style={{
+            backgroundColor: colors.background,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            paddingTop: 24,
+            paddingHorizontal: 24,
+            paddingBottom: Math.max(insets.bottom, 24),
+          }}
+        >
         <View
           style={{
             width: 40,
@@ -113,7 +118,8 @@ export const ExportSheet: React.FC<Props> = ({
             <Download size={18} color={colors.textMuted} />
           </Pressable>
         </Card>
-        <Button label="Cancel" variant="ghost" fullWidth style={{ marginTop: 16 }} onPress={onClose} />
+          <Button label="Cancel" variant="ghost" fullWidth style={{ marginTop: 16 }} onPress={onClose} />
+        </View>
       </View>
     </Modal>
   );

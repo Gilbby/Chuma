@@ -42,6 +42,12 @@
             "backgroundColor": "#0A5C36"
           }
         }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Chuma to access your contacts so you can add group officials by phone number."
+        }
       ]
     ],
     "experiments": {

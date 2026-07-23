@@ -6,9 +6,8 @@ import {
   ScrollView,
   Pressable,
   Modal,
-  FlatList,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ScreenHeader, ErrorState, ExportSheet } from "@/src/components/common";
@@ -72,6 +71,7 @@ function recentMonths(count = 24): Date[] {
 
 export default function StatementScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ groupId?: string }>();
 
@@ -189,17 +189,17 @@ export default function StatementScreen() {
         </Pressable>
       </View>
 
-      <FlatList
+      <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={PRESETS}
-        keyExtractor={(p) => p.key}
         contentContainerStyle={styles.chipRow}
-        style={{ flexGrow: 0 }}
-        renderItem={({ item }) => {
+        style={styles.chipScroll}
+      >
+        {PRESETS.map((item) => {
           const active = item.key === preset;
           return (
             <Pressable
+              key={item.key}
               onPress={() => choosePreset(item.key)}
               style={[
                 styles.chip,
@@ -213,13 +213,16 @@ export default function StatementScreen() {
               {item.key === "custom" ? (
                 <Calendar size={13} color={active ? "#fff" : colors.textMuted} />
               ) : null}
-              <Text style={[styles.chipText, { color: active ? "#fff" : colors.textMain }]}>
+              <Text
+                numberOfLines={1}
+                style={[styles.chipText, { color: active ? "#fff" : colors.textMain }]}
+              >
                 {item.label}
               </Text>
             </Pressable>
           );
-        }}
-      />
+        })}
+      </ScrollView>
 
       {loading ? (
         <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
@@ -444,7 +447,7 @@ export default function StatementScreen() {
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
           onPress={() => setGroupPickerOpen(false)}
         />
-        <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 24) }]}>
           <View style={[styles.grabber, { backgroundColor: colors.border }]} />
           <Text style={[styles.sheetTitle, { color: colors.textMain }]}>Statement for</Text>
           <Card padding={0}>
@@ -492,7 +495,7 @@ export default function StatementScreen() {
           style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
           onPress={() => setPeriodPickerOpen(false)}
         />
-        <View style={[styles.sheet, { backgroundColor: colors.background, maxHeight: "70%" }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.background, maxHeight: "70%", paddingBottom: Math.max(insets.bottom, 24) }]}>
           <View style={[styles.grabber, { backgroundColor: colors.border }]} />
           <Text style={[styles.sheetTitle, { color: colors.textMain }]}>
             {customStart ? "Pick the last month" : "Pick the first month"}
@@ -674,13 +677,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   scopeText: { fontSize: 14, fontWeight: "600", flex: 1 },
-  chipRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 12 },
+  chipScroll: { flexGrow: 0, height: 44, marginBottom: 8 },
+  chipRow: { paddingHorizontal: 20, alignItems: "center" },
   chip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    marginRight: 8,
+    flexShrink: 0,
+    height: 34,
     paddingHorizontal: 14,
-    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
   },

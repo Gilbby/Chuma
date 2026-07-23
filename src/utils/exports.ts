@@ -6,9 +6,11 @@
 // is no share sheet, so we open the browser print dialog (PDF) or trigger a
 // file download (CSV).
 
-import { Alert, Platform, Share } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatZMW } from "@/src/utils/currency";
 import { TxnItem } from "@/src/types";
 import type { Statement } from "@/src/services/statement";
@@ -46,19 +48,150 @@ export async function printOrShareHtml(html: string, dialogTitle: string) {
   }
 }
 
-/** Hand a CSV to the user: a download on web, the share sheet on native. */
-export async function shareCsv(filename: string, title: string, csv: string) {
+// Remember the folder the user picked for downloads so we prompt only once.
+const SAF_DIR_KEY = "chuma:downloadDirUri";
+
+/** A previously-granted Android folder to download into, or prompt for one. */
+async function androidDownloadDir(): Promise<string | null> {
+  const saved = await AsyncStorage.getItem(SAF_DIR_KEY);
+  if (saved) return saved;
+  const perm =
+    await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+  if (!perm.granted) return null;
+  await AsyncStorage.setItem(SAF_DIR_KEY, perm.directoryUri);
+  return perm.directoryUri;
+}
+
+/**
+ * Generate a PDF from HTML and DOWNLOAD it to the device — as opposed to
+ * printOrShareHtml, which opens the share sheet.
+ *
+ * Android: writes the file into a folder the user picks once via the Storage
+ * Access Framework (e.g. Downloads), with a readable name. The grant is
+ * remembered so later downloads save straight there without prompting.
+ * iOS: has no folder picker, so the file goes to the share sheet whose
+ * "Save to Files" is the platform's save flow — named properly, not a UUID.
+ * Web: the browser print dialog is the only way to produce a file.
+ */
+export async function savePdf(html: string, baseName: string, dialogTitle: string) {
+  try {
+    if (Platform.OS === "web") {
+      await Print.printAsync({ html });
+      return;
+    }
+
+    const { uri } = await Print.printToFileAsync({ html, base64: false });
+
+    if (Platform.OS === "android") {
+      const dir = await androidDownloadDir();
+      if (dir) {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            dir,
+            baseName,
+            "application/pdf"
+          );
+          await FileSystem.writeAsStringAsync(destUri, base64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          Alert.alert("Downloaded", `${baseName}.pdf was saved to your chosen folder.`);
+          return;
+        } catch {
+          // The saved grant may be stale (folder deleted / permission revoked):
+          // forget it so the next download re-prompts, and share this one.
+          await AsyncStorage.removeItem(SAF_DIR_KEY);
+        }
+      }
+      // Folder picker dismissed → fall through to the share sheet so the export
+      // isn't lost.
+    }
+
+    // iOS + Android fallback: rename the temp file so "Save to Files" / share
+    // targets show a readable name instead of the print module's UUID.
+    let shareUri = uri;
+    try {
+      const named = `${FileSystem.cacheDirectory}${baseName}.pdf`;
+      await FileSystem.copyAsync({ from: uri, to: named });
+      shareUri = named;
+    } catch {
+      // keep the original temp uri
+    }
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(shareUri, {
+        mimeType: "application/pdf",
+        dialogTitle,
+        UTI: "com.adobe.pdf",
+      });
+    } else {
+      Alert.alert("Save unavailable", "Your device cannot save files right now.");
+    }
+  } catch (e) {
+    Alert.alert("Export failed", "Could not generate the PDF. Please try again.");
+  }
+}
+
+/**
+ * DOWNLOAD a CSV to the device — same flow as savePdf.
+ *
+ * Android: writes it into the folder the user picked once via the Storage
+ * Access Framework (remembered across downloads), with a readable name.
+ * iOS: no folder picker, so it goes to the share sheet as a real .csv file
+ * (named properly) whose "Save to Files" is the platform's save flow.
+ * Web: a direct browser download.
+ */
+export async function saveCsv(csv: string, baseName: string, dialogTitle: string) {
   try {
     if (Platform.OS === "web") {
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = `${baseName}.csv`;
       a.click();
       URL.revokeObjectURL(url);
       return;
     }
-    await Share.share({ title, message: csv });
+
+    if (Platform.OS === "android") {
+      const dir = await androidDownloadDir();
+      if (dir) {
+        try {
+          const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            dir,
+            baseName,
+            "text/csv"
+          );
+          await FileSystem.writeAsStringAsync(destUri, csv, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+          Alert.alert("Downloaded", `${baseName}.csv was saved to your chosen folder.`);
+          return;
+        } catch {
+          // Stale grant (folder deleted / permission revoked): forget it so the
+          // next download re-prompts, and share this one.
+          await AsyncStorage.removeItem(SAF_DIR_KEY);
+        }
+      }
+      // Folder picker dismissed → fall through to the share sheet.
+    }
+
+    // iOS + Android fallback: write a real .csv file and share it (not raw text).
+    const fileUri = `${FileSystem.cacheDirectory}${baseName}.csv`;
+    await FileSystem.writeAsStringAsync(fileUri, csv, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType: "text/csv",
+        dialogTitle,
+        UTI: "public.comma-separated-values-text",
+      });
+    } else {
+      Alert.alert("Save unavailable", "Your device cannot save files right now.");
+    }
   } catch (e) {
     Alert.alert("Export failed", "Could not export the CSV. Please try again.");
   }
@@ -119,7 +252,11 @@ export async function exportTransactionsPdf(data: TxnItem[]) {
       </table>
       <p class="footer">This is an auto-generated export from the Chuma app.</p>
     </body></html>`;
-  await printOrShareHtml(html, "Save or share your transactions");
+  await savePdf(
+    html,
+    `Chuma-Transactions-${new Date().toISOString().slice(0, 10)}`,
+    "Save your transactions"
+  );
 }
 
 export async function exportTransactionsCsv(data: TxnItem[]) {
@@ -138,10 +275,10 @@ export async function exportTransactionsCsv(data: TxnItem[]) {
         .join(",")
     )
     .join("\n");
-  await shareCsv(
-    "chuma-transactions.csv",
-    "Chuma Transaction Export",
-    header + rows
+  await saveCsv(
+    header + rows,
+    `Chuma-Transactions-${new Date().toISOString().slice(0, 10)}`,
+    "Save your transactions"
   );
 }
 
@@ -262,7 +399,11 @@ export async function exportStatementPdf(s: Statement) {
   </div>
 </body></html>`;
 
-  await printOrShareHtml(html, `Chuma statement · ${statementTitle(s)}`);
+  await savePdf(
+    html,
+    `Chuma-Statement-${new Date(s.period.from).toISOString().slice(0, 10)}`,
+    `Chuma statement · ${statementTitle(s)}`
+  );
 }
 
 export async function exportStatementCsv(s: Statement) {
@@ -296,9 +437,9 @@ export async function exportStatementCsv(s: Statement) {
   const csv = [...meta, ...rows]
     .map((row) => row.map(csvCell).join(","))
     .join("\n");
-  await shareCsv(
-    `chuma-statement-${new Date(s.period.from).toISOString().slice(0, 10)}.csv`,
-    "Chuma Statement Export",
-    csv
+  await saveCsv(
+    csv,
+    `Chuma-Statement-${new Date(s.period.from).toISOString().slice(0, 10)}`,
+    "Save your statement"
   );
 }
