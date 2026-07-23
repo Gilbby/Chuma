@@ -185,6 +185,13 @@ export default function CreateGroup() {
     setRepaymentTiers(defaultTiersForCycle(cycleMonths));
   }, [cycleMonths]);
 
+  // The wizard reuses a single ScrollView across all steps, so advancing while
+  // scrolled down (e.g. the long loan-rules step) would carry that offset into
+  // the next step and open it pre-scrolled. Reset to the top on every step change.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
   const handleNumericInput = (text: string, setter: (v: string) => void) => {
     const cleaned = text.replace(/[^0-9.]/g, "");
     const parts = cleaned.split(".");
