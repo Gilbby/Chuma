@@ -16,6 +16,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
+import { NoGroupState } from "@/src/components/common/NoGroupState";
+import { ErrorState } from "@/src/components/common/ErrorState";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
@@ -56,6 +58,7 @@ export default function Contribute() {
   const [step, setStep] = useState<Step>("entry");
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
 
@@ -93,6 +96,7 @@ export default function Contribute() {
 
   const load = useCallback(async () => {
     setGroupsLoading(true);
+    setGroupsError(false);
     try {
       const [fetchedGroups, user] = await Promise.all([
         getGroups(),
@@ -103,6 +107,10 @@ export default function Contribute() {
         fetchedGroups.find((g) => g.id === groupId) ?? fetchedGroups[0] ?? null;
       setSelectedGroup(group);
       setPayerPhone(user?.phone ?? "");
+    } catch {
+      // Without this the empty list below would claim they have no groups when
+      // the fetch is what actually failed.
+      setGroupsError(true);
     } finally {
       setGroupsLoading(false);
     }
@@ -265,9 +273,18 @@ export default function Contribute() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
         <ScreenHeader title="Make Payment" />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        {groupsLoading ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : groupsError ? (
+          <ErrorState onRetry={load} />
+        ) : (
+          <NoGroupState
+            message="Savings go into a group's fund, so there is nowhere to send this yet. Join a group or start your own, then come back."
+            testID="contribute-no-group"
+          />
+        )}
       </SafeAreaView>
     );
   }

@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
+import { NoGroupState } from "@/src/components/common/NoGroupState";
+import { ErrorState } from "@/src/components/common/ErrorState";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
@@ -60,16 +62,22 @@ export default function Loan() {
     interestRate: number;
   } | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState(false);
   const [eligLoading, setEligLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   const loadGroups = useCallback(async () => {
     setGroupsLoading(true);
+    setGroupsError(false);
     try {
       const g = await getGroups();
       setGroups(g);
       setGrp((groupId ? g.find((x) => x.id === groupId) ?? g[0] : g[0]) ?? null);
+    } catch {
+      // Without this the empty list below would claim they have no groups when
+      // the fetch is what actually failed.
+      setGroupsError(true);
     } finally {
       setGroupsLoading(false);
     }
@@ -80,7 +88,13 @@ export default function Loan() {
   }, [loadGroups]);
 
   useEffect(() => {
-    if (!grp?.id) return;
+    if (!grp?.id) {
+      // There is nothing to score eligibility against without a group. Bailing
+      // out with eligLoading still true would hang the guard below forever.
+      setElig(null);
+      setEligLoading(false);
+      return;
+    }
     setEligLoading(true);
     getLoanEligibility(grp.id)
       .then(setElig)
@@ -103,9 +117,18 @@ export default function Loan() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="loan-screen">
         <ScreenHeader title="Request loan" />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        {groupsLoading || eligLoading ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : groupsError ? (
+          <ErrorState onRetry={loadGroups} />
+        ) : (
+          <NoGroupState
+            message="Loans are paid out of your group's fund, and how much you can borrow depends on what you have saved with them. Join a group or start your own first."
+            testID="loan-no-group"
+          />
+        )}
       </SafeAreaView>
     );
   }

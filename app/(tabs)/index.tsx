@@ -220,7 +220,7 @@ export default function Home() {
     can("approve.shareout");
 
   const quickActions = [
-    { label: "Payments", icon: PiggyBank, route: "/contribute" },
+    { label: "Saving", icon: PiggyBank, route: "/contribute" },
     { label: "Loan", icon: HandCoins, route: "/loan" },
     // Repay now lives on the unified payment screen (loans show among the dues),
     // reached from Payments — so the freed slot surfaces the account statement.
