@@ -25,7 +25,12 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
-import { getGroupById, inviteMember } from "@/src/services/groups";
+import {
+  getGroupById,
+  inviteMember,
+  resendInvite,
+  cancelInvite,
+} from "@/src/services/groups";
 import type { Role } from "@/src/types";
 import { getApprovals } from "@/src/services/approvals";
 import { getGroupTransactions } from "@/src/services/transactions";
@@ -54,6 +59,9 @@ import {
   Plus,
   Lock,
   ArrowLeft,
+  Send,
+  X,
+  Clock,
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
@@ -75,6 +83,8 @@ export default function GroupDetails() {
   const [inviteRole, setInviteRole] = useState<Role>("Member");
   const [inviteError, setInviteError] = useState("");
   const [inviting, setInviting] = useState(false);
+  // memberId of the pending invite currently being resent / cancelled
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
 
   const insets = useSafeAreaInsets();
 
@@ -128,8 +138,78 @@ export default function GroupDetails() {
     }
   }, [load]);
 
+  /** Re-fetch the group without flashing the skeleton (used after invite actions). */
+  const refreshGroup = useCallback(async () => {
+    if (!id) return;
+    try {
+      const g = await getGroupById(id);
+      if (g) setGroup(g);
+    } catch {
+      // keep showing what we have; the next pull-to-refresh will surface errors
+    }
+  }, [id]);
+
+  // Someone who was invited but hasn't accepted is NOT a member of the group:
+  // they have no savings, owe no contribution and can't be given a loan. Keep
+  // the two lists apart everywhere so a pending invite never reads as a member.
+  const activeMembers = useMemo(
+    () => (group?.members ?? []).filter((m: any) => m.status !== "pending"),
+    [group]
+  );
+  const pendingMembers = useMemo(
+    () => (group?.members ?? []).filter((m: any) => m.status === "pending"),
+    [group]
+  );
+
+  const onResendInvite = useCallback(
+    async (member: Member) => {
+      setBusyInviteId(member.id);
+      try {
+        await resendInvite(id, member.id);
+        Alert.alert(
+          "Invite resent",
+          `We've sent the invitation to ${member.phone} again. They'll also see it in the Chuma app once they sign up with this number.`
+        );
+        await refreshGroup();
+      } catch (e: any) {
+        Alert.alert("Could not resend", e?.message || "Please try again.");
+      } finally {
+        setBusyInviteId(null);
+      }
+    },
+    [id, refreshGroup]
+  );
+
+  const onCancelInvite = useCallback(
+    (member: Member) => {
+      Alert.alert(
+        "Cancel invitation",
+        `Withdraw the invitation sent to ${member.name || member.phone}?`,
+        [
+          { text: "Keep it", style: "cancel" },
+          {
+            text: "Cancel invite",
+            style: "destructive",
+            onPress: async () => {
+              setBusyInviteId(member.id);
+              try {
+                await cancelInvite(id, member.id);
+                await refreshGroup();
+              } catch (e: any) {
+                Alert.alert("Could not cancel", e?.message || "Please try again.");
+              } finally {
+                setBusyInviteId(null);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [id, refreshGroup]
+  );
+
   const cycleStatus = useMemo(() =>
-    (group?.members ?? []).map((m, i) => {
+    (group?.members ?? []).filter((m: any) => m.status !== "pending").map((m, i) => {
       const seed = (i * 7) % 10;
       const status: "paid" | "overdue" | "pending" =
         seed < 6 ? "paid" : seed < 8 ? "overdue" : "pending";
@@ -165,6 +245,9 @@ export default function GroupDetails() {
   const canPayFee =
     effectiveRole === "Chairperson" ||
     effectiveRole === "Treasurer";
+  // Resending or withdrawing an invite is an admin action — same set the API
+  // enforces on /invite (requireGroupAdmin).
+  const isAdmin = effectiveRole !== "Member";
 
   const paidCount = cycleStatus.filter((c) => c.status === "paid").length;
   const overdueCount = cycleStatus.filter((c) => c.status === "overdue").length;
@@ -302,7 +385,7 @@ export default function GroupDetails() {
         {tab === "members" && (
           <View style={{ paddingHorizontal: 20 }}>
             <Card padding={0}>
-              {group.members.slice(0, 12).map((m, i) => (
+              {activeMembers.slice(0, 12).map((m, i, arr) => (
                 <View key={m.userId ?? m.id ?? m.phone ?? String(i)}>
                   <Pressable
                     onPress={() => { setSelectedMember(m); setSheetVisible(true); }}
@@ -310,13 +393,60 @@ export default function GroupDetails() {
                   >
                     <MemberRow member={m} colors={colors} />
                   </Pressable>
-                  {i < 11 && <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />}
+                  {i < Math.min(arr.length, 12) - 1 && (
+                    <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />
+                  )}
                 </View>
               ))}
             </Card>
             <Text style={[styles.helperText, { color: colors.textMuted }]}>
-              Showing 12 of {group.memberCount} members
+              Showing {Math.min(activeMembers.length, 12)} of {group.memberCount} member
+              {group.memberCount === 1 ? "" : "s"}
             </Text>
+
+            {/* Invited, not yet joined. Kept out of the members list above so the
+                group's headcount and savings never count someone who hasn't
+                accepted — and so an admin can chase or withdraw the invite. */}
+            {pendingMembers.length > 0 && (
+              <View style={{ marginTop: 20 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                  <Clock size={14} color={colors.textMuted} />
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 1.2,
+                      marginLeft: 6,
+                    }}
+                  >
+                    PENDING INVITES ({pendingMembers.length})
+                  </Text>
+                </View>
+                <Card padding={0}>
+                  {pendingMembers.map((m, i) => (
+                    <View key={m.id ?? m.phone ?? String(i)}>
+                      <PendingInviteRow
+                        member={m}
+                        colors={colors}
+                        busy={busyInviteId === m.id}
+                        canManage={isAdmin}
+                        onResend={() => onResendInvite(m)}
+                        onCancel={() => onCancelInvite(m)}
+                      />
+                      {i < pendingMembers.length - 1 && (
+                        <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />
+                      )}
+                    </View>
+                  ))}
+                </Card>
+                <Text style={[styles.helperText, { color: colors.textMuted }]}>
+                  {isAdmin
+                    ? "These people have been invited but haven't joined yet. They don't count towards the group until they accept."
+                    : "These people have been invited but haven't joined yet."}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -971,10 +1101,30 @@ export default function GroupDetails() {
                     m.status !== "removed" && phoneKey(m.phone) === phoneKey(invitePhone)
                 ) as any;
                 if (existing) {
+                  if (existing.status === "pending") {
+                    // Already invited and still waiting — the useful action here
+                    // is to send the invitation again, not to refuse outright.
+                    Alert.alert(
+                      "Already invited",
+                      `${existing.name || "This number"} was invited but hasn't joined yet. Send the invitation again?`,
+                      [
+                        { text: "Not now", style: "cancel" },
+                        {
+                          text: "Resend",
+                          onPress: async () => {
+                            setInvitePhone("");
+                            setInviteRole("Member");
+                            setInviteError("");
+                            setInviteOpen(false);
+                            await onResendInvite(existing as Member);
+                          },
+                        },
+                      ]
+                    );
+                    return;
+                  }
                   setInviteError(
-                    existing.status === "pending"
-                      ? `${existing.name || "This number"} has already been invited and hasn't responded yet.`
-                      : `${existing.name || "This number"} is already a member of this group.`
+                    `${existing.name || "This number"} is already a member of this group.`
                   );
                   return;
                 }
@@ -1172,6 +1322,99 @@ const MemberRow = ({
         </Text>
       </View>
       <StatusBadge label={member.role} variant={roleVariant} />
+    </View>
+  );
+};
+
+/** Relative age of an invite — "today", "3 days ago". Keeps the row honest
+ *  about how long someone has been sitting on an unanswered invitation. */
+function invitedAgo(iso?: string) {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? "a month ago" : `${months} months ago`;
+}
+
+const PendingInviteRow = ({
+  member,
+  colors,
+  busy,
+  canManage,
+  onResend,
+  onCancel,
+}: {
+  member: Member;
+  colors: ReturnType<typeof useTheme>["colors"];
+  busy: boolean;
+  canManage: boolean;
+  onResend: () => void;
+  onCancel: () => void;
+}) => {
+  const ago = invitedAgo(member.lastInviteSentAt ?? member.invitedAt);
+  // The name is only a placeholder until they sign up — the API stores the phone
+  // as the name for an invitee with no account yet.
+  const displayName =
+    member.name && phoneKey(member.name) !== phoneKey(member.phone)
+      ? member.name
+      : member.phone;
+  return (
+    <View style={[styles.memberRow, { opacity: busy ? 0.5 : 1 }]}>
+      <Avatar name={displayName} size={40} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text
+          style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }}
+          numberOfLines={1}
+        >
+          {displayName}
+        </Text>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+          Invited as {member.role}
+          {ago ? ` · sent ${ago}` : ""}
+        </Text>
+      </View>
+      <StatusBadge label="Pending" variant="warning" />
+      {canManage && (
+        <View style={{ flexDirection: "row", marginLeft: 8 }}>
+          <Pressable
+            onPress={onResend}
+            disabled={busy}
+            hitSlop={8}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 11,
+              backgroundColor: colors.primary + "1A",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            testID={`invite-resend-${member.id}`}
+          >
+            <Send size={16} color={colors.primary} />
+          </Pressable>
+          <Pressable
+            onPress={onCancel}
+            disabled={busy}
+            hitSlop={8}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 11,
+              marginLeft: 6,
+              backgroundColor: colors.danger + "1A",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            testID={`invite-cancel-${member.id}`}
+          >
+            <X size={16} color={colors.danger} />
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 };

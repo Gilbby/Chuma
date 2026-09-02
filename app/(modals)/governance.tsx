@@ -144,7 +144,11 @@ export default function Governance() {
   const c = group.constitution;
   const lends = c?.internalLendingEnabled !== false;
 
-  const admins = (group.members ?? []).filter((m: Member) => ADMIN_ROLES.includes(m.role));
+  // Only members who have actually joined hold office — a pending invite carries
+  // the role but not the seat until it is accepted.
+  const admins = (group.members ?? []).filter(
+    (m: Member) => m.status !== "pending" && ADMIN_ROLES.includes(m.role)
+  );
 
   const savingRules: Row[] = [
     {

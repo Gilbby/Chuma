@@ -100,9 +100,12 @@ export default function ShareOutScreen() {
     : 0;
 
   const members = group
-    ? (group.members ?? []).map((m: any) => ({
-        id: String(m.userId ?? m.id), name: m.name, contribution: m.savings,
-      }))
+    ? (group.members ?? [])
+        // Someone who never accepted the invite has no savings and no share.
+        .filter((m: any) => m.status !== "pending")
+        .map((m: any) => ({
+          id: String(m.userId ?? m.id), name: m.name, contribution: m.savings,
+        }))
     : [];
 
   const result = computeShareOut(members, computedProfit);
@@ -151,8 +154,11 @@ export default function ShareOutScreen() {
     done: new Date(stage.date).getTime() < now.getTime(),
   }));
 
-  const adminCount = (group?.members ?? []).filter((m) =>
-    ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
+  // Pending invites can't vote, so they must not raise the approval bar.
+  const adminCount = (group?.members ?? []).filter(
+    (m) =>
+      m.status !== "pending" &&
+      ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
   ).length;
   const threshold = group?.constitution?.approvalThreshold ?? "majority";
   const requiredApprovals = getRequiredApprovals(threshold, adminCount);

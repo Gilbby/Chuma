@@ -148,8 +148,11 @@ export default function Loan() {
 
   const mySavings = elig?.savings ?? 0;
   const maxLoan = elig?.maxLoan ?? 0;
-  const adminCount = (grp.members ?? []).filter((m) =>
-    ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
+  // Pending invites can't vote, so they must not raise the approval bar.
+  const adminCount = (grp.members ?? []).filter(
+    (m) =>
+      m.status !== "pending" &&
+      ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
   ).length;
   const threshold = grp.constitution?.approvalThreshold ?? "majority";
   const requiredApprovals = getRequiredApprovals(threshold, adminCount);

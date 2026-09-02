@@ -222,11 +222,14 @@ export default function Home() {
       );
 
       const result = computeShareOut(
-        (g.members ?? []).map((m: any) => ({
-          id: String(m.userId ?? m.id),
-          name: m.name,
-          contribution: m.savings,
-        })),
+        (g.members ?? [])
+          // Someone who never accepted the invite has no savings and no share.
+          .filter((m: any) => m.status !== "pending")
+          .map((m: any) => ({
+            id: String(m.userId ?? m.id),
+            name: m.name,
+            contribution: m.savings,
+          })),
         profit
       );
 

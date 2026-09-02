@@ -10,6 +10,12 @@ export interface Member {
   savings: number;
   contributions: number;
   loanActive?: number;
+  // "pending" = invited but hasn't accepted yet. They are NOT part of the group
+  // until they accept — don't count them, don't show them as members.
+  status?: "pending" | "active" | "removed";
+  invitedByName?: string;
+  invitedAt?: string;
+  lastInviteSentAt?: string;
 }
 
 export type GroupType =

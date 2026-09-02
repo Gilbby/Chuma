@@ -3,13 +3,20 @@ import { getCurrentUser } from "@/src/utils/currentUser";
 import { Group } from "@/src/types";
 
 function mapGroup(raw: any, currentUserId?: string): Group {
-  const members = raw.members ?? [];
+  // Member subdocs come back with _id only (lean/toObject), and "removed" rows
+  // are history, not people in the group — drop them here so no screen has to.
+  const members = (raw.members ?? [])
+    .filter((m: any) => m.status !== "removed")
+    .map((m: any) => ({ ...m, id: String(m._id ?? m.id ?? "") }));
   const mine = currentUserId
-    ? members.find((m: any) => String(m.userId) === String(currentUserId))
+    ? members.find(
+        (m: any) => String(m.userId) === String(currentUserId) && m.status === "active"
+      )
     : undefined;
   return {
     ...raw,
     id: String(raw._id),
+    members,
     memberCount: members.filter((m: any) => m.status === "active").length,
     yourRole: mine?.role ?? "Member",
     // keep shareOutDate / nextContributionDate as ISO strings — Hermes date math
@@ -55,4 +62,20 @@ export async function inviteMember(
   role: string = "Member"
 ): Promise<{ message: string }> {
   return api(`/groups/${groupId}/invite`, { method: "POST", body: { phone, role } });
+}
+
+/** Re-send the SMS/notification for an invite that hasn't been accepted yet. */
+export async function resendInvite(
+  groupId: string,
+  memberId: string
+): Promise<{ message: string; lastInviteSentAt?: string }> {
+  return api(`/groups/${groupId}/invite/${memberId}/resend`, { method: "POST" });
+}
+
+/** Withdraw a pending invite (only works while it is still pending). */
+export async function cancelInvite(
+  groupId: string,
+  memberId: string
+): Promise<{ message: string }> {
+  return api(`/groups/${groupId}/invite/${memberId}`, { method: "DELETE" });
 }
