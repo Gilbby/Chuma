@@ -33,18 +33,14 @@ const TERMINAL: KycStatus[] = ["approved", "declined", "expired", "abandoned"];
 export default function Kyc() {
   const { colors } = useTheme();
   const router = useRouter();
-  // Where to go once verification finishes. Launched from the home nudge
-  // (return=tabs) we go back to the app; from the Create-group tap
+  // Where to go once verification finishes. From the Create-group tap
   // (return=create-group) we continue into the wizard they were reaching for;
-  // otherwise this is onboarding and PIN setup comes next.
+  // every other entry point is from inside the app, so we return them to it.
+  // There is no onboarding fallback: KYC is never part of signing up, so this
+  // screen is only ever reached by someone who already finished setup.
   const { return: returnTo } = useLocalSearchParams<{ return?: string }>();
   const fromCreateGroup = returnTo === "create-group";
-  const afterKyc =
-    returnTo === "tabs"
-      ? "/(tabs)"
-      : returnTo === "create-group"
-        ? "/(modals)/create-group"
-        : "/pin";
+  const afterKyc = fromCreateGroup ? "/(modals)/create-group" : "/(tabs)";
   // Skipping must never drop them into a screen that needs verification —
   // a skipped create-group goes back to the Groups list instead.
   const skipTo = fromCreateGroup ? "/(tabs)/groups" : afterKyc;
@@ -124,9 +120,9 @@ export default function Kyc() {
     }
   };
 
-  // Route the KYC decision. The ONLY way out of this screen is `approved`
-  // (→ applyApproved → /pin). Everything else keeps the user here — identity
-  // verification is mandatory before they can access the app.
+  // Route the KYC decision. Only `approved` leaves this screen (→ applyApproved
+  // → afterKyc). Every other outcome holds the user here, but verification is a
+  // soft gate: the skip button below lets them continue unverified (handleSkip).
   const handleResult = async (result: KycStatusResult) => {
     if (result.status === "approved" && result.verified) {
       await applyApproved(result.verified);
@@ -192,7 +188,8 @@ export default function Kyc() {
           <Text style={[styles.title, { color: colors.textMain }]}>Verification in review</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
             Your details were submitted and are being reviewed. Some IDs need a quick manual check,
-            so this can take a little while. You can&apos;t create a group until you&apos;re approved.
+            so this can take a little while.{" "}
+            {fromCreateGroup ? "You can't create a group until you're approved. " : ""}
             Tap Check status to see if you are.
           </Text>
           <View style={{ flex: 1 }} />

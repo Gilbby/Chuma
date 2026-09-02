@@ -46,8 +46,9 @@ export default function Otp() {
     setError("");
     try {
       const res = await verifyOtp(phone, codeStr, mode);
-      // Signup asks for a display name, then PIN. Full KYC is chairperson-only
-      // and happens later, at Create group. "kyc" stays handled for legacy tokens.
+      // Signup asks for a display name, then a PIN — that is the whole of it.
+      // KYC is never part of signing up; it is asked for once, at Create group,
+      // because founding a group charges the K100 fee and makes you Chairperson.
       const dest =
         res.next === "tabs"
           ? "/(tabs)"
@@ -57,9 +58,7 @@ export default function Otp() {
             ? mode === "signin"
               ? "/name?return=tabs"
               : "/name"
-            : res.next === "kyc"
-              ? "/kyc"
-              : "/pin";
+            : "/pin";
       // The token is already stored, so from here on a killed app would
       // otherwise restore straight into the tabs with onboarding half done.
       if (dest === "/(tabs)") await clearPendingOnboarding();
