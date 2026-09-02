@@ -26,6 +26,7 @@ import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
 import { getGroupById, inviteMember } from "@/src/services/groups";
+import type { Role } from "@/src/types";
 import { getApprovals } from "@/src/services/approvals";
 import { getGroupTransactions } from "@/src/services/transactions";
 import { getLoans } from "@/src/services/loans";
@@ -71,6 +72,7 @@ export default function GroupDetails() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [invitePhone, setInvitePhone] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("Member");
   const [inviteError, setInviteError] = useState("");
   const [inviting, setInviting] = useState(false);
 
@@ -848,7 +850,7 @@ export default function GroupDetails() {
         visible={inviteOpen}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => { setInviteOpen(false); setInvitePhone(""); setInviteError(""); }}
+        onRequestClose={() => { setInviteOpen(false); setInvitePhone(""); setInviteRole("Member"); setInviteError(""); }}
       >
         <KeyboardAvoidingView
           style={{ flex: 1, justifyContent: "flex-end" }}
@@ -856,7 +858,7 @@ export default function GroupDetails() {
         >
           <Pressable
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
-            onPress={() => { setInviteOpen(false); setInvitePhone(""); setInviteError(""); }}
+            onPress={() => { setInviteOpen(false); setInvitePhone(""); setInviteRole("Member"); setInviteError(""); }}
           />
           <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
@@ -898,6 +900,51 @@ export default function GroupDetails() {
                 autoFocus
               />
             </View>
+
+            <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginTop: 18, marginBottom: 12 }}>
+              ROLE IN THIS GROUP
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+              {(["Member", "Treasurer", "Secretary"] as Role[]).map((r) => {
+                // Treasurer and Secretary are single seats. Offering one that is
+                // already filled would push a second holder onto the group.
+                const taken =
+                  r !== "Member" &&
+                  (group.members ?? []).some(
+                    (m: any) => m.status !== "removed" && m.role === r
+                  );
+                const active = inviteRole === r;
+                return (
+                  <Pressable
+                    key={r}
+                    disabled={taken}
+                    onPress={() => { setInviteRole(r); setInviteError(""); }}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      opacity: taken ? 0.45 : 1,
+                      backgroundColor: active ? colors.primary : colors.surface,
+                      borderColor: active ? colors.primary : colors.border,
+                    }}
+                    testID={`invite-role-${r.toLowerCase()}`}
+                  >
+                    <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>
+                      {r}
+                      {taken ? " (filled)" : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {inviteRole !== "Member" ? (
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8, lineHeight: 18 }}>
+                A {inviteRole.toLowerCase()} can vote on approvals for this group. They get the role
+                once they accept the invite.
+              </Text>
+            ) : null}
+
             {inviteError ? (
               <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>
                 {inviteError}
@@ -936,12 +983,13 @@ export default function GroupDetails() {
                 setInviteError("");
                 try {
                   // send the normalized phone with country code; backend also normalizes
-                  await inviteMember(id, full);
+                  await inviteMember(id, full, inviteRole);
                   Alert.alert(
                     "Invite sent",
-                    `${full} has been invited. They'll see the invitation after signing up with this number.`
+                    `${full} has been invited as ${inviteRole === "Member" ? "a member" : `${inviteRole.toLowerCase()}`}. They'll see the invitation after signing up with this number.`
                   );
                   setInvitePhone("");
+                  setInviteRole("Member");
                   setInviteOpen(false);
                   await load(); // refresh so the pending member shows in the members list
                 } catch (e: any) {

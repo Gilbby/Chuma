@@ -1,454 +1,333 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  Pressable,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
+import { ErrorState } from "@/src/components/common/ErrorState";
+import { NoGroupState } from "@/src/components/common/NoGroupState";
 import { Card } from "@/src/components/ui/Card";
-import { Button } from "@/src/components/ui/Button";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { useRole } from "@/src/contexts/RoleContext";
-import { Crown, Shield, FileText, Vote, Edit3, Plus, Lock, X } from "lucide-react-native";
+import { getGroups } from "@/src/services/groups";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { formatZMW } from "@/src/utils/currency";
+import { Group, Member, Role } from "@/src/types";
+import { Crown, Shield, FileText, Vote } from "lucide-react-native";
 
-interface Rule {
-  id: string;
+// `Plus`, `Edit3`, `Lock` and `X` go back in when proposals and rule editing
+// return; see the hidden block at the foot of this file.
+
+interface Row {
   label: string;
   value: string;
-  editable: boolean;
 }
 
-interface Threshold {
-  id: string;
-  label: string;
-  value: string;
-  editable: boolean;
-}
+const ADMIN_ROLES: Role[] = ["Chairperson", "Treasurer", "Secretary"];
 
-interface Proposal {
-  id: string;
-  title: string;
-  proposer: string;
-  votesFor: number;
-  totalVoters: number;
-  status: "Open" | "Passed" | "Rejected";
-}
+const ROLE_ICON: Record<string, { icon: typeof Crown; color: "primary" | "warning" | "info" }> = {
+  Chairperson: { icon: Crown, color: "primary" },
+  Treasurer: { icon: Shield, color: "warning" },
+  Secretary: { icon: FileText, color: "info" },
+};
 
-const INITIAL_RULES: Rule[] = [
-  { id: "r1", label: "Contribution amount", value: "K 500 weekly", editable: true },
-  { id: "r2", label: "Loan interest", value: "5% per month", editable: true },
-  { id: "r3", label: "Loan max", value: "3× member savings", editable: true },
-  { id: "r4", label: "Late penalty", value: "K 50 per missed cycle", editable: true },
-  { id: "r5", label: "Quorum for approval", value: "60% of voting members", editable: true },
-  { id: "r6", label: "Share-out frequency", value: "Annually (December)", editable: false },
-];
+const THRESHOLD_LABEL: Record<string, string> = {
+  "2-of-3": "Any 2 of the 3 admins",
+  majority: "Majority of admins",
+  all: "All three admins",
+};
 
-const INITIAL_THRESHOLDS: Threshold[] = [
-  { id: "t1", label: "Loan approval", value: "60%", editable: true },
-  { id: "t2", label: "Withdrawal", value: "50% + Treasurer", editable: true },
-  { id: "t3", label: "Rule change", value: "75%", editable: true },
-  { id: "t4", label: "Removing a member", value: "80% + Chairperson", editable: true },
-];
+const fmtDate = (iso?: string) => {
+  if (!iso) return "Not set";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "Not set"
+    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
 
-const INITIAL_PROPOSALS: Proposal[] = [
-  { id: "p1", title: "Lower interest rate to 4%", proposer: "John Mwale", votesFor: 5, totalVoters: 12, status: "Open" },
-  { id: "p2", title: "Add monthly contribution option", proposer: "Mwansa Tembo", votesFor: 8, totalVoters: 12, status: "Open" },
-];
-
-const ADMINS = [
-  { name: "Gilbert (you)", role: "Chairperson", icon: Crown, color: "primary" as const },
-  { name: "Chisomo Banda", role: "Treasurer", icon: Shield, color: "warning" as const },
-  { name: "Natasha Phiri", role: "Secretary", icon: FileText, color: "info" as const },
-];
-
-type EditTarget =
-  | { kind: "rule"; id: string }
-  | { kind: "threshold"; id: string }
-  | { kind: "propose" }
-  | null;
+/** "K50 flat" / "2% per day" / "None", from a constitution penalty rule. */
+const penaltyLabel = (rule?: {
+  enabled: boolean;
+  penaltyType: "flat" | "percent";
+  penaltyRate?: number;
+  penaltyAmount?: number;
+}) => {
+  if (!rule?.enabled) return "None";
+  return rule.penaltyType === "flat"
+    ? `${formatZMW(rule.penaltyAmount ?? 0)} flat`
+    : `${rule.penaltyRate ?? 0}% per day`;
+};
 
 export default function Governance() {
   const { colors } = useTheme();
-  const { role, can } = useRole();
-  const canEditRules = can("edit.rules");
-  const canPropose = can("propose.rule");
+  const params = useLocalSearchParams<{ groupId?: string }>();
 
-  const [rules, setRules] = useState<Rule[]>(INITIAL_RULES);
-  const [thresholds, setThresholds] = useState<Threshold[]>(INITIAL_THRESHOLDS);
-  const [proposals, setProposals] = useState<Proposal[]>(INITIAL_PROPOSALS);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [group, setGroup] = useState<Group | null>(null);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [edit, setEdit] = useState<EditTarget>(null);
-  const [draft, setDraft] = useState("");
-  const [toast, setToast] = useState("");
-
-  const openEditRule = (r: Rule) => {
-    setDraft(r.value);
-    setEdit({ kind: "rule", id: r.id });
-  };
-  const openEditThreshold = (t: Threshold) => {
-    setDraft(t.value);
-    setEdit({ kind: "threshold", id: t.id });
-  };
-  const openPropose = () => {
-    setDraft("");
-    setEdit({ kind: "propose" });
-  };
-
-  const closeModal = () => {
-    setEdit(null);
-    setDraft("");
-  };
-
-  const flashToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2200);
-  };
-
-  const save = () => {
-    if (!edit) return;
-    const value = draft.trim();
-    if (!value) return;
-    if (edit.kind === "rule") {
-      setRules((prev) => prev.map((r) => (r.id === edit.id ? { ...r, value } : r)));
-      flashToast("Rule updated");
-    } else if (edit.kind === "threshold") {
-      setThresholds((prev) => prev.map((t) => (t.id === edit.id ? { ...t, value } : t)));
-      flashToast("Threshold updated");
-    } else if (edit.kind === "propose") {
-      const newProp: Proposal = {
-        id: `p${Date.now()}`,
-        title: value,
-        proposer: `${role === "Chairperson" ? "Gilbert (you)" : role + " (you)"}`,
-        votesFor: 1,
-        totalVoters: 12,
-        status: "Open",
-      };
-      setProposals((prev) => [newProp, ...prev]);
-      flashToast("Proposal submitted");
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      const [fetched, me] = await Promise.all([
+        getGroups(),
+        getCurrentUser<{ id?: string; _id?: string }>(),
+      ]);
+      setGroups(fetched);
+      setGroup(
+        (params.groupId ? fetched.find((g) => g.id === params.groupId) : undefined) ??
+          fetched[0] ??
+          null
+      );
+      setMyUserId(me?.id ?? me?._id ?? null);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
     }
-    closeModal();
-  };
+  }, [params.groupId]);
 
-  const modalTitle =
-    edit?.kind === "rule"
-      ? "Edit rule"
-      : edit?.kind === "threshold"
-        ? "Edit threshold"
-        : edit?.kind === "propose"
-          ? "New proposal"
-          : "";
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const modalLabel =
-    edit?.kind === "rule"
-      ? rules.find((r) => r.id === edit.id)?.label
-      : edit?.kind === "threshold"
-        ? thresholds.find((t) => t.id === edit.id)?.label
-        : "Describe your proposal";
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="governance-screen">
+        <ScreenHeader title="Governance" subtitle="Group rules" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="governance-screen">
+        <ScreenHeader title="Governance" subtitle="Group rules" />
+        <ErrorState onRetry={load} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!group) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="governance-screen">
+        <ScreenHeader title="Governance" subtitle="Group rules" />
+        <NoGroupState
+          message="Rules belong to a group. Once you join one or start your own, its constitution shows up here."
+          testID="governance-no-group"
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const c = group.constitution;
+  const lends = c?.internalLendingEnabled !== false;
+
+  const admins = (group.members ?? []).filter((m: Member) => ADMIN_ROLES.includes(m.role));
+
+  const savingRules: Row[] = [
+    {
+      label: "Contribution",
+      value: `${formatZMW(group.contributionAmount)} ${(group.contributionFrequency || "").toLowerCase()}`.trim(),
+    },
+    { label: "Late contribution", value: penaltyLabel(c?.penaltyRules?.lateContribution) },
+    { label: "Grace period", value: c ? `${c.gracePeriodDays} days` : "Not set" },
+    { label: "Share-out", value: fmtDate(group.shareOutDate) },
+  ];
+
+  const loanRules: Row[] = lends
+    ? [
+        { label: "Interest", value: `${c?.loanInterestRate ?? group.loanInterestRate}% per month` },
+        {
+          label: "Maximum loan",
+          value: `${c?.loanMultiplier ?? group.loanMaxMultiplier}x your savings`,
+        },
+        {
+          label: "Loan cut-off",
+          value:
+            (c?.loanFreeWindowMonths ?? 0) === 0
+              ? "None"
+              : `${c?.loanFreeWindowMonths} month(s) before share-out`,
+        },
+        { label: "Late repayment", value: penaltyLabel(c?.penaltyRules?.lateRepayment) },
+      ]
+    : [];
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      edges={["top"]}
-      testID="governance-screen"
-    >
-      <ScreenHeader title="Governance" subtitle="Group rules & voting" />
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="governance-screen">
+      <ScreenHeader
+        title="Governance"
+        subtitle={groups.length > 1 ? group.name : "Group rules"}
+      />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
         {/* Admin roles */}
         <Text style={[styles.label, { color: colors.textMuted }]}>ADMIN ROLES</Text>
         <Card padding={0}>
-          {ADMINS.map((a, i) => {
-            const Icon = a.icon;
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.adminRow,
-                  i < ADMINS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                ]}
-              >
-                <View style={[styles.adminIcon, { backgroundColor: colors.primarySoft }]}>
-                  <Icon size={20} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={{ color: colors.textMain, fontWeight: "600" }}>{a.name}</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{a.role}</Text>
-                </View>
-                <StatusBadge label={a.role} variant={a.color} />
-              </View>
-            );
-          })}
-        </Card>
-
-        {/* Rules */}
-        <View style={styles.sectionHead}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>GROUP RULES</Text>
-          {canPropose ? (
-            <Pressable onPress={openPropose} testID="governance-propose-btn">
-              <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>
-                Propose change
+          {admins.length === 0 ? (
+            <View style={styles.emptyRow}>
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                No admins assigned yet.
               </Text>
-            </Pressable>
-          ) : null}
-        </View>
-        <Card padding={0}>
-          {rules.map((r, i) => {
-            const isEditable = r.editable && canEditRules;
-            return (
-              <Pressable
-                key={r.id}
-                onPress={isEditable ? () => openEditRule(r) : undefined}
-                disabled={!isEditable}
-                testID={`governance-rule-row-${r.id}`}
-                style={({ pressed }) => [
-                  styles.ruleRow,
-                  i < rules.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                  pressed && isEditable && { backgroundColor: colors.surfaceSecondary },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 }}>
-                    {r.label.toUpperCase()}
+            </View>
+          ) : (
+            admins.map((m, i) => {
+              const meta = ROLE_ICON[m.role] ?? { icon: Shield, color: "info" as const };
+              const Icon = meta.icon;
+              const isMe = !!myUserId && String(m.userId) === String(myUserId);
+              return (
+                <View
+                  key={m.id ?? `${m.role}-${i}`}
+                  style={[
+                    styles.row,
+                    i < admins.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                  ]}
+                >
+                  <View style={[styles.roleIcon, { backgroundColor: colors.primarySoft }]}>
+                    <Icon size={16} color={colors.primary} />
+                  </View>
+                  <Text style={{ color: colors.textMain, flex: 1, fontWeight: "600", fontSize: 14 }}>
+                    {m.name}
+                    {isMe ? " (you)" : ""}
                   </Text>
-                  <Text style={{ color: colors.textMain, fontWeight: "600", marginTop: 4 }}>
-                    {r.value}
-                  </Text>
+                  <StatusBadge label={m.role} variant={meta.color} />
                 </View>
-                {isEditable ? (
-                  <Pressable
-                    onPress={() => openEditRule(r)}
-                    testID={`governance-edit-${r.id}`}
-                    style={{ padding: 6 }}
-                    hitSlop={10}
-                  >
-                    <Edit3 size={16} color={colors.primary} />
-                  </Pressable>
-                ) : r.editable ? (
-                  <Lock size={14} color={colors.textMuted} />
-                ) : null}
-              </Pressable>
-            );
-          })}
+              );
+            })
+          )}
         </Card>
 
-        {/* Voting settings */}
-        <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>VOTING THRESHOLDS</Text>
-        <Card padding={0}>
-          {thresholds.map((t, i) => {
-            const isEditable = t.editable && canEditRules;
-            return (
-              <Pressable
-                key={t.id}
-                onPress={isEditable ? () => openEditThreshold(t) : undefined}
-                disabled={!isEditable}
-                testID={`governance-threshold-row-${t.id}`}
-                style={({ pressed }) => [
-                  styles.thresholdRow,
-                  i < thresholds.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                  pressed && isEditable && { backgroundColor: colors.surfaceSecondary },
-                ]}
-              >
-                <Vote size={16} color={colors.primary} />
-                <Text style={{ color: colors.textMain, marginLeft: 10, flex: 1, fontWeight: "500" }}>
-                  {t.label}
-                </Text>
-                <Text style={{ color: colors.textMain, fontWeight: "700", marginRight: 8 }}>
-                  {t.value}
-                </Text>
-                {isEditable ? (
-                  <Edit3 size={14} color={colors.primary} />
-                ) : (
-                  <Lock size={12} color={colors.textMuted} />
-                )}
-              </Pressable>
-            );
-          })}
-        </Card>
-
-        {/* Open proposals */}
+        {/* Saving rules */}
         <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
-          OPEN PROPOSALS ({proposals.length})
+          SAVING RULES
         </Text>
-        {proposals.map((p) => (
-          <Card key={p.id} padding={16} style={{ marginBottom: 10 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={{ color: colors.textMain, fontWeight: "700", flex: 1, marginRight: 10 }}>
-                {p.title}
-              </Text>
-              <StatusBadge label={p.status} variant={p.status === "Open" ? "warning" : "success"} />
-            </View>
-            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 6 }}>
-              Proposed by {p.proposer} · {p.votesFor}/{p.totalVoters} voted
-            </Text>
-          </Card>
-        ))}
+        <Card padding={0}>
+          {savingRules.map((r, i) => (
+            <RuleRow key={r.label} row={r} last={i === savingRules.length - 1} colors={colors} />
+          ))}
+        </Card>
 
-        <View style={{ height: 16 }} />
-        {canPropose ? (
-          <Button
-            label="New proposal"
-            icon={<Plus size={18} color="#fff" />}
-            onPress={openPropose}
-            testID="governance-new-proposal-btn"
-          />
+        {/* Loan rules — absent entirely for savings-only groups */}
+        {lends ? (
+          <>
+            <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
+              LOAN RULES
+            </Text>
+            <Card padding={0}>
+              {loanRules.map((r, i) => (
+                <RuleRow key={r.label} row={r} last={i === loanRules.length - 1} colors={colors} />
+              ))}
+            </Card>
+          </>
         ) : (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: colors.surfaceSecondary,
-              padding: 14,
-              borderRadius: 14,
-              gap: 10,
-            }}
-          >
-            <Lock size={16} color={colors.textMuted} />
-            <Text style={{ color: colors.textMuted, fontSize: 13, flex: 1 }}>
-              Your role ({role}) cannot create new proposals.
+          <>
+            <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
+              LOANS
             </Text>
-          </View>
+            <Card padding={16}>
+              <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
+                This group saves together without lending. Everything members put in is paid back
+                out at share-out.
+              </Text>
+            </Card>
+          </>
         )}
-      </ScrollView>
 
-      {/* Edit modal */}
-      <Modal
-        visible={edit !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={closeModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.modalBg}
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
-          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.modalHead}>
-              <Text style={{ color: colors.textMain, fontSize: 18, fontWeight: "700" }}>
-                {modalTitle}
-              </Text>
-              <Pressable onPress={closeModal} hitSlop={10} testID="governance-modal-close">
-                <X size={20} color={colors.textMuted} />
-              </Pressable>
-            </View>
-            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "600", letterSpacing: 0.3, marginBottom: 8 }}>
-              {(modalLabel ?? "").toUpperCase()}
-            </Text>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              autoFocus
-              multiline={edit?.kind === "propose"}
-              placeholder={
-                edit?.kind === "propose"
-                  ? "e.g. Reduce loan interest to 4% per month"
-                  : "Enter new value"
-              }
-              placeholderTextColor={colors.textMuted}
-              testID="governance-modal-input"
-              style={[
-                styles.modalInput,
-                {
-                  color: colors.textMain,
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                  minHeight: edit?.kind === "propose" ? 84 : 48,
-                  textAlignVertical: edit?.kind === "propose" ? "top" : "center",
-                },
-              ]}
-            />
-            {edit?.kind === "propose" ? (
-              <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 8, lineHeight: 16 }}>
-                Members vote on your proposal. It passes when {thresholds.find((t) => t.id === "t3")?.value ?? "75%"} approve.
-              </Text>
-            ) : null}
-            <View style={styles.modalActions}>
-              <Button
-                label="Cancel"
-                variant="outline"
-                onPress={closeModal}
-                size="md"
-                fullWidth={false}
-                style={{ flex: 1, marginRight: 8 }}
-                testID="governance-modal-cancel"
-              />
-              <Button
-                label={edit?.kind === "propose" ? "Submit" : "Save"}
-                onPress={save}
-                size="md"
-                fullWidth={false}
-                disabled={!draft.trim()}
-                style={{ flex: 1, marginLeft: 8 }}
-                testID="governance-modal-save"
-              />
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Toast */}
-      {toast ? (
-        <View style={[styles.toast, { backgroundColor: colors.textMain }]} pointerEvents="none">
-          <Text style={{ color: colors.textInverse, fontWeight: "600", fontSize: 13 }}>{toast}</Text>
+        {/* Approvals */}
+        <View style={styles.sectionHead}>
+          <Vote size={16} color={colors.primary} />
+          <Text style={[styles.label, { color: colors.textMuted, marginBottom: 0 }]}>
+            APPROVALS
+          </Text>
         </View>
-      ) : null}
+        <Card padding={0}>
+          <RuleRow
+            row={{
+              label: "Needed to approve",
+              value: THRESHOLD_LABEL[c?.approvalThreshold ?? ""] ?? "Any 2 of the 3 admins",
+            }}
+            last
+            colors={colors}
+          />
+        </Card>
+
+        <Text style={[styles.footnote, { color: colors.textMuted }]}>
+          These rules were agreed when the group was created. Changing them needs a vote, which is
+          not available yet.
+        </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+const RuleRow = ({
+  row,
+  last,
+  colors,
+}: {
+  row: Row;
+  last?: boolean;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) => (
+  <View
+    style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+  >
+    <Text style={{ color: colors.textMuted, flex: 1, fontSize: 14 }}>{row.label}</Text>
+    <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>{row.value}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 20, paddingBottom: 32 },
+  content: { padding: 20, paddingBottom: 40 },
   label: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 8 },
-  adminRow: { flexDirection: "row", alignItems: "center", padding: 14 },
-  adminIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  sectionHead: {
+  sectionHead: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 22, marginBottom: 8 },
+  row: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 22,
-    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
   },
-  ruleRow: { flexDirection: "row", alignItems: "center", padding: 16 },
-  thresholdRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16 },
-  modalBg: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+  emptyRow: { paddingHorizontal: 16, paddingVertical: 18 },
+  roleIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24,
   },
-  modalCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 22,
-  },
-  modalHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  modalActions: { flexDirection: "row", marginTop: 18 },
-  toast: {
-    position: "absolute",
-    bottom: 32,
-    alignSelf: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 999,
-  },
+  footnote: { fontSize: 12, lineHeight: 18, marginTop: 22, textAlign: "center" },
 });
+
+/* PROPOSALS — hidden until there is a backend for them. The previous version
+   listed hardcoded proposals, had no vote button despite promising a vote, and
+   lost anything you created on unmount. Rule and threshold editing went with
+   it: the API has no group-update endpoint, so an edit could only ever have
+   been a toast. Restoring this needs, on the server, a proposal create/vote
+   endpoint (the Approval model already carries a "rule-change" type and an
+   atomic vote path) that writes the passed change into group.constitution;
+   and on the client, the proposals list, a vote control, and a "Propose
+   change" entry point in the rules section head. */
