@@ -15,6 +15,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { storage } from "@/src/utils/storage";
 import { updateProfile } from "@/src/services/auth";
 import { setCurrentUser, getCurrentUser } from "@/src/utils/currentUser";
+import { clearPendingOnboarding } from "@/src/utils/onboarding";
 import {
   startKycSession,
   getKycStatus,
@@ -100,6 +101,7 @@ export default function Kyc() {
       dateOfBirth: v.dateOfBirth ?? "",
       complete: true,
     });
+    await clearPendingOnboarding();
     router.replace(afterKyc);
   };
 
@@ -163,6 +165,9 @@ export default function Kyc() {
   // without verifying now. A standing reminder stays in their inbox (and a home
   // banner) until they complete it.
   const handleSkip = async () => {
+    // Legacy onboarding could route here straight from OTP; either way this
+    // screen is now behind them, so the resume marker goes with it.
+    await clearPendingOnboarding();
     await storage.setItem("kyc_draft", { complete: false });
     // Reached from the Groups + button (or from create-group's own guard), this
     // screen sits on top of the tabs stack, so popping lands exactly back on

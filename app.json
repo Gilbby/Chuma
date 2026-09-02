@@ -44,6 +44,12 @@
         }
       ],
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Chuma to use Face ID to sign you in and confirm transactions."
+        }
+      ],
+      [
         "expo-contacts",
         {
           "contactsPermission": "Allow Chuma to access your contacts so you can add group officials by phone number."

@@ -11,6 +11,7 @@ import Animated, {
 import { useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { getToken } from "@/src/utils/authToken";
+import { resumeRoute } from "@/src/utils/onboarding";
 
 const SPLASH_BG =
   "https://static.prod-images.emergentagent.com/jobs/ad57d3a5-0066-4217-af01-a981f77ed10e/images/3aaee2b2f25053386a7dc86ee27194d3ead5308fa01ae8ad39f426e0ff785d7b.png";
@@ -34,7 +35,10 @@ export default function Splash() {
       // to /welcome), so we intentionally don't block on a network check here
       // — that keeps the app usable on spotty connectivity.
       const token = await getToken();
-      router.replace(token ? "/(tabs)" : "/welcome");
+      // A token is not a finished account — it is issued at OTP, before the
+      // name and PIN steps — so resumeRoute() decides where a restored session
+      // actually belongs.
+      router.replace((token ? await resumeRoute() : "/welcome") as never);
     }, 1900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -15,6 +15,11 @@ import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { updateProfile } from "@/src/services/auth";
+import {
+  hasRealName,
+  setPendingOnboarding,
+  clearPendingOnboarding,
+} from "@/src/utils/onboarding";
 import { ShieldCheck } from "lucide-react-native";
 
 // The member tier of identity: a name they choose, not a verified document.
@@ -33,9 +38,9 @@ export default function Name() {
   const [loading, setLoading] = useState(false);
 
   const trimmed = name.trim();
-  // Mirrors hasRealName() on the server (middleware/auth.js) so the user sees
-  // the problem before a round trip, not a 400 afterwards.
-  const valid = trimmed.length >= 2 && !/^[-+0-9 ]+$/.test(trimmed);
+  // Same rule the server applies (hasRealName, middleware/auth.js), so the
+  // user sees the problem before a round trip, not a 400 afterwards.
+  const valid = hasRealName(trimmed);
 
   const onSubmit = async () => {
     if (!valid || loading) return;
@@ -44,6 +49,9 @@ export default function Name() {
     setError("");
     try {
       await updateProfile({ name: trimmed });
+      // Advance the resume marker: PIN setup is the one step still owed.
+      if (afterName === "/pin") await setPendingOnboarding("/pin");
+      else await clearPendingOnboarding();
       router.replace(afterName);
     } catch (e: any) {
       setError(e?.message || "Could not save your name. Please try again.");
@@ -86,7 +94,7 @@ export default function Name() {
                 setName(t);
                 if (error) setError("");
               }}
-              placeholder="e.g. Yande Christabel"
+              placeholder="e.g. John Doe"
               placeholderTextColor={colors.textMuted}
               autoCapitalize="words"
               autoCorrect={false}

@@ -29,6 +29,12 @@ import { getGroups } from "@/src/services/groups";
 import { getPenalties } from "@/src/services/penalties";
 import { logout } from "@/src/services/auth";
 import { getCurrentUser } from "@/src/utils/currentUser";
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  setBiometricEnabled,
+  promptBiometric,
+} from "@/src/utils/biometrics";
 import { Role, Group, Penalty } from "@/src/types";
 import { getTrustScore, getTrustBand } from "@/src/services/trustScore";
 import { useRole } from "@/src/contexts/RoleContext";
@@ -37,7 +43,10 @@ export default function Profile() {
   const { colors, mode, toggle } = useTheme();
   const router = useRouter();
   const { role, setRole, description, isTester } = useRole();
-  const [bio, setBio] = React.useState(true);
+  // Off until the phone says it has an enrolled fingerprint/face and the user
+  // has actually turned it on — a switch we can't honour shouldn't read as on.
+  const [bio, setBio] = React.useState(false);
+  const [bioAvailable, setBioAvailable] = React.useState(false);
   const [notif, setNotif] = React.useState(true);
   const [trustOpen, setTrustOpen] = useState(false);
 
@@ -66,8 +75,27 @@ export default function Profile() {
   useFocusEffect(
     useCallback(() => {
       load();
+      // Re-read on every focus: the user may have added or removed a
+      // fingerprint in phone settings since they last looked at this screen.
+      (async () => {
+        setBioAvailable(await isBiometricAvailable());
+        setBio(await isBiometricEnabled());
+      })();
     }, [load])
   );
+
+  const onToggleBio = async (next: boolean) => {
+    if (!next) {
+      setBio(false);
+      await setBiometricEnabled(false);
+      return;
+    }
+    // Confirm the enrolled finger/face before trusting it as a sign-in method.
+    if (await promptBiometric("Enable biometric sign-in")) {
+      setBio(true);
+      await setBiometricEnabled(true);
+    }
+  };
 
   const myContributions = groups.reduce((sum, g) => {
     const meMember = (g.members ?? []).find((m: any) => String(m.userId) === myUserId);
@@ -171,12 +199,13 @@ export default function Profile() {
           />
           <Row
             icon={<Fingerprint size={20} color={colors.primary} />}
-            label="Biometric login"
+            label={bioAvailable ? "Biometric login" : "Biometric login (not set up)"}
             colors={colors}
             right={
               <Switch
                 value={bio}
-                onValueChange={setBio}
+                onValueChange={onToggleBio}
+                disabled={!bioAvailable}
                 trackColor={{ false: colors.border, true: colors.primaryAccent }}
                 thumbColor="#fff"
                 testID="profile-biometric-switch"

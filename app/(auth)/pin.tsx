@@ -7,6 +7,7 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Delete } from "lucide-react-native";
 import { setPin as savePin } from "@/src/services/auth";
+import { clearPendingOnboarding } from "@/src/utils/onboarding";
 
 const LEN = 4;
 
@@ -40,6 +41,9 @@ export default function Pin() {
             setLoading(true);
             try {
               await savePin(next);
+              // Onboarding is done — biometric is optional, so a restart from
+              // here belongs in the tabs, not back on this screen.
+              await clearPendingOnboarding();
               router.replace("/biometric");
             } catch (e: any) {
               setError(e.message || "Failed to save PIN. Please try again.");

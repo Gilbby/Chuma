@@ -1,15 +1,73 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Fingerprint } from "lucide-react-native";
+import {
+  isBiometricAvailable,
+  biometricLabel,
+  promptBiometric,
+  setBiometricEnabled,
+} from "@/src/utils/biometrics";
 
 export default function Biometric() {
   const { colors } = useTheme();
   const router = useRouter();
+  // null = still checking the sensor; false = this phone can't, so we never
+  // show the offer at all and the PIN stays the only way in.
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [label, setLabel] = useState("biometric");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const ok = await isBiometricAvailable();
+      if (!alive) return;
+      if (!ok) {
+        // No sensor, or nothing enrolled: skip the step entirely rather than
+        // offering a switch that could only fail.
+        router.replace("/(tabs)");
+        return;
+      }
+      setLabel(await biometricLabel());
+      setAvailable(true);
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onEnable = async () => {
+    setBusy(true);
+    setError("");
+    // Prove the enrolled finger/face belongs to whoever is holding the phone
+    // before we trust it as a sign-in method.
+    const ok = await promptBiometric("Enable biometric sign-in");
+    if (ok) {
+      await setBiometricEnabled(true);
+      router.replace("/(tabs)");
+      return;
+    }
+    setError(`Couldn't confirm your ${label}. You can still use your PIN.`);
+    setBusy(false);
+  };
+
+  if (available === null) {
+    return (
+      <SafeAreaView
+        style={[styles.checking, { backgroundColor: colors.background }]}
+        testID="biometric-screen"
+      >
+        <ActivityIndicator color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} testID="biometric-screen">
@@ -26,15 +84,21 @@ export default function Biometric() {
 
         <Text style={[styles.title, { color: colors.textMain }]}>Faster, safer sign-in</Text>
         <Text style={[styles.sub, { color: colors.textMuted }]}>
-          Use your fingerprint or Face ID to sign in and confirm transactions without typing your
-          PIN every time.
+          Use your {label} to sign in and confirm transactions without typing your PIN every time.
         </Text>
+
+        {error ? (
+          <Text style={[styles.error, { color: colors.danger }]} testID="biometric-error">
+            {error}
+          </Text>
+        ) : null}
 
         <View style={{ flex: 1 }} />
 
         <Button
           label="Enable biometric"
-          onPress={() => router.replace("/(tabs)")}
+          onPress={onEnable}
+          loading={busy}
           testID="biometric-enable-btn"
         />
         <View style={{ height: 12 }} />
@@ -50,6 +114,7 @@ export default function Biometric() {
 }
 
 const styles = StyleSheet.create({
+  checking: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: {
     flex: 1,
     paddingHorizontal: 24,
@@ -75,4 +140,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 12,
   },
+  error: { fontSize: 13, marginTop: 16, textAlign: "center", fontWeight: "500" },
 });

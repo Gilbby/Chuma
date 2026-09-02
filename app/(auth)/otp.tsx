@@ -14,6 +14,7 @@ import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { verifyOtp } from "@/src/services/auth";
+import { setPendingOnboarding, clearPendingOnboarding } from "@/src/utils/onboarding";
 
 const LEN = 6;
 
@@ -59,6 +60,10 @@ export default function Otp() {
             : res.next === "kyc"
               ? "/kyc"
               : "/pin";
+      // The token is already stored, so from here on a killed app would
+      // otherwise restore straight into the tabs with onboarding half done.
+      if (dest === "/(tabs)") await clearPendingOnboarding();
+      else await setPendingOnboarding(dest);
       router.replace(dest as never);
     } catch (e: any) {
       setError("Incorrect or expired code");

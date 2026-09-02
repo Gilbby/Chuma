@@ -18,11 +18,13 @@ import {
   CheckSquare,
   Gift,
   Scale,
+  Eye,
+  EyeOff,
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Skeleton, SkeletonGroup } from "@/src/components/ui";
 import { Avatar } from "@/src/components/ui/Avatar";
-import { ErrorState, GroupHealthStack } from "@/src/components/common";
+import { ErrorState, GroupHealthStack, PinPrompt } from "@/src/components/common";
 import { TransactionRow } from "@/src/components/common/TransactionRow";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { getGroups } from "@/src/services/groups";
@@ -32,6 +34,12 @@ import { getNotifications } from "@/src/services/notifications";
 import { getApprovals } from "@/src/services/approvals";
 import { getTransactions } from "@/src/services/transactions";
 import { getCurrentUser } from "@/src/utils/currentUser";
+import {
+  isBiometricEnabled,
+  promptBiometric,
+  isBalanceHidden,
+  setBalanceHidden as setBalanceHiddenPref,
+} from "@/src/utils/biometrics";
 import { Group, Loan, Penalty, Notice, Approval, TxnItem } from "@/src/types";
 import { computeShareOut, estimateGroupProfit, getMyShare } from "@/src/services/shareOut";
 import { formatZMW } from "@/src/utils/currency";
@@ -75,6 +83,10 @@ export default function Home() {
   const [recentTxns, setRecentTxns] = useState<TxnItem[]>([]);
   const [myUserId, setMyUserId] = useState<string>("");
   const [me, setMe] = useState<{ name?: string; avatar?: string }>({});
+  // Starts hidden until the stored preference is read, so a covered balance
+  // never flashes into view on launch.
+  const [balanceHidden, setBalanceHidden] = useState(true);
+  const [pinOpen, setPinOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,8 +122,34 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       load();
+      isBalanceHidden().then(setBalanceHidden);
     }, [load])
   );
+
+  const revealBalance = async () => {
+    setPinOpen(false);
+    setBalanceHidden(false);
+    await setBalanceHiddenPref(false);
+  };
+
+  // Hiding needs no proof — anyone may cover the number. Revealing does: the
+  // fingerprint/face they enabled, falling back to their Chuma PIN if they
+  // never enabled it, cancel it, or it fails.
+  const toggleBalance = async () => {
+    if (!balanceHidden) {
+      setBalanceHidden(true);
+      await setBalanceHiddenPref(true);
+      return;
+    }
+    if (await isBiometricEnabled()) {
+      if (await promptBiometric("Show your balance")) {
+        await revealBalance();
+        return;
+      }
+    }
+    setPinOpen(true);
+  };
+
   const handleRetry = () => {
     load();
   };
@@ -311,11 +349,24 @@ export default function Home() {
             { backgroundColor: colors.primary },
           ]}
         >
-          <View style={styles.heroBgCircle1} />
-          <View style={styles.heroBgCircle2} />
-          <Text style={styles.heroLabel}>Total balance</Text>
-          <Text style={styles.heroAmount}>
-            {formatZMW(myTotalSavings)}
+          <View style={styles.heroLabelRow}>
+            <Text style={styles.heroLabel}>Total balance</Text>
+            <Pressable
+              onPress={toggleBalance}
+              hitSlop={12}
+              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+              accessibilityLabel={balanceHidden ? "Show balance" : "Hide balance"}
+              testID="home-balance-toggle"
+            >
+              {balanceHidden ? (
+                <EyeOff size={20} color="rgba(255,255,255,0.9)" />
+              ) : (
+                <Eye size={20} color="rgba(255,255,255,0.9)" />
+              )}
+            </Pressable>
+          </View>
+          <Text style={styles.heroAmount} testID="home-balance-amount">
+            {balanceHidden ? "K ••••••" : formatZMW(myTotalSavings)}
           </Text>
           <View style={styles.heroRow}>
             <View>
@@ -533,6 +584,18 @@ export default function Home() {
           </>
         )}
       </ScrollView>
+
+      <PinPrompt
+        visible={pinOpen}
+        title="Enter your PIN"
+        subtitle="Confirm it's you to show your balance."
+        onSuccess={revealBalance}
+        onCancel={() => setPinOpen(false)}
+        // Never set a PIN, so there is nothing to check — show the balance
+        // rather than locking them out of their own figure.
+        onNoPin={revealBalance}
+        testID="home-balance-pin"
+      />
     </SafeAreaView>
   );
 }
@@ -612,23 +675,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: "hidden",
   },
-  heroBgCircle1: {
-    position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    right: -50,
-    top: -80,
-  },
-  heroBgCircle2: {
-    position: "absolute",
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    right: 30,
-    top: 30,
+  heroLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   heroLabel: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "500", letterSpacing: 0.3 },
   heroAmount: { color: "#fff", fontSize: 34, fontWeight: "700", marginTop: 4, letterSpacing: -0.6 },

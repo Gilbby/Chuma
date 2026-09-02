@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { API_BASE_URL } from "@/src/config/api";
 import { getToken, clearToken } from "@/src/utils/authToken";
 import { clearCurrentUser } from "@/src/utils/currentUser";
+import { clearPendingOnboarding } from "@/src/utils/onboarding";
 
 type Options = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
@@ -22,6 +23,7 @@ async function onSessionExpired() {
   try {
     await clearToken();
     await clearCurrentUser();
+    await clearPendingOnboarding();
     router.replace("/welcome");
   } finally {
     setTimeout(() => {
