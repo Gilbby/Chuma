@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -17,10 +17,11 @@ import {
   type GroupInvite,
 } from "@/src/services/groups";
 import { getCurrentUser } from "@/src/utils/currentUser";
-import { Group } from "@/src/types";
+import { Group, Member } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
-import { Users, Plus, ChevronRight } from "lucide-react-native";
+import { invitedAgo, inviteDisplayName, pendingInvites } from "@/src/utils/invites";
+import { Users, Plus, ChevronRight, Clock } from "lucide-react-native";
 
 export default function Groups() {
   const { colors } = useTheme();
@@ -42,6 +43,14 @@ export default function Groups() {
     }
     router.push("/(modals)/create-group");
   }, [router]);
+
+  // Invites this user's groups are still waiting on. Derived from the groups
+  // themselves on every load, so it cannot be dismissed or swiped away — it
+  // clears only when the invitee accepts or declines, or an admin withdraws it.
+  const awaitingCount = useMemo(
+    () => groups.reduce((n, g) => n + pendingInvites(g).length, 0),
+    [groups]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,6 +160,9 @@ export default function Groups() {
           <Text style={[styles.title, { color: colors.textMain }]}>My Groups</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
             {groups.length} active chuma groups
+            {awaitingCount > 0
+              ? ` · ${awaitingCount} invite${awaitingCount === 1 ? "" : "s"} awaiting a reply`
+              : ""}
           </Text>
         </View>
         <Pressable
@@ -286,6 +298,8 @@ export default function Groups() {
                   </>
                 ) : null}
               </View>
+
+              <PendingInvitesNote group={g} colors={colors} />
             </Card>
           </Pressable>
         ))}
@@ -295,6 +309,64 @@ export default function Groups() {
     </SafeAreaView>
   );
 }
+
+/**
+ * The people this group invited who still haven't answered.
+ *
+ * Rebuilt from the group on every load and deliberately given no dismiss
+ * control: an unanswered invitation stays on the overview until someone acts on
+ * it — the invitee accepts or declines, or an admin withdraws it from the
+ * group's members tab (tap the card to get there).
+ */
+const PendingInvitesNote = ({
+  group,
+  colors,
+}: {
+  group: Group;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) => {
+  const pending = pendingInvites(group);
+  if (pending.length === 0) return null;
+  // Cap the list so one badly-behaved group can't push the next card off screen;
+  // the full list lives on the group's members tab.
+  const shown = pending.slice(0, 3);
+  const extra = pending.length - shown.length;
+  return (
+    <View
+      style={[
+        styles.pendingBox,
+        { backgroundColor: colors.warning + "14", borderColor: colors.warning + "33" },
+      ]}
+      testID={`group-pending-invites-${group.id}`}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <Clock size={13} color={colors.warning} />
+        <Text style={[styles.pendingTitle, { color: colors.warning }]}>
+          {pending.length} INVITE{pending.length === 1 ? "" : "S"} AWAITING A REPLY
+        </Text>
+      </View>
+      {shown.map((m: Member, i: number) => {
+        const ago = invitedAgo(m.lastInviteSentAt ?? m.invitedAt);
+        return (
+          <Text
+            key={m.id || m.phone || String(i)}
+            style={[styles.pendingRow, { color: colors.textMuted }]}
+            numberOfLines={1}
+          >
+            {inviteDisplayName(m)}
+            {m.role && m.role !== "Member" ? ` · ${m.role}` : ""}
+            {ago ? ` · sent ${ago}` : ""}
+          </Text>
+        );
+      })}
+      {extra > 0 && (
+        <Text style={[styles.pendingRow, { color: colors.textMuted }]}>
+          +{extra} more
+        </Text>
+      )}
+    </View>
+  );
+};
 
 const Stat = ({
   label,
@@ -343,4 +415,7 @@ const styles = StyleSheet.create({
   cycleValue: { fontSize: 13, fontWeight: "700" },
   sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 8 },
   inviteIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  pendingBox: { marginTop: 14, borderRadius: 12, borderWidth: 1, padding: 10 },
+  pendingTitle: { fontSize: 10, fontWeight: "800", letterSpacing: 1, marginLeft: 6 },
+  pendingRow: { fontSize: 12, marginTop: 6 },
 });

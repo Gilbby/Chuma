@@ -37,6 +37,12 @@ import { getGroupTransactions } from "@/src/services/transactions";
 import { getLoans } from "@/src/services/loans";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
+import {
+  phoneKey,
+  invitedAgo,
+  inviteDisplayName,
+  pendingInvites,
+} from "@/src/utils/invites";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { Member, Group, Approval, TxnItem, Loan } from "@/src/types";
 import * as Clipboard from "expo-clipboard";
@@ -65,11 +71,6 @@ import {
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
-
-/** Last 9 digits — compares +260971234567, 0971234567 and 971234567 as equal. */
-function phoneKey(phone?: string) {
-  return String(phone ?? "").replace(/\D/g, "").slice(-9);
-}
 
 export default function GroupDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -156,10 +157,7 @@ export default function GroupDetails() {
     () => (group?.members ?? []).filter((m: any) => m.status !== "pending"),
     [group]
   );
-  const pendingMembers = useMemo(
-    () => (group?.members ?? []).filter((m: any) => m.status === "pending"),
-    [group]
-  );
+  const pendingMembers = useMemo(() => pendingInvites(group), [group]);
 
   const onResendInvite = useCallback(
     async (member: Member) => {
@@ -1326,20 +1324,6 @@ const MemberRow = ({
   );
 };
 
-/** Relative age of an invite — "today", "3 days ago". Keeps the row honest
- *  about how long someone has been sitting on an unanswered invitation. */
-function invitedAgo(iso?: string) {
-  if (!iso) return null;
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return null;
-  const days = Math.floor((Date.now() - then) / 86400000);
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days} days ago`;
-  const months = Math.floor(days / 30);
-  return months === 1 ? "a month ago" : `${months} months ago`;
-}
-
 const PendingInviteRow = ({
   member,
   colors,
@@ -1356,12 +1340,7 @@ const PendingInviteRow = ({
   onCancel: () => void;
 }) => {
   const ago = invitedAgo(member.lastInviteSentAt ?? member.invitedAt);
-  // The name is only a placeholder until they sign up — the API stores the phone
-  // as the name for an invitee with no account yet.
-  const displayName =
-    member.name && phoneKey(member.name) !== phoneKey(member.phone)
-      ? member.name
-      : member.phone;
+  const displayName = inviteDisplayName(member);
   return (
     <View style={[styles.memberRow, { opacity: busy ? 0.5 : 1 }]}>
       <Avatar name={displayName} size={40} />
