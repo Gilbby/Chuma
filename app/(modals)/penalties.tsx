@@ -105,7 +105,7 @@ export default function Penalties() {
         ) : sections.length === 0 ? (
           <Card>
             <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
-              No penalties — nice work
+              No penalties, nice work
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
               You&apos;re all caught up across your groups.

@@ -216,7 +216,7 @@ export default function Contribute() {
     submitAttempted && num <= 0
       ? "Enter an amount to pay"
       : belowBase
-        ? `Minimum ${formatZMW(base)} — this covers your dues`
+        ? `Minimum ${formatZMW(base)}: this covers your dues`
         : invalidLoan
           ? "Enter an amount for each loan"
           : "";
@@ -656,7 +656,7 @@ export default function Contribute() {
                 {!payCash && (pricing?.networkFee ?? 0) > 0 ? (
                   <Text style={[styles.confirmLabel, { color: colors.textMuted, marginTop: 8 }]}>
                     Your mobile network charges an extra {formatZMW(pricing?.networkFee ?? 0)} to send
-                    this, deducted from your wallet separately — it doesn't go to the group or Chuma.
+                    this, deducted from your wallet separately. It doesn't go to the group or Chuma.
                   </Text>
                 ) : null}
 
@@ -672,7 +672,7 @@ export default function Contribute() {
                   onPress={async () => {
                     if (networkUnknown) {
                       setSubmitError(
-                        "No mobile money network detected for your number — update your profile or pay with cash."
+                        "No mobile money network detected for your number. Update your profile or pay with cash."
                       );
                       return;
                     }
@@ -856,7 +856,7 @@ const SuccessScreen = ({
     ? `Your payment of ${formatZMW(amount)} to ${group} has been recorded and your account updated.`
     : isCash
       ? `Your ${formatZMW(amount)} cash payment to ${group} has been recorded. It will be applied once the treasurer confirms receiving the cash.`
-      : `Approve the ${formatZMW(amount)} payment on your phone. Your dues in ${group} will be settled as soon as it's confirmed — usually within seconds.`;
+      : `Approve the ${formatZMW(amount)} payment on your phone. Your dues in ${group} will be settled as soon as it's confirmed, usually within seconds.`;
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}

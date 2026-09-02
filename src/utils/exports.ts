@@ -244,7 +244,7 @@ export async function exportTransactionsPdf(data: TxnItem[]) {
       .footer { margin-top: 24px; font-size: 11px; color: #999; }
     </style></head>
     <body>
-      <h1>Chuma — Transaction History</h1>
+      <h1>Chuma: Transaction History</h1>
       <p>Generated on ${fmtDate(new Date())} · ${data.length} transactions</p>
       <table>
         <thead><tr><th>Date</th><th>Type</th><th>Group</th><th>Amount</th><th>Status</th></tr></thead>

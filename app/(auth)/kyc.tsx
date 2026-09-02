@@ -32,13 +32,24 @@ const TERMINAL: KycStatus[] = ["approved", "declined", "expired", "abandoned"];
 export default function Kyc() {
   const { colors } = useTheme();
   const router = useRouter();
-  // When launched from the in-app KYC nudge (return=tabs) we go back to the app
-  // afterwards; during first-time onboarding we continue to PIN setup.
+  // Where to go once verification finishes. Launched from the home nudge
+  // (return=tabs) we go back to the app; from the Create-group tap
+  // (return=create-group) we continue into the wizard they were reaching for;
+  // otherwise this is onboarding and PIN setup comes next.
   const { return: returnTo } = useLocalSearchParams<{ return?: string }>();
-  const afterKyc = returnTo === "tabs" ? "/(tabs)" : "/pin";
-  // New-signup onboarding is a HARD gate — no skip. The in-app nudge (existing
-  // users tapping the banner/notification, return=tabs) may skip for now.
-  const canSkip = returnTo === "tabs";
+  const fromCreateGroup = returnTo === "create-group";
+  const afterKyc =
+    returnTo === "tabs"
+      ? "/(tabs)"
+      : returnTo === "create-group"
+        ? "/(modals)/create-group"
+        : "/pin";
+  // Skipping must never drop them into a screen that needs verification —
+  // a skipped create-group goes back to the Groups list instead.
+  const skipTo = fromCreateGroup ? "/(tabs)/groups" : afterKyc;
+  // KYC is never a hard gate now: it can always be postponed.
+  const canSkip = true;
+  const skipLabel = fromCreateGroup ? "Not now" : "I'll do this later";
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
@@ -153,7 +164,15 @@ export default function Kyc() {
   // banner) until they complete it.
   const handleSkip = async () => {
     await storage.setItem("kyc_draft", { complete: false });
-    router.replace(afterKyc);
+    // Reached from the Groups + button (or from create-group's own guard), this
+    // screen sits on top of the tabs stack, so popping lands exactly back on
+    // Groups. replace() would mount a second tabs instance inside the stack
+    // instead of unwinding to the one already there.
+    if (fromCreateGroup && router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace(skipTo);
   };
 
   // ── Review state: submitted, awaiting Didit's decision ──────────────────────
@@ -168,7 +187,8 @@ export default function Kyc() {
           <Text style={[styles.title, { color: colors.textMain }]}>Verification in review</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
             Your details were submitted and are being reviewed. Some IDs need a quick manual check,
-            so this can take a little while. Tap Check status once you&apos;ve been approved.
+            so this can take a little while. You can&apos;t create a group until you&apos;re approved.
+            Tap Check status to see if you are.
           </Text>
           <View style={{ flex: 1 }} />
           <Button
@@ -190,7 +210,7 @@ export default function Kyc() {
             <>
               <View style={{ height: 10 }} />
               <Button
-                label="Continue for now"
+                label={skipLabel}
                 variant="ghost"
                 onPress={handleSkip}
                 disabled={busy}
@@ -213,8 +233,8 @@ export default function Kyc() {
         </View>
         <Text style={[styles.title, { color: colors.textMain }]}>Verify your identity</Text>
         <Text style={[styles.sub, { color: colors.textMuted }]}>
-          We&apos;re required by law to verify your identity before you can send or receive money.
-          You&apos;ll do this securely with our partner Didit.
+          Only verified members can create a group. It&apos;s a one-time check, handled securely by
+          our verification partner, and it takes about two minutes.
         </Text>
 
         <View style={{ marginTop: 28, gap: 16 }}>
@@ -233,7 +253,7 @@ export default function Kyc() {
           <Step
             icon={<ShieldCheck size={20} color={colors.primary} />}
             title="Get verified"
-            body="Your verified name is added to your Chuma profile."
+            body="Once approved, you can create and manage your own group."
             colors={colors}
           />
         </View>
@@ -255,7 +275,7 @@ export default function Kyc() {
         ) : null}
 
         <Button
-          label={error ? "Try again" : "Verify with Didit"}
+          label={error ? "Try again" : "Start verification"}
           onPress={startVerification}
           loading={busy}
           disabled={busy}
@@ -265,7 +285,7 @@ export default function Kyc() {
           <>
             <View style={{ height: 10 }} />
             <Button
-              label="I'll do this later"
+              label={skipLabel}
               variant="ghost"
               onPress={handleSkip}
               disabled={busy}
@@ -275,7 +295,8 @@ export default function Kyc() {
         )}
 
         <Text style={[styles.disclaimer, { color: colors.textMuted }]}>
-          Your information is encrypted and processed by Didit. It is never shared without your consent.
+          Your information is encrypted and processed by our verification partner. It is never shared
+          without your consent.
         </Text>
       </ScrollView>
     </SafeAreaView>

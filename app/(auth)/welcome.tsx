@@ -36,7 +36,7 @@ const SLIDES = [
   {
     icon: Vote,
     title: "Governance by\nthe whole group",
-    sub: "Vote on loans, rules and share-outs — no single chairperson decides alone.",
+    sub: "Vote on loans, rules and share-outs: no single chairperson decides alone.",
   },
 ];
 

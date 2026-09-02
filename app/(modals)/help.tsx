@@ -59,7 +59,7 @@ const FAQS = [
   {
     id: "7",
     q: "What is a trust score?",
-    a: "Your trust score reflects your reliability as a member — how consistently you contribute on time and repay loans. A higher score can improve your loan eligibility within your group.",
+    a: "Your trust score reflects your reliability as a member: how consistently you contribute on time and repay loans. A higher score can improve your loan eligibility within your group.",
   },
 ];
 

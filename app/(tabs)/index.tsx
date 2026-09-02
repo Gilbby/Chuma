@@ -17,8 +17,6 @@ import {
   FileText,
   CheckSquare,
   Gift,
-  ShieldCheck,
-  ChevronRight,
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Skeleton, SkeletonGroup } from "@/src/components/ui";
@@ -75,7 +73,7 @@ export default function Home() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [recentTxns, setRecentTxns] = useState<TxnItem[]>([]);
   const [myUserId, setMyUserId] = useState<string>("");
-  const [me, setMe] = useState<{ name?: string; avatar?: string; kycStatus?: string }>({});
+  const [me, setMe] = useState<{ name?: string; avatar?: string }>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,10 +83,9 @@ export default function Home() {
         _id: string;
         name?: string;
         avatar?: string;
-        kyc?: { status?: string };
       }>();
       setMyUserId(user?._id ? String(user._id) : "");
-      setMe({ name: user?.name, avatar: user?.avatar, kycStatus: user?.kyc?.status });
+      setMe({ name: user?.name, avatar: user?.avatar });
       const [g, l, p, n, a, t] = await Promise.all([
         getGroups(),
         getLoans({ mine: true }),
@@ -213,8 +210,6 @@ export default function Home() {
   // (the API can return resolved approvals too).
   const pendingApprovals = approvals.filter((a) => a.status === "pending").length;
   const unread = notifications.filter((n) => !n.read).length;
-  // Soft KYC nudge: prompt anyone not yet verified to complete verification.
-  const needsKyc = !!me.kycStatus && me.kycStatus !== "verified";
 
   // Members don't approve anything, so only surface Approve to roles that hold
   // at least one approval permission.
@@ -282,34 +277,6 @@ export default function Home() {
             {canApprove ? ` · ${pendingApprovals} approvals` : ""}
           </Text>
         </View>
-
-        {/* Soft KYC nudge banner — shown until identity is verified */}
-        {needsKyc && (
-          <Pressable
-            onPress={() => router.push("/kyc?return=tabs" as never)}
-            style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            testID="home-kyc-banner"
-          >
-            <View style={[styles.kycBanner, { backgroundColor: colors.warning + "18", borderColor: colors.warning + "44" }]}>
-              <View style={[styles.kycIcon, { backgroundColor: colors.warning + "22" }]}>
-                <ShieldCheck size={20} color={colors.warning} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.kycTitle, { color: colors.textMain }]}>
-                  {me.kycStatus === "rejected"
-                    ? "Verification failed — try again"
-                    : me.kycStatus === "pending"
-                    ? "Verification in review"
-                    : "Verify your identity"}
-                </Text>
-                <Text style={[styles.kycSub, { color: colors.textMuted }]}>
-                  Complete a quick identity check to secure your account.
-                </Text>
-              </View>
-              <ChevronRight size={20} color={colors.textMuted} />
-            </View>
-          </Pressable>
-        )}
 
         {loading ? (
           <>
@@ -629,25 +596,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   metaText: { fontSize: 12, marginLeft: 8 },
-  kycBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginHorizontal: 20,
-    marginBottom: 16,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  kycIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  kycTitle: { fontSize: 14, fontWeight: "700", letterSpacing: -0.2 },
-  kycSub: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   heroCard: {
     marginHorizontal: 20,
     padding: 22,

@@ -49,6 +49,9 @@ export default function EditProfile() {
   const [accountNumber, setAccountNumber] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nameError, setNameError] = useState("");
+  // A KYC-verified name comes from the identity document (chairpersons), so
+  // the server rejects edits to it — mirror that here instead of failing on save.
+  const nameLocked = me?.kyc?.status === "verified";
   const [accountNameError, setAccountNameError] = useState("");
   const [accountNumberError, setAccountNumberError] = useState("");
 
@@ -195,7 +198,7 @@ export default function EditProfile() {
             </View>
 
             {/* Section 2 — Name */}
-            <Text style={[styles.label, { color: colors.textMuted }]}>FULL NAME</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>FULL NAME{nameLocked ? " (VERIFIED)" : ""}</Text>
             <TextInput
               style={[
                 styles.inputField,
@@ -210,10 +213,16 @@ export default function EditProfile() {
               placeholder="Your full name"
               placeholderTextColor={colors.textMuted}
               autoCapitalize="words"
+              editable={!nameLocked}
               testID="edit-profile-name-input"
             />
             {nameError ? (
               <Text style={[styles.errText, { color: colors.danger }]}>{nameError}</Text>
+            ) : null}
+            {nameLocked ? (
+              <Text style={[styles.errText, { color: colors.textMuted }]}>
+                Taken from your verified ID. This one can&apos;t be changed.
+              </Text>
             ) : null}
 
             {/* Phone — login identity, not editable */}
@@ -287,7 +296,7 @@ export default function EditProfile() {
                   lineHeight: 18,
                 }}
               >
-                Cash is recorded manually by your group admin — no account details needed.
+                Cash is recorded manually by your group admin, no account details needed.
               </Text>
             ) : (
               <>
@@ -344,7 +353,7 @@ export default function EditProfile() {
                 ) : null}
                 {isWallet && (
                   <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
-                    Defaults to your registered number — edit if your wallet uses a different number.
+                    Defaults to your registered number. Edit if your wallet uses a different number.
                   </Text>
                 )}
 

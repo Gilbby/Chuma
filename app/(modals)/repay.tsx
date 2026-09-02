@@ -133,7 +133,7 @@ export default function Repay() {
             }}
           >
             {pending
-              ? `Approve the ${formatZMW(amount)} payment on your phone. It will be applied to your loan with ${selected.groupName} as soon as it's confirmed — usually within seconds.`
+              ? `Approve the ${formatZMW(amount)} payment on your phone. It will be applied to your loan with ${selected.groupName} as soon as it's confirmed, usually within seconds.`
               : `${formatZMW(amount)} applied to your loan with ${selected.groupName}.`}
           </Text>
           <View style={{ flex: 1 }} />

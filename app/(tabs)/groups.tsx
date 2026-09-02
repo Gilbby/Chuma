@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { useRole } from "@/src/hooks/useRole";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
@@ -11,6 +10,7 @@ import { ErrorState } from "@/src/components/common";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { getGroups, acceptInvite } from "@/src/services/groups";
+import { getCurrentUser } from "@/src/utils/currentUser";
 import {
   getNotifications,
   markNotificationRead,
@@ -24,13 +24,23 @@ import { Users, Plus, ChevronRight } from "lucide-react-native";
 export default function Groups() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { can } = useRole();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [invites, setInvites] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Founding a group moves money (the month-1 fee), so it needs KYC. Ask for it
+  // here rather than at signup — the user now knows why they are being asked.
+  const openCreateGroup = useCallback(async () => {
+    const user = await getCurrentUser<{ kyc?: { status?: string } }>();
+    if (user?.kyc?.status !== "verified") {
+      router.push("/kyc?return=create-group" as never);
+      return;
+    }
+    router.push("/(modals)/create-group");
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,15 +89,13 @@ export default function Groups() {
             {groups.length} active chuma groups
           </Text>
         </View>
-        {can("create.group") && (
-          <Pressable
-            style={[styles.addBtn, { backgroundColor: colors.primary }]}
-            onPress={() => router.push("/(modals)/create-group")}
-            testID="groups-add-btn"
-          >
-            <Plus size={20} color="#fff" strokeWidth={2.4} />
-          </Pressable>
-        )}
+        <Pressable
+          style={[styles.addBtn, { backgroundColor: colors.primary }]}
+          onPress={openCreateGroup}
+          testID="groups-add-btn"
+        >
+          <Plus size={20} color="#fff" strokeWidth={2.4} />
+        </Pressable>
       </View>
 
       {loading ? (

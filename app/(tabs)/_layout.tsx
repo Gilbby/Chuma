@@ -1,11 +1,20 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Tabs } from "expo-router";
 import { Home, Users, ArrowLeftRight, User } from "lucide-react-native";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { useRole } from "@/src/contexts/RoleContext";
 import { View, StyleSheet, Platform } from "react-native";
 
 export default function TabsLayout() {
   const { colors, mode } = useTheme();
+  const { refresh } = useRole();
+
+  // The provider mounts above the auth stack, so it derived the role before
+  // sign-in. Entering the tabs is the first moment a token exists — re-derive.
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   return (
     <Tabs
       screenOptions={{

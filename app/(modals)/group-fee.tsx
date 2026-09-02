@@ -143,7 +143,7 @@ export default function GroupFeeScreen() {
             </Text>
             <Text style={{ color: colors.textMuted, textAlign: "center", marginTop: 4 }}>
               {receipt.pending
-                ? `Approve the payment on your phone — ${receipt.groupName} reactivates once it's confirmed`
+                ? `Approve the payment on your phone. ${receipt.groupName} reactivates once it's confirmed`
                 : `${receipt.groupName} reactivated`}
             </Text>
           </View>

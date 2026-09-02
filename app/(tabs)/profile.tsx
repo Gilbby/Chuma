@@ -36,7 +36,7 @@ import { useRole } from "@/src/contexts/RoleContext";
 export default function Profile() {
   const { colors, mode, toggle } = useTheme();
   const router = useRouter();
-  const { role, setRole, description } = useRole();
+  const { role, setRole, description, isTester } = useRole();
   const [bio, setBio] = React.useState(true);
   const [notif, setNotif] = React.useState(true);
   const [trustOpen, setTrustOpen] = useState(false);
@@ -91,10 +91,6 @@ export default function Profile() {
     fair: colors.warning,
     low: colors.danger,
   }[trustBand.band];
-
-  // The demo role switcher is a testing tool — only the seeded Gilbert account
-  // may see it. Everyone else gets the role assigned to their account.
-  const isTester = String(me?.phone ?? "").replace(/\D/g, "") === "260975988642";
 
   const memberSince = (() => {
     const d = new Date(me?.joinedDate ?? "");

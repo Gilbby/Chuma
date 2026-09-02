@@ -45,7 +45,21 @@ export default function Otp() {
     setError("");
     try {
       const res = await verifyOtp(phone, codeStr, mode);
-      router.replace(res.next === "tabs" ? "/(tabs)" : "/kyc");
+      // Signup asks for a display name, then PIN. Full KYC is chairperson-only
+      // and happens later, at Create group. "kyc" stays handled for legacy tokens.
+      const dest =
+        res.next === "tabs"
+          ? "/(tabs)"
+          : res.next === "name"
+            // Signing in with a pre-name-step account: they already have a PIN,
+            // so the name screen returns them to the app, not to PIN setup.
+            ? mode === "signin"
+              ? "/name?return=tabs"
+              : "/name"
+            : res.next === "kyc"
+              ? "/kyc"
+              : "/pin";
+      router.replace(dest as never);
     } catch (e: any) {
       setError("Incorrect or expired code");
       setCode(Array(LEN).fill(""));

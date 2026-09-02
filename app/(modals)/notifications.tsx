@@ -118,7 +118,7 @@ export default function Notifications() {
         id: `n-fee-${g.id}`,
         type: "security",
         title: "Group fee overdue",
-        body: `${g.name}: monthly fee unpaid. Day ${grace.daysIntoGrace} of 5 — ${left} day${left === 1 ? "" : "s"} left before the group is locked. Pay ${formatZMW(getAmountOwed(g))} to keep it active.`,
+        body: `${g.name}: monthly fee unpaid. Day ${grace.daysIntoGrace} of 5, ${left} day${left === 1 ? "" : "s"} left before the group is locked. Pay ${formatZMW(getAmountOwed(g))} to keep it active.`,
         date: "Today",
         read: false,
         groupId: g.id,

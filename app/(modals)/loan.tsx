@@ -353,7 +353,7 @@ export default function Loan() {
                 <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 8 }}>
                   Up to {termLabel(maxTerm)} for a {formatZMW(num)} loan
                   {Number.isFinite(monthsToShareOut) && monthsToShareOut <= 12
-                    ? ` — capped so it clears before share-out (${termLabel(monthsToShareOut)} left in the cycle).`
+                    ? `, capped so it clears before share-out (${termLabel(monthsToShareOut)} left in the cycle).`
                     : ", per this group's rules."}
                 </Text>
               )}

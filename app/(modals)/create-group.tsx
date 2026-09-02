@@ -15,14 +15,13 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Redirect } from "expo-router";
+import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as Contacts from "expo-contacts";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { useRole } from "@/src/hooks/useRole";
 import { createGroup, inviteMember } from "@/src/services/groups";
 import { defaultTiersForCycle, tierBandLabel } from "@/src/services/loans";
 import { getCurrentUser } from "@/src/utils/currentUser";
@@ -97,7 +96,6 @@ interface Invite {
 export default function CreateGroup() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { can } = useRole();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const scrollRef = useRef<ScrollView>(null);
@@ -185,6 +183,17 @@ export default function CreateGroup() {
     setRepaymentTiers(defaultTiersForCycle(cycleMonths));
   }, [cycleMonths]);
 
+  // Guards direct navigation (deep link) into a 6-step wizard that would only
+  // 403 at the payment step — the Groups + button already checks this first.
+  useEffect(() => {
+    (async () => {
+      const user = await getCurrentUser<{ kyc?: { status?: string } }>();
+      if (user?.kyc?.status !== "verified") {
+        router.replace("/kyc?return=create-group" as never);
+      }
+    })();
+  }, [router]);
+
   // The wizard reuses a single ScrollView across all steps, so advancing while
   // scrolled down (e.g. the long loan-rules step) would carry that offset into
   // the next step and open it pre-scrolled. Reset to the top on every step change.
@@ -258,7 +267,7 @@ export default function CreateGroup() {
       if (isValidZambianPhone(local)) {
         clearErr(errKey);
       } else {
-        setErrors((prev) => ({ ...prev, [errKey]: "That contact isn't a valid Zambian number — check it" }));
+        setErrors((prev) => ({ ...prev, [errKey]: "That contact isn't a valid Zambian number. Check it" }));
       }
     } catch (e: any) {
       Alert.alert("Couldn't open contacts", e?.message || "Please try again.");
@@ -309,7 +318,7 @@ export default function CreateGroup() {
 
   const addPhoneInvite = async () => {
     if (!phoneInput) return;
-    if (!newGroupId) { setInviteError("Group not ready yet — please wait a moment."); return; }
+    if (!newGroupId) { setInviteError("Group not ready yet, please wait a moment."); return; }
     if (phoneInput.length < 9) { setInviteError("Enter a 9-digit number after +260"); return; }
     const full = `+260${phoneInput}`;
     setInviting(true); setInviteError("");
@@ -416,12 +425,6 @@ export default function CreateGroup() {
     }
   };
 
-  // Only a Chairperson may create a group. Guards against direct navigation
-  // (e.g. deep link) — the entry button on the Groups screen is already hidden.
-  if (!can("create.group")) {
-    return <Redirect href="/(tabs)/groups" />;
-  }
-
   // ─── Post-creation invite screen ────────────────────────────────────────────
 
   if (showInvite) {
@@ -494,7 +497,7 @@ export default function CreateGroup() {
 
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button
-                label="Done — go to dashboard"
+                label="Done, go to dashboard"
                 onPress={() => router.replace(`/group/${newGroupId}`)}
                 testID="invite-done-btn"
               />
@@ -805,7 +808,7 @@ export default function CreateGroup() {
                 {internalLending && (
                   <>
                     <FL
-                      text={`Loan multiplier — up to ${loanMultiplier}× member savings`}
+                      text={`Loan multiplier: up to ${loanMultiplier}× member savings`}
                       colors={colors}
                       style={{ marginTop: 20 }}
                     />
@@ -845,7 +848,7 @@ export default function CreateGroup() {
 
                     <FL text="Repayment terms by loan size" colors={colors} style={{ marginTop: 20 }} />
                     <Text style={[styles.fieldHint, { color: colors.textMuted, marginBottom: 4 }]}>
-                      Tuned to your {cycleDuration} cycle — bigger loans get longer to repay, but always clear before share-out so the fund keeps circulating.
+                      Tuned to your {cycleDuration} cycle: bigger loans get longer to repay, but always clear before share-out so the fund keeps circulating.
                     </Text>
                     <Card padding={4} style={{ marginTop: 4 }}>
                       {repaymentTiers.map((tier, i) => {
@@ -911,7 +914,7 @@ export default function CreateGroup() {
                       })}
                     </View>
 
-                    <FL text="Grace period — days before repayment begins" colors={colors} style={{ marginTop: 20 }} />
+                    <FL text="Grace period: days before repayment begins" colors={colors} style={{ marginTop: 20 }} />
                     <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                       <TextInput
                         style={[styles.inlineInput, { color: colors.textMain, flex: 1, textAlign: "left" }]}
