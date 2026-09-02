@@ -62,6 +62,7 @@ import {
   Phone,
   AlertTriangle,
   UserMinus,
+  ShieldCheck,
   UserPlus,
   Plus,
   Lock,
@@ -161,6 +162,14 @@ export default function GroupDetails() {
     [group]
   );
   const pendingMembers = useMemo(() => pendingInvites(group), [group]);
+
+  // People who have left. Their row is kept so the group keeps its record of
+  // what they saved and contributed — removal ends a membership, it does not
+  // erase a history.
+  const formerMembers = useMemo(
+    () => group?.formerMembers ?? [],
+    [group]
+  );
 
   const onResendInvite = useCallback(
     async (member: Member) => {
@@ -502,6 +511,44 @@ The group's other admins vote on this — ${member.name} does not. If it carries
                   {isAdmin
                     ? "These people have been invited but haven't joined yet. They don't count towards the group until they accept."
                     : "These people have been invited but haven't joined yet."}
+                </Text>
+              </View>
+            )}
+
+            {/* Left the group. Kept on the record deliberately: their savings,
+                contributions and every transaction they made stay in the
+                group's books after they go. Read-only — nothing here removes
+                or edits what they did. */}
+            {formerMembers.length > 0 && (
+              <View style={{ marginTop: 20 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                  <UserMinus size={14} color={colors.textMuted} />
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 1.2,
+                      marginLeft: 6,
+                    }}
+                  >
+                    FORMER MEMBERS ({formerMembers.length})
+                  </Text>
+                </View>
+                <Card padding={0}>
+                  {formerMembers.map((m, i) => (
+                    <View key={m.id ?? m.phone ?? String(i)}>
+                      <FormerMemberRow member={m} colors={colors} />
+                      {i < formerMembers.length - 1 && (
+                        <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />
+                      )}
+                    </View>
+                  ))}
+                </Card>
+                <Text style={[styles.helperText, { color: colors.textMuted }]}>
+                  They no longer count towards the group, and their savings were
+                  refunded when they left. Their contributions and transactions
+                  stay in the group&apos;s records.
                 </Text>
               </View>
             )}
@@ -997,7 +1044,21 @@ The group's other admins vote on this — ${member.name} does not. If it carries
                         not an action: the other admins vote and the savings are
                         refunded on the way out. Never removes anyone on tap. */}
                     <Card padding={14} style={{ backgroundColor: colors.surface }}>
-                      {removalPending.has(String(selectedMember.id)) ? (
+                      {selectedMember.role !== "Member" ? (
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surfaceSecondary, alignItems: "center", justifyContent: "center" }}>
+                            <ShieldCheck size={20} color={colors.textMuted} />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
+                              {selectedMember.role}s can&apos;t be removed
+                            </Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                              Hand the role to someone else first
+                            </Text>
+                          </View>
+                        </View>
+                      ) : removalPending.has(String(selectedMember.id)) ? (
                         <View style={{ flexDirection: "row", alignItems: "center" }}>
                           <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.warning + "20", alignItems: "center", justifyContent: "center" }}>
                             <Clock size={20} color={colors.warning} />
@@ -1394,6 +1455,43 @@ const MemberRow = ({
         label={removalPending ? "Removal pending" : member.role}
         variant={removalPending ? "warning" : roleVariant}
       />
+    </View>
+  );
+};
+
+/** One former member, as the group's record of them. Read-only by design. */
+const FormerMemberRow = ({
+  member,
+  colors,
+}: {
+  member: Member;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) => {
+  const left = formatDate(member.exitedAt);
+  const saved = member.exitSavings ?? 0;
+  const cleared = member.exitLoanCleared ?? 0;
+  return (
+    <View style={styles.memberRow}>
+      <Avatar name={member.name} size={40} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text
+          style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }}
+          numberOfLines={1}
+        >
+          {member.name}
+        </Text>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+          {formatZMW(saved, { compact: true })} saved · {member.contributions ?? 0}{" "}
+          contribution{(member.contributions ?? 0) === 1 ? "" : "s"}
+          {cleared > 0 ? ` · ${formatZMW(cleared, { compact: true })} to loan` : ""}
+        </Text>
+        {left ? (
+          <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+            Left {left}
+          </Text>
+        ) : null}
+      </View>
+      <StatusBadge label="Former" variant="neutral" />
     </View>
   );
 };

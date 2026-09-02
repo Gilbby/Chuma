@@ -3,11 +3,16 @@ import { getCurrentUser } from "@/src/utils/currentUser";
 import { Group } from "@/src/types";
 
 function mapGroup(raw: any, currentUserId?: string): Group {
-  // Member subdocs come back with _id only (lean/toObject), and "removed" rows
-  // are history, not people in the group — drop them here so no screen has to.
-  const members = (raw.members ?? [])
-    .filter((m: any) => m.status !== "removed")
-    .map((m: any) => ({ ...m, id: String(m._id ?? m.id ?? "") }));
+  // Member subdocs come back with _id only (lean/toObject). A "removed" row is
+  // history, not a person in the group: it is kept OUT of `members` so no screen
+  // counts them, and kept ON the group as `formerMembers` so what they saved and
+  // contributed is never erased by their removal.
+  const rows = (raw.members ?? []).map((m: any) => ({
+    ...m,
+    id: String(m._id ?? m.id ?? ""),
+  }));
+  const members = rows.filter((m: any) => m.status !== "removed");
+  const formerMembers = rows.filter((m: any) => m.status === "removed");
   const mine = currentUserId
     ? members.find(
         (m: any) => String(m.userId) === String(currentUserId) && m.status === "active"
@@ -17,6 +22,7 @@ function mapGroup(raw: any, currentUserId?: string): Group {
     ...raw,
     id: String(raw._id),
     members,
+    formerMembers,
     memberCount: members.filter((m: any) => m.status === "active").length,
     yourRole: mine?.role ?? "Member",
     // keep shareOutDate / nextContributionDate as ISO strings — Hermes date math

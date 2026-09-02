@@ -16,6 +16,12 @@ export interface Member {
   invitedByName?: string;
   invitedAt?: string;
   lastInviteSentAt?: string;
+  // Frozen at removal. A former member's row is kept as the group's record of
+  // them — savings goes to 0 when the refund lands, these do not.
+  exitedAt?: string;
+  exitSavings?: number;
+  exitRefund?: number;
+  exitLoanCleared?: number;
 }
 
 export type GroupType =
@@ -88,6 +94,9 @@ export interface Group {
   loanInterestRate: number; // % per month
   loanMaxMultiplier: number; // x of savings
   members: Member[];
+  /** Removed members, kept as history. Never counted as members of the group.
+   *  Always set by the service layer; optional so older shapes still type. */
+  formerMembers?: Member[];
   yourRole: Role;
   healthScore?: number;
   savingsGrowth?: number;
