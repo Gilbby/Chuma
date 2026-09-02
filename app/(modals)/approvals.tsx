@@ -14,7 +14,7 @@ import { getCurrentUser } from "@/src/utils/currentUser";
 import { Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
-import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles, UserMinus, Trash2 } from "lucide-react-native";
+import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles, UserMinus, Trash2, HandCoins } from "lucide-react-native";
 
 const TYPE_ICONS: Record<Approval["type"], typeof Banknote> = {
   loan: Banknote,
@@ -24,6 +24,7 @@ const TYPE_ICONS: Record<Approval["type"], typeof Banknote> = {
   "member-removal": UserMinus,
   "group-deletion": Trash2,
   "share-out": Sparkles,
+  "cash-receipt": HandCoins,
 };
 
 export default function Approvals() {
@@ -163,6 +164,10 @@ export default function Approvals() {
             a.type === "member-removal" &&
             !!myUserId &&
             String(a.targetUserId) === myUserId;
+          // A receipt is not a group decision — one admin says whether the cash
+          // reached them — so it drops the vote tally and asks the question in
+          // the words of the thing: did you get the money?
+          const isReceipt = a.type === "cash-receipt";
           const progress = a.totalVoters === 0 ? 0 : a.votesFor / a.totalVoters;
           const isPending = a.status === "pending";
           const statusVariant =
@@ -191,7 +196,7 @@ export default function Approvals() {
               {a.amount ? (
                 <View style={[styles.amountBox, { backgroundColor: colors.surfaceSecondary }]}>
                   <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>
-                    REQUESTED AMOUNT
+                    {isReceipt ? "CASH HANDED OVER" : "REQUESTED AMOUNT"}
                   </Text>
                   <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 20, marginTop: 2 }}>
                     {formatZMW(a.amount)}
@@ -199,19 +204,26 @@ export default function Approvals() {
                 </View>
               ) : null}
 
-              <View style={{ marginTop: 14 }}>
-                <View style={styles.rowBetween}>
-                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>
-                    {a.votesFor} APPROVED · {a.votesAgainst} REJECTED
-                  </Text>
-                  <Text style={{ color: colors.textMain, fontSize: 12, fontWeight: "700" }}>
-                    {a.votesFor} of {a.totalVoters} approvals
-                  </Text>
+              {isReceipt ? (
+                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 14, lineHeight: 16 }}>
+                  One admin confirms this — whoever is holding the cash. Nothing
+                  is credited to them until you do.
+                </Text>
+              ) : (
+                <View style={{ marginTop: 14 }}>
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+                      {a.votesFor} APPROVED · {a.votesAgainst} REJECTED
+                    </Text>
+                    <Text style={{ color: colors.textMain, fontSize: 12, fontWeight: "700" }}>
+                      {a.votesFor} of {a.totalVoters} approvals
+                    </Text>
+                  </View>
+                  <View style={{ marginTop: 6 }}>
+                    <ProgressBar progress={progress} />
+                  </View>
                 </View>
-                <View style={{ marginTop: 6 }}>
-                  <ProgressBar progress={progress} />
-                </View>
-              </View>
+              )}
 
               {a.type === "withdrawal" ? (
                 <View
@@ -274,7 +286,7 @@ export default function Approvals() {
               {isPending && !isOwnRemoval ? (
                 <View style={styles.actions}>
                   <Button
-                    label="Reject"
+                    label={isReceipt ? "Not received" : "Reject"}
                     variant="outline"
                     onPress={() => onVote(a.id, "reject")}
                     size="md"
@@ -286,7 +298,7 @@ export default function Approvals() {
                     testID={`approval-reject-${a.id}`}
                   />
                   <Button
-                    label="Approve"
+                    label={isReceipt ? "Confirm received" : "Approve"}
                     onPress={() => onVote(a.id, "approve")}
                     size="md"
                     fullWidth={false}

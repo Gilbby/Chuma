@@ -157,7 +157,10 @@ export interface Approval {
     | "admin-action"
     | "member-removal"
     | "group-deletion"
-    | "share-out";
+    | "share-out"
+    // An admin acknowledging that cash physically reached them. Needs one
+    // admin, not a quorum — see the API's cashReceipt service.
+    | "cash-receipt";
   title: string;
   description: string;
   requestedBy: string;
