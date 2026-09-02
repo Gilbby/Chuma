@@ -1528,9 +1528,11 @@ const PendingInviteRow = ({
   const ago = invitedAgo(member.lastInviteSentAt ?? member.invitedAt);
   const displayName = inviteDisplayName(member);
   return (
+    // No avatar here, unlike a member row: an invitee often has no account yet,
+    // so the circle is initials of a phone number — and the row needs the width
+    // for the badge and the two actions.
     <View style={[styles.memberRow, { opacity: busy ? 0.5 : 1 }]}>
-      <Avatar name={displayName} size={40} />
-      <View style={{ flex: 1, marginLeft: 12 }}>
+      <View style={{ flex: 1 }}>
         <Text
           style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }}
           numberOfLines={1}
