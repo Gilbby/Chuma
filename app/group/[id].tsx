@@ -326,7 +326,9 @@ The group's other admins vote on this — ${member.name} does not. If it carries
         title={group.name}
         subtitle={`${group.memberCount} members`}
         rightAction={
-          tab === "members" ? (
+          // Inviting is an admin action the API refuses for members
+          // (requireGroupAdmin), so it is not offered to them here either.
+          tab === "members" && isAdmin ? (
             <Pressable
               style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}
               onPress={() => setInviteOpen((v) => !v)}
@@ -473,8 +475,10 @@ The group's other admins vote on this — ${member.name} does not. If it carries
 
             {/* Invited, not yet joined. Kept out of the members list above so the
                 group's headcount and savings never count someone who hasn't
-                accepted — and so an admin can chase or withdraw the invite. */}
-            {pendingMembers.length > 0 && (
+                accepted — and so an admin can chase or withdraw the invite.
+                Admins only: an unanswered invite is theirs to chase, and an
+                ordinary member has nothing to do about it. */}
+            {isAdmin && pendingMembers.length > 0 && (
               <View style={{ marginTop: 20 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
                   <Clock size={14} color={colors.textMuted} />
@@ -508,9 +512,8 @@ The group's other admins vote on this — ${member.name} does not. If it carries
                   ))}
                 </Card>
                 <Text style={[styles.helperText, { color: colors.textMuted }]}>
-                  {isAdmin
-                    ? "These people have been invited but haven't joined yet. They don't count towards the group until they accept."
-                    : "These people have been invited but haven't joined yet."}
+                  These people have been invited but haven&apos;t joined yet.
+                  They don&apos;t count towards the group until they accept.
                 </Text>
               </View>
             )}
@@ -1103,7 +1106,7 @@ The group's other admins vote on this — ${member.name} does not. If it carries
       </Modal>
 
       <Modal
-        visible={inviteOpen}
+        visible={isAdmin && inviteOpen}
         transparent={true}
         animationType="slide"
         onRequestClose={() => { setInviteOpen(false); setInvitePhone(""); setInviteRole("Member"); setInviteError(""); }}

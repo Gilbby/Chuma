@@ -47,8 +47,14 @@ export default function Groups() {
   // Invites this user's groups are still waiting on. Derived from the groups
   // themselves on every load, so it cannot be dismissed or swiped away — it
   // clears only when the invitee accepts or declines, or an admin withdraws it.
+  // Counted only where the user is an admin: chasing an unanswered invite is
+  // an admin job, so an ordinary member is never shown the backlog.
   const awaitingCount = useMemo(
-    () => groups.reduce((n, g) => n + pendingInvites(g).length, 0),
+    () =>
+      groups.reduce(
+        (n, g) => (g.yourRole !== "Member" ? n + pendingInvites(g).length : n),
+        0
+      ),
     [groups]
   );
 
