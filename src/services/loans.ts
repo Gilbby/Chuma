@@ -155,12 +155,28 @@ export async function getLoans(opts?: {
   return (res.loans ?? []).map(mapLoan);
 }
 
-export async function getLoanEligibility(groupId: string): Promise<{
+export interface LoanEligibility {
   savings: number;
   maxLoan: number;
   multiplier: number;
   interestRate: number;
-}> {
+  /** What the group's wallet can actually pay out right now. */
+  walletBalance: number;
+  /** False when something stops this member borrowing whatever they type. */
+  canBorrow: boolean;
+  blockedCode:
+    | "needs_name"
+    | "group_locked"
+    | "lending_disabled"
+    | "open_loan"
+    | "no_savings"
+    | null;
+  blockedReason: string | null;
+}
+
+export async function getLoanEligibility(
+  groupId: string
+): Promise<LoanEligibility> {
   return api(`/loans/eligibility?groupId=${encodeURIComponent(groupId)}`);
 }
 

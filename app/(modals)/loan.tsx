@@ -29,12 +29,13 @@ import {
   getLoanEligibility,
   requestLoan,
   loanTermInfo,
+  type LoanEligibility,
 } from "@/src/services/loans";
 import { getRequiredApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
 import { Group } from "@/src/types";
-import { Check, ChevronDown, Clock, Info } from "lucide-react-native";
+import { AlertCircle, Check, ChevronDown, Clock, Info } from "lucide-react-native";
 
 type Step = "request" | "breakdown" | "confirm" | "success";
 
@@ -55,12 +56,7 @@ export default function Loan() {
   const [grp, setGrp] = useState<Group | null>(null);
   const [showGroup, setShowGroup] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const [elig, setElig] = useState<{
-    savings: number;
-    maxLoan: number;
-    multiplier: number;
-    interestRate: number;
-  } | null>(null);
+  const [elig, setElig] = useState<LoanEligibility | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState(false);
   // True when they belong to groups but none of them lend.
@@ -179,19 +175,41 @@ export default function Loan() {
 
   const breakdown = getLoanBreakdown(num, grp.loanInterestRate, effectiveDuration.months);
   const eligibility = checkEligibility(num, maxLoan);
-  const eligible = eligibility.eligible && !lendingClosed;
+
+  // The amount is only half of eligibility. POST /loans also refuses outright
+  // when the member is blocked for a reason that has nothing to do with what
+  // they type — unpaid group fee, lending switched off, no real name, a loan
+  // already running — and the group has to hold the cash to lend. Judge all of
+  // it here so the form stops on this screen, rather than letting someone fill
+  // in every field and be turned away at the confirm button.
+  const blockedReason = elig && !elig.canBorrow ? elig.blockedReason : null;
+  const walletShort = !!elig && num > 0 && num > elig.walletBalance;
+  const eligible =
+    !blockedReason && !walletShort && eligibility.eligible && !lendingClosed;
+
+  // The one thing standing in their way, in the order the API applies it.
+  const denialReason = blockedReason
+    ? blockedReason
+    : walletShort
+      ? `This group's wallet only holds ${formatZMW(elig?.walletBalance ?? 0)} right now, so it can't cover ${formatZMW(num)}.`
+      : num > maxLoan
+        ? eligibility.reason
+        : null;
   const savingsLoanRatio = num > 0 ? mySavings / num : 0;
 
   // With no amount entered yet there is nothing to judge, so stay neutral rather
   // than accusing an empty field of being over the limit.
-  const eligibilityBadge =
-    num <= 0
+  const eligibilityBadge = blockedReason
+    ? { label: "Not eligible", variant: "danger" as const }
+    : num <= 0
       ? { label: "Enter an amount", variant: "neutral" as const }
       : lendingClosed
         ? { label: "Lending closed", variant: "danger" as const }
         : eligible
           ? { label: "Eligible", variant: "success" as const }
-          : { label: "Over limit", variant: "danger" as const };
+          : walletShort
+            ? { label: "Wallet short", variant: "danger" as const }
+            : { label: "Over limit", variant: "danger" as const };
 
   if (step === "success") {
     return (
@@ -278,7 +296,29 @@ export default function Loan() {
         <ScrollView contentContainerStyle={styles.content}>
           {step === "request" && (
             <>
-              {lendingClosed && (
+              {/* Blocked before the amount matters. Said once, at the top, so
+                  nobody works through the form to be refused at the end. */}
+              {blockedReason && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 10,
+                    padding: 14,
+                    borderRadius: 14,
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.danger,
+                    marginBottom: 20,
+                  }}
+                  testID="loan-blocked"
+                >
+                  <AlertCircle size={18} color={colors.danger} style={{ marginTop: 1 }} />
+                  <Text style={{ color: colors.textMain, fontSize: 13, lineHeight: 19, flex: 1 }}>
+                    {blockedReason}
+                  </Text>
+                </View>
+              )}
+              {lendingClosed && !blockedReason && (
                 <View
                   style={{
                     flexDirection: "row",
@@ -331,9 +371,9 @@ export default function Loan() {
               <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 6 }}>
                 {`You can borrow up to ${formatZMW(maxLoan)} (${grp.loanMaxMultiplier}× your ${formatZMW(mySavings)} savings)`}
               </Text>
-              {num > maxLoan && (
+              {num > 0 && denialReason && !blockedReason && (
                 <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4, fontWeight: "500" }}>
-                  {eligibility.reason}
+                  {denialReason}
                 </Text>
               )}
 
@@ -440,9 +480,13 @@ export default function Loan() {
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button
                 label="See breakdown"
-                disabled={num > 0 && !eligible}
+                // Blocked members are stopped here, with the amount irrelevant:
+                // there is no breakdown worth showing for a loan the API will
+                // refuse. Everyone else keeps the empty-amount nudge below.
+                disabled={!!blockedReason || lendingClosed || (num > 0 && !eligible)}
                 onPress={() => {
                   if (num <= 0) { setSubmitAttempted(true); return; }
+                  if (!eligible) return;
                   setStep("breakdown");
                 }}
                 testID="loan-breakdown-btn"
