@@ -79,3 +79,37 @@ export async function cancelInvite(
 ): Promise<{ message: string }> {
   return api(`/groups/${groupId}/invite/${memberId}`, { method: "DELETE" });
 }
+
+export interface GroupInvite {
+  /** The pending member row's id inside the group. */
+  memberId: string;
+  groupId: string;
+  groupName: string;
+  groupType?: string;
+  role: string;
+  invitedBy?: string | null;
+  invitedAt?: string | null;
+  memberCount: number;
+  contributionAmount?: number;
+  contributionFrequency?: string;
+}
+
+/**
+ * Invitations waiting on this user, read from the groups themselves rather than
+ * from notifications. An invite therefore survives its notification being read
+ * or cleared — it leaves this list only once accepted or declined.
+ */
+export async function getMyInvites(): Promise<GroupInvite[]> {
+  const res = await api<{ invites: GroupInvite[] }>("/groups/invites");
+  return res.invites ?? [];
+}
+
+/** Reject an invitation. Drops the pending member row server-side. */
+export async function declineInvite(
+  groupId: string
+): Promise<{ alreadyHandled: boolean }> {
+  const res = await api<{ alreadyHandled?: boolean }>(`/groups/${groupId}/decline`, {
+    method: "POST",
+  });
+  return { alreadyHandled: !!res?.alreadyHandled };
+}

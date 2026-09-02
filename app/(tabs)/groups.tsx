@@ -9,14 +9,15 @@ import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
-import { getGroups, acceptInvite } from "@/src/services/groups";
-import { getCurrentUser } from "@/src/utils/currentUser";
 import {
-  getNotifications,
-  markNotificationRead,
-  isActionableInvite,
-} from "@/src/services/notifications";
-import { Group, Notice } from "@/src/types";
+  getGroups,
+  acceptInvite,
+  declineInvite,
+  getMyInvites,
+  type GroupInvite,
+} from "@/src/services/groups";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import { Group } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
 import { Users, Plus, ChevronRight } from "lucide-react-native";
@@ -24,9 +25,9 @@ import { Users, Plus, ChevronRight } from "lucide-react-native";
 export default function Groups() {
   const { colors } = useTheme();
   const router = useRouter();
-  const [dismissed, setDismissed] = useState<string[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [invites, setInvites] = useState<Notice[]>([]);
+  const [invites, setInvites] = useState<GroupInvite[]>([]);
+  const [busyInvite, setBusyInvite] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,9 +47,12 @@ export default function Groups() {
     setLoading(true);
     setError(false);
     try {
-      const [g, notifs] = await Promise.all([getGroups(), getNotifications()]);
+      // Invitations come from the groups themselves, not from notifications:
+      // reading or clearing a notification must never make an invitation
+      // disappear. Only accepting or declining removes one.
+      const [g, inv] = await Promise.all([getGroups(), getMyInvites()]);
       setGroups(g);
-      setInvites(notifs.filter(isActionableInvite));
+      setInvites(inv);
     } catch (e) {
       setError(true);
     } finally {
@@ -75,7 +79,67 @@ export default function Groups() {
     }
   }, [load]);
 
-  const pendingInvites = invites.filter((n) => !dismissed.includes(n.id));
+  const handleAccept = useCallback(
+    async (inv: GroupInvite) => {
+      setBusyInvite(inv.groupId);
+      try {
+        const res = await acceptInvite(inv.groupId);
+        await load();
+        Alert.alert(
+          res.alreadyMember ? "Already a member" : "Joined",
+          res.alreadyMember
+            ? `You're already a member of ${inv.groupName}.`
+            : `You joined ${inv.groupName}.`
+        );
+      } catch (e: any) {
+        // The invite was withdrawn while it sat on screen — refresh so the dead
+        // card goes away instead of failing again on the next tap.
+        if (e?.status === 404 || e?.status === 403) {
+          await load();
+          Alert.alert(
+            "Invitation unavailable",
+            e?.message || "This invitation is no longer valid."
+          );
+          return;
+        }
+        Alert.alert("Could not join", e?.message || "Please try again.");
+      } finally {
+        setBusyInvite(null);
+      }
+    },
+    [load]
+  );
+
+  // Declining is final — the invitee needs a fresh invite to get back in — so
+  // confirm before rejecting it.
+  const confirmDecline = useCallback(
+    (inv: GroupInvite) => {
+      Alert.alert(
+        "Decline invitation?",
+        `You won't join ${inv.groupName}. They would have to invite you again.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Decline",
+            style: "destructive",
+            onPress: async () => {
+              setBusyInvite(inv.groupId);
+              try {
+                await declineInvite(inv.groupId);
+                await load();
+              } catch (e: any) {
+                Alert.alert("Could not decline", e?.message || "Please try again.");
+              } finally {
+                setBusyInvite(null);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [load]
+  );
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -110,13 +174,13 @@ export default function Groups() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {pendingInvites.length > 0 && (
+        {invites.length > 0 && (
           <>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
               PENDING INVITATIONS
             </Text>
-            {pendingInvites.map((inv) => (
-              <Card key={inv.id} padding={14} style={{ marginBottom: 10 }}>
+            {invites.map((inv) => (
+              <Card key={inv.groupId} padding={14} style={{ marginBottom: 10 }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}>
                     <Users size={18} color={colors.primary} />
@@ -126,7 +190,8 @@ export default function Groups() {
                       {inv.groupName}
                     </Text>
                     <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                      Invited by {inv.invitedBy}
+                      {inv.invitedBy ? `Invited by ${inv.invitedBy}` : "You've been invited"}
+                      {inv.role && inv.role !== "Member" ? ` · as ${inv.role}` : ""}
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", gap: 8 }}>
@@ -135,30 +200,18 @@ export default function Groups() {
                       variant="outline"
                       size="sm"
                       fullWidth={false}
-                      onPress={async () => {
-                        try {
-                          await markNotificationRead(inv.id);
-                        } catch {}
-                        setDismissed((d) => [...d, inv.id]);
-                      }}
-                      testID={`invite-decline-${inv.id}`}
+                      disabled={busyInvite === inv.groupId}
+                      onPress={() => confirmDecline(inv)}
+                      testID={`invite-decline-${inv.groupId}`}
                     />
                     <Button
                       label="Accept"
                       variant="primary"
                       size="sm"
                       fullWidth={false}
-                      onPress={async () => {
-                        try {
-                          if (inv.groupId) await acceptInvite(inv.groupId);
-                          await markNotificationRead(inv.id);
-                          setDismissed((d) => [...d, inv.id]);
-                          await load();
-                        } catch (e) {
-                          Alert.alert("Could not join", "Please try again.");
-                        }
-                      }}
-                      testID={`invite-accept-${inv.id}`}
+                      disabled={busyInvite === inv.groupId}
+                      onPress={() => handleAccept(inv)}
+                      testID={`invite-accept-${inv.groupId}`}
                     />
                   </View>
                 </View>

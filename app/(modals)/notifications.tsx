@@ -9,7 +9,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { Notice, Group } from "@/src/types";
 import { getNotifications, markAllNotificationsRead, markNotificationRead, isActionableInvite } from "@/src/services/notifications";
 import { confirmCashContribution, retryPayout } from "@/src/services/transactions";
-import { getGroups, acceptInvite } from "@/src/services/groups";
+import { getGroups, acceptInvite, declineInvite } from "@/src/services/groups";
 import { getGraceInfo, getAmountOwed, getMonthsOwed } from "@/src/services/groupFees";
 import { useRole } from "@/src/hooks/useRole";
 import { formatZMW } from "@/src/utils/currency";
@@ -176,7 +176,30 @@ export default function Notifications() {
     }
   };
 
-  const handleDeclineInvite = (n: Notice) => clearInvite(n);
+  // Declining rejects the invite server-side (the pending member row is
+  // dropped), not just the notification — otherwise the invitation would come
+  // straight back on the Groups tab, which reads invites from the groups.
+  const handleDeclineInvite = (n: Notice) => {
+    Alert.alert(
+      "Decline invitation?",
+      `You won't join ${n.groupName}. They would have to invite you again.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Decline",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              if (n.groupId) await declineInvite(n.groupId);
+              await clearInvite(n);
+            } catch (e: any) {
+              Alert.alert("Could not decline", e?.message || "Please try again.");
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleCashReceipt = async (n: Notice, received: boolean) => {
     try {
