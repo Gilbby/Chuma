@@ -1,6 +1,7 @@
 import { api } from "./apiClient";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { Group } from "@/src/types";
+import { phoneKey } from "@/src/utils/invites";
 
 function mapGroup(raw: any, currentUserId?: string): Group {
   // Member subdocs come back with _id only (lean/toObject). A "removed" row is
@@ -12,7 +13,22 @@ function mapGroup(raw: any, currentUserId?: string): Group {
     id: String(m._id ?? m.id ?? ""),
   }));
   const members = rows.filter((m: any) => m.status !== "removed");
-  const formerMembers = rows.filter((m: any) => m.status === "removed");
+
+  // A former member can be invited back, and the API adds a fresh row rather
+  // than reviving the old one — so someone who has rejoined has BOTH a removed
+  // row and a live one. They are in the group now, so their old row is dropped
+  // from `formerMembers`: nobody should read as active and departed at once.
+  const backInTheGroup = new Set(
+    members.flatMap((m: any) =>
+      [m.userId ? String(m.userId) : "", phoneKey(m.phone)].filter(Boolean)
+    )
+  );
+  const formerMembers = rows.filter(
+    (m: any) =>
+      m.status === "removed" &&
+      !backInTheGroup.has(String(m.userId ?? "")) &&
+      !backInTheGroup.has(phoneKey(m.phone))
+  );
   const mine = currentUserId
     ? members.find(
         (m: any) => String(m.userId) === String(currentUserId) && m.status === "active"

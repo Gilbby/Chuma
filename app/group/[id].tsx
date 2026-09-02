@@ -1483,6 +1483,17 @@ const FormerMemberRow = ({
         >
           {member.name}
         </Text>
+        {/* The number they were on the books under. Kept visible so the group
+            can still identify and reach someone after they've gone — names
+            repeat in a village, numbers don't. */}
+        {member.phone ? (
+          <Text
+            style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}
+            numberOfLines={1}
+          >
+            {member.phone}
+          </Text>
+        ) : null}
         <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
           {formatZMW(saved, { compact: true })} saved · {member.contributions ?? 0}{" "}
           contribution{(member.contributions ?? 0) === 1 ? "" : "s"}

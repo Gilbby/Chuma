@@ -331,6 +331,10 @@ const PendingInvitesNote = ({
   group: Group;
   colors: ReturnType<typeof useTheme>["colors"];
 }) => {
+  // Admins only, matching the header count above and the group's members tab:
+  // chasing an unanswered invite is an admin job, and an ordinary member has
+  // nothing to do about it.
+  if (group.yourRole === "Member") return null;
   const pending = pendingInvites(group);
   if (pending.length === 0) return null;
   // Cap the list so one badly-behaved group can't push the next card off screen;
