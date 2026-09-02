@@ -80,6 +80,28 @@ export async function cancelInvite(
   return api(`/groups/${groupId}/invite/${memberId}`, { method: "DELETE" });
 }
 
+/**
+ * Propose removing a member. Nobody is removed by this call: it opens a
+ * member-removal approval for the group's OTHER admins to vote on (the member
+ * being removed never votes on it), and their savings are refunded to their
+ * mobile wallet when it carries.
+ */
+export async function requestMemberRemoval(
+  groupId: string,
+  memberId: string,
+  reason?: string
+): Promise<{
+  message: string;
+  requiredApprovals: number;
+  eligibleVoters: number;
+  refund: number;
+}> {
+  return api(`/groups/${groupId}/members/${memberId}/remove`, {
+    method: "POST",
+    body: reason ? { reason } : {},
+  });
+}
+
 export interface GroupInvite {
   /** The pending member row's id inside the group. */
   memberId: string;

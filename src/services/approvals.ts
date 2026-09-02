@@ -40,6 +40,16 @@ export async function getApprovals(opts?: { groupId?: string }): Promise<Approva
   return (res.approvals ?? []).map(mapApproval);
 }
 
+/**
+ * Re-run an approved action that could not complete when the vote carried —
+ * a refund the group wallet couldn't cover yet, say. The votes stand.
+ */
+export async function runApproval(
+  id: string
+): Promise<{ approval: any; executed: any }> {
+  return api(`/approvals/${id}/execute`, { method: "POST" });
+}
+
 export async function voteOnApproval(
   id: string,
   action: "approve" | "reject",

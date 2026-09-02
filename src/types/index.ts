@@ -160,7 +160,12 @@ export interface Approval {
   votesAgainst: number;
   totalVoters: number;
   timestamp: string;
-  status: "pending" | "approved" | "rejected";
+  // "executed" = approved AND its action has run (a refund paid, a share-out
+  // distributed). An approved-but-not-executed action can be run again.
+  status: "pending" | "approved" | "rejected" | "executed";
+  /** Who a member-removal is about — they never vote on their own removal. */
+  targetUserId?: string;
+  targetName?: string;
 }
 
 export interface Penalty {

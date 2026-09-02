@@ -30,6 +30,7 @@ import {
   inviteMember,
   resendInvite,
   cancelInvite,
+  requestMemberRemoval,
 } from "@/src/services/groups";
 import type { Role } from "@/src/types";
 import { getApprovals } from "@/src/services/approvals";
@@ -86,6 +87,8 @@ export default function GroupDetails() {
   const [inviting, setInviting] = useState(false);
   // memberId of the pending invite currently being resent / cancelled
   const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
+  // member row id whose removal is being proposed
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const insets = useSafeAreaInsets();
 
@@ -204,6 +207,59 @@ export default function GroupDetails() {
       );
     },
     [id, refreshGroup]
+  );
+
+  /** Member row ids with a removal already waiting on the other admins. */
+  const removalPending = useMemo(
+    () =>
+      new Set(
+        groupApprovals
+          .filter((a) => a.type === "member-removal" && a.status === "pending")
+          .map((a: any) => String(a.refId))
+      ),
+    [groupApprovals]
+  );
+
+  /**
+   * Propose a removal. This never removes anyone on its own — it opens a vote
+   * for the group's other admins, and the member's savings are refunded to
+   * their wallet if it carries. Say both things plainly before asking.
+   */
+  const onRemoveMember = useCallback(
+    (member: Member) => {
+      const savings = member.savings || 0;
+      const owed = member.loanActive || 0;
+      Alert.alert(
+        "Propose removal",
+        `Remove ${member.name} from ${group?.name ?? "this group"}?
+
+The group's other admins vote on this — ${member.name} does not. If it carries, their ${formatZMW(savings)} in savings is refunded to their mobile wallet${owed > 0 ? ` after ${formatZMW(owed)} clears their outstanding loan` : ""}.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Propose removal",
+            style: "destructive",
+            onPress: async () => {
+              setRemovingId(member.id);
+              try {
+                const res = await requestMemberRemoval(id, member.id);
+                setSheetVisible(false);
+                await load();
+                Alert.alert(
+                  "Removal proposed",
+                  `${res.requiredApprovals} of ${res.eligibleVoters} other admin${res.eligibleVoters === 1 ? "" : "s"} must approve. ${formatZMW(res.refund)} would be refunded to ${member.name}.`
+                );
+              } catch (e: any) {
+                Alert.alert("Could not propose removal", e?.message || "Please try again.");
+              } finally {
+                setRemovingId(null);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [group?.name, id, load]
   );
 
   const cycleStatus = useMemo(() =>
@@ -389,7 +445,11 @@ export default function GroupDetails() {
                     onPress={() => { setSelectedMember(m); setSheetVisible(true); }}
                     testID={`member-row-${m.userId ?? m.id ?? m.phone}`}
                   >
-                    <MemberRow member={m} colors={colors} />
+                    <MemberRow
+                      member={m}
+                      colors={colors}
+                      removalPending={removalPending.has(String(m.id))}
+                    />
                   </Pressable>
                   {i < Math.min(arr.length, 12) - 1 && (
                     <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />
@@ -933,38 +993,45 @@ export default function GroupDetails() {
                         <ChevronRight size={18} color={colors.textMuted} />
                       </Pressable>
                     </Card>
+                    {/* Removing someone moves their money, so it is a proposal,
+                        not an action: the other admins vote and the savings are
+                        refunded on the way out. Never removes anyone on tap. */}
                     <Card padding={14} style={{ backgroundColor: colors.surface }}>
-                      <Pressable
-                        style={{ flexDirection: "row", alignItems: "center" }}
-                        onPress={() =>
-                          Alert.alert(
-                            "Remove member",
-                            `Remove ${selectedMember?.name} from ${group.name}?`,
-                            [
-                              { text: "Cancel", style: "cancel" },
-                              {
-                                text: "Remove",
-                                style: "destructive",
-                                onPress: () => setSheetVisible(false),
-                              },
-                            ]
-                          )
-                        }
-                        testID="member-remove-btn"
-                      >
-                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.danger + "20", alignItems: "center", justifyContent: "center" }}>
-                          <UserMinus size={20} color={colors.danger} />
+                      {removalPending.has(String(selectedMember.id)) ? (
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.warning + "20", alignItems: "center", justifyContent: "center" }}>
+                            <Clock size={20} color={colors.warning} />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
+                              Removal awaiting approval
+                            </Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                              The other admins decide in the approval center
+                            </Text>
+                          </View>
                         </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={{ color: colors.danger, fontWeight: "700", fontSize: 14 }}>
-                            Remove from group
-                          </Text>
-                          <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                            This member will lose access to the group
-                          </Text>
-                        </View>
-                        <ChevronRight size={18} color={colors.danger} />
-                      </Pressable>
+                      ) : (
+                        <Pressable
+                          style={{ flexDirection: "row", alignItems: "center", opacity: removingId === selectedMember.id ? 0.5 : 1 }}
+                          disabled={removingId === selectedMember.id}
+                          onPress={() => onRemoveMember(selectedMember)}
+                          testID="member-remove-btn"
+                        >
+                          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.danger + "20", alignItems: "center", justifyContent: "center" }}>
+                            <UserMinus size={20} color={colors.danger} />
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text style={{ color: colors.danger, fontWeight: "700", fontSize: 14 }}>
+                              Propose removal
+                            </Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                              Other admins vote · savings refunded on the way out
+                            </Text>
+                          </View>
+                          <ChevronRight size={18} color={colors.danger} />
+                        </Pressable>
+                      )}
                     </Card>
                   </View>
                 )}
@@ -1296,9 +1363,12 @@ const RuleRow = ({
 const MemberRow = ({
   member,
   colors,
+  removalPending,
 }: {
   member: Member;
   colors: ReturnType<typeof useTheme>["colors"];
+  /** A removal for this member is waiting on the other admins' votes. */
+  removalPending?: boolean;
 }) => {
   const roleVariant: "primary" | "warning" | "info" | "neutral" =
     member.role === "Chairperson"
@@ -1317,9 +1387,13 @@ const MemberRow = ({
         </Text>
         <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
           {formatZMW(member.savings, { compact: true })} saved
+          {removalPending ? " · removal pending" : ""}
         </Text>
       </View>
-      <StatusBadge label={member.role} variant={roleVariant} />
+      <StatusBadge
+        label={removalPending ? "Removal pending" : member.role}
+        variant={removalPending ? "warning" : roleVariant}
+      />
     </View>
   );
 };

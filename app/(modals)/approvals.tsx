@@ -9,7 +9,8 @@ import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { SkeletonGroup } from "@/src/components/ui";
 import { ErrorState } from "@/src/components/common";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { getApprovals, voteOnApproval } from "@/src/services/approvals";
+import { getApprovals, voteOnApproval, runApproval } from "@/src/services/approvals";
+import { getCurrentUser } from "@/src/utils/currentUser";
 import { Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { useRole } from "@/src/contexts/RoleContext";
@@ -35,6 +36,16 @@ export default function Approvals() {
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [voting, setVoting] = useState<string | null>(null);
+  const [running, setRunning] = useState<string | null>(null);
+  // Needed to spot an approval about the viewer themselves — nobody votes on
+  // their own removal, so the buttons must not be there to tap.
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCurrentUser<{ _id: string }>().then((u) =>
+      setMyUserId(u?._id ? String(u._id) : null)
+    );
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +74,20 @@ export default function Approvals() {
   }, [load]);
 
   const data = items.filter((i) => (filter === "pending" ? i.status === "pending" : true));
+
+  // An approved action whose execution was blocked at the time — a refund the
+  // wallet couldn't cover yet. The votes stand; this just runs it again.
+  const onRun = async (id: string) => {
+    setRunning(id);
+    try {
+      await runApproval(id);
+      await load();
+    } catch (e: any) {
+      Alert.alert("Could not complete", e?.message || "Please try again.");
+    } finally {
+      setRunning(null);
+    }
+  };
 
   const onVote = async (id: string, action: "approve" | "reject") => {
     setVoting(id);
@@ -134,6 +159,10 @@ export default function Approvals() {
           data.map((a) => {
           // Fallback guards against any future/unknown approval type crashing the list.
           const Icon = TYPE_ICONS[a.type] ?? ShieldCheck;
+          const isOwnRemoval =
+            a.type === "member-removal" &&
+            !!myUserId &&
+            String(a.targetUserId) === myUserId;
           const progress = a.totalVoters === 0 ? 0 : a.votesFor / a.totalVoters;
           const isPending = a.status === "pending";
           const statusVariant =
@@ -204,7 +233,45 @@ export default function Approvals() {
                 </View>
               ) : null}
 
-              {isPending ? (
+              {isPending && isOwnRemoval ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 10,
+                    backgroundColor: colors.surfaceSecondary,
+                    padding: 10,
+                    borderRadius: 10,
+                    gap: 8,
+                  }}
+                >
+                  <Info size={14} color={colors.warning} />
+                  <Text style={{ flex: 1, color: colors.textMuted, fontSize: 11, lineHeight: 16 }}>
+                    This is about you. The group&apos;s other admins decide it — you
+                    have no vote on your own removal.
+                  </Text>
+                </View>
+              ) : null}
+
+              {a.status === "approved" ? (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, lineHeight: 16, marginBottom: 8 }}>
+                    Approved, but not carried out yet — usually the group wallet
+                    could not cover it at the time.
+                  </Text>
+                  <Button
+                    label="Run again"
+                    variant="outline"
+                    size="md"
+                    onPress={() => onRun(a.id)}
+                    disabled={!canVote || running === a.id}
+                    loading={running === a.id}
+                    testID={`approval-run-${a.id}`}
+                  />
+                </View>
+              ) : null}
+
+              {isPending && !isOwnRemoval ? (
                 <View style={styles.actions}>
                   <Button
                     label="Reject"
