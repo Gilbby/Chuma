@@ -25,6 +25,7 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { createGroup, inviteMember } from "@/src/services/groups";
 import { defaultTiersForCycle, tierBandLabel } from "@/src/services/loans";
 import { getCurrentUser } from "@/src/utils/currentUser";
+import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X, CreditCard, Contact } from "lucide-react-native";
 import Slider from "@react-native-community/slider";
@@ -51,6 +52,13 @@ const GROUP_TYPES: { label: string; value: GroupType }[] = [
   { label: "Investment Group", value: "investment-group" },
 ];
 
+// Types that pool contributions without lending them back out. The loan-rules
+// step is skipped for these and the constitution is saved with lending off, so
+// the API refuses loan requests against the group (loan.routes.js).
+const SAVINGS_ONLY_TYPES: GroupType[] = ["church-group"];
+
+const lendsToMembers = (t: GroupType | "") => !!t && !SAVINGS_ONLY_TYPES.includes(t);
+
 const CONTRIB_FREQS = ["Weekly", "Bi-weekly", "Monthly"];
 const CYCLE_DURATIONS = ["3 months", "6 months", "12 months"];
 const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -61,7 +69,6 @@ const LOAN_MULTIPLIERS = [
   { label: "3×", value: "3" },
   { label: "5×", value: "5" },
 ];
-const PAYMENT_METHODS = ["MTN MoMo", "Airtel Money", "Zamtel Kwacha", "Bank Transfer"];
 
 const APPROVAL_THRESHOLDS: { label: string; value: GroupConstitution["approvalThreshold"] }[] = [
   { label: "2 of 3 admins", value: "2-of-3" },
@@ -159,7 +166,7 @@ export default function CreateGroup() {
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Step 6 — Payment
-  const [payMethod, setPayMethod] = useState("Airtel Money");
+  const [payerPhone, setPayerPhone] = useState("");
   const [paying, setPaying] = useState(false);
 
   // new group id after creation
@@ -187,10 +194,14 @@ export default function CreateGroup() {
   // 403 at the payment step — the Groups + button already checks this first.
   useEffect(() => {
     (async () => {
-      const user = await getCurrentUser<{ kyc?: { status?: string } }>();
+      const user = await getCurrentUser<{ kyc?: { status?: string }; phone?: string }>();
       if (user?.kyc?.status !== "verified") {
         router.replace("/kyc?return=create-group" as never);
+        return;
       }
+      // The fee is always charged to the registered number, so the payment step
+      // shows that wallet instead of asking them to pick one.
+      setPayerPhone(user?.phone ?? "");
     })();
   }, [router]);
 
@@ -337,6 +348,22 @@ export default function CreateGroup() {
 
   const goToStep = (n: number) => { setStep(n); setErrors({}); };
 
+  // Step 3 is Loan rules. A savings-only type has none, so the wizard steps over
+  // it in both directions and the counter below reports one step fewer.
+  const lendingAvailable = lendsToMembers(groupType);
+  const payerAccount = detectNetwork(payerPhone);
+  const networkKnown = payerAccount.network !== "Unknown";
+  const nextStep = (s: number) => (s === 2 && !lendingAvailable ? 4 : s + 1);
+  const prevStep = (s: number) => (s === 4 && !lendingAvailable ? 2 : s - 1);
+  const totalSteps = lendingAvailable ? TOTAL_STEPS : TOTAL_STEPS - 1;
+  const displayStep = lendingAvailable || step < 3 ? step : step - 1;
+
+  // Keep the saved constitution honest about the type: switching to a
+  // savings-only type clears lending, switching back restores the default.
+  useEffect(() => {
+    setInternalLending(lendingAvailable);
+  }, [lendingAvailable]);
+
   // Set a repayment band's max term, keeping the ladder valid: every term stays
   // within 1…cycle, and larger loans never get a shorter term than smaller ones.
   const setTierMonths = (index: number, months: number) => {
@@ -353,7 +380,7 @@ export default function CreateGroup() {
 
   const handleNext = () => {
     if (!validate()) return;
-    setStep((s) => s + 1);
+    setStep(nextStep);
     setErrors({});
   };
 
@@ -379,7 +406,8 @@ export default function CreateGroup() {
           },
           missingMeeting: { enabled: false, amount: 0 },
           lateRepayment: {
-            enabled: lateRepayEnabled,
+            // Nothing to repay without lending, so this rule could never fire.
+            enabled: lendingAvailable && lateRepayEnabled,
             penaltyType: lateRepayPenaltyType,
             penaltyRate: lateRepayPenaltyType === "percent" ? toNum(lateRepaymentPenaltyRate) || 1 : undefined,
             penaltyAmount: lateRepayPenaltyType === "flat" ? toNum(lateRepayFlatAmount) || 100 : undefined,
@@ -533,7 +561,12 @@ export default function CreateGroup() {
               <RRow label="Name" value={groupName} colors={colors} />
               <RRow label="Type" value={typeLabel} colors={colors} />
               <RRow label="Cycle" value={cycleDuration} colors={colors} />
-              <RRow label="Registration fee" value={`K100.00 paid · ${payMethod}`} colors={colors} last />
+              <RRow
+                label="Registration fee"
+                value={`K100.00 paid · ${networkKnown ? payerAccount.network : "Mobile money"}`}
+                colors={colors}
+                last
+              />
             </Card>
           </View>
 
@@ -569,15 +602,15 @@ export default function CreateGroup() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-screen">
       <ScreenHeader
         title={STEP_TITLES[step - 1]}
-        onBack={step > 1 ? () => goToStep(step - 1) : undefined}
+        onBack={step > 1 ? () => goToStep(prevStep(step)) : undefined}
       />
 
       {/* Step progress bar */}
       <View style={styles.progressWrap}>
-        <Text style={[styles.stepLabel, { color: colors.textMuted }]}>Step {step} of {TOTAL_STEPS}</Text>
+        <Text style={[styles.stepLabel, { color: colors.textMuted }]}>Step {displayStep} of {totalSteps}</Text>
         <View style={[styles.progressBg, { backgroundColor: colors.border }]}>
-          <View style={{ flex: step, height: 4, backgroundColor: colors.primary, borderRadius: 99 }} />
-          <View style={{ flex: TOTAL_STEPS - step }} />
+          <View style={{ flex: displayStep, height: 4, backgroundColor: colors.primary, borderRadius: 99 }} />
+          <View style={{ flex: totalSteps - displayStep }} />
         </View>
       </View>
 
@@ -616,6 +649,12 @@ export default function CreateGroup() {
                   })}
                 </View>
                 {errors.groupType ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.groupType}</Text> : null}
+                {groupType && !lendingAvailable ? (
+                  <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>
+                    This type saves together without lending, so there are no loan rules to set.
+                    Members contribute and share out at the end of the cycle.
+                  </Text>
+                ) : null}
 
                 <FL text="Description (optional)" colors={colors} style={{ marginTop: 20 }} />
                 <TextInput
@@ -1121,8 +1160,24 @@ export default function CreateGroup() {
                   <RRow label="Late penalty" value={lateContribEnabled ? lateContribPenaltyType === "flat" ? `K${lateContribFlatAmount} flat fee` : `${lateContributionPenaltyRate}% per day (max 30%)` : "None"} colors={colors} last />
                 </RC>
 
-                <RC title="Loans" onEdit={() => goToStep(3)} colors={colors} style={{ marginTop: 14 }}>
-                  <RRow label="Internal lending" value={internalLending ? "Enabled" : "Disabled"} colors={colors} last={!internalLending} />
+                <RC
+                  title="Loans"
+                  onEdit={() => goToStep(lendingAvailable ? 3 : 1)}
+                  colors={colors}
+                  style={{ marginTop: 14 }}
+                >
+                  <RRow
+                    label="Internal lending"
+                    value={
+                      lendingAvailable
+                        ? internalLending
+                          ? "Enabled"
+                          : "Disabled"
+                        : `Not offered by ${groupTypeLabel.toLowerCase()}s`
+                    }
+                    colors={colors}
+                    last={!internalLending}
+                  />
                   {internalLending && (
                     <>
                       <RRow label="Multiplier" value={`${loanMultiplier}× savings`} colors={colors} />
@@ -1213,31 +1268,40 @@ export default function CreateGroup() {
                   ))}
                 </Card>
 
-                {/* Payment method */}
-                <FL text="Payment method" colors={colors} />
-                <View style={styles.chipsRow}>
-                  {PAYMENT_METHODS.map((m) => {
-                    const active = payMethod === m;
-                    return (
-                      <Pressable
-                        key={m}
-                        onPress={() => setPayMethod(m)}
-                        style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
-                        testID={`pay-method-${m.replace(/\s+/g, "-").toLowerCase()}`}
-                      >
-                        <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{m}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                {/* Paying from — auto-detected from the registered number */}
+                <FL text="Paying from" colors={colors} />
+                <Card padding={16} style={{ marginTop: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: payerAccount.color,
+                        marginRight: 10,
+                      }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
+                        {networkKnown ? payerAccount.network : "No mobile money network"}
+                      </Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                        {payerPhone || "Loading your number..."}
+                      </Text>
+                    </View>
+                    {networkKnown && <Check size={16} color={colors.success} strokeWidth={2.5} />}
+                  </View>
+                </Card>
 
                 <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 14, lineHeight: 18, marginBottom: 24 }}>
-                  You will receive a payment prompt on your phone. Confirm the K100.00 payment to activate the group.
+                  {networkKnown
+                    ? "The fee is charged to your registered mobile money account. You will get a prompt on your phone to confirm the K100.00 payment."
+                    : "We could not match your registered number to MTN, Airtel or Zamtel. Update it in your profile, then come back to finish."}
                 </Text>
 
                 <Button
                   label={paying ? "Processing…" : "Pay K100 & Create Group"}
-                  disabled={paying}
+                  disabled={paying || !networkKnown}
                   onPress={handlePayAndCreate}
                   testID="create-group-pay-btn"
                 />

@@ -17,6 +17,7 @@ import {
   FileText,
   CheckSquare,
   Gift,
+  Scale,
 } from "lucide-react-native";
 import { Card } from "@/src/components/ui/Card";
 import { Skeleton, SkeletonGroup } from "@/src/components/ui";
@@ -219,9 +220,18 @@ export default function Home() {
     can("approve.rule") ||
     can("approve.shareout");
 
+  // Church groups and any other savings-only type never lend, so Loan would
+  // send them to a screen that can only turn them away. Their constitution is
+  // what they actually come to check, and it is otherwise four taps deep.
+  const savingsOnly =
+    groups.length > 0 &&
+    !groups.some((g) => g.constitution?.internalLendingEnabled !== false);
+
   const quickActions = [
     { label: "Saving", icon: PiggyBank, route: "/contribute" },
-    { label: "Loan", icon: HandCoins, route: "/loan" },
+    savingsOnly
+      ? { label: "Church", icon: Scale, route: "/governance" }
+      : { label: "Loan", icon: HandCoins, route: "/loan" },
     // Repay now lives on the unified payment screen (loans show among the dues),
     // reached from Payments — so the freed slot surfaces the account statement.
     { label: "Statements", icon: FileText, route: "/statement" },

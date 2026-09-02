@@ -63,6 +63,8 @@ export default function Loan() {
   } | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [groupsError, setGroupsError] = useState(false);
+  // True when they belong to groups but none of them lend.
+  const [lendingBlocked, setLendingBlocked] = useState(false);
   const [eligLoading, setEligLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -71,7 +73,12 @@ export default function Loan() {
     setGroupsLoading(true);
     setGroupsError(false);
     try {
-      const g = await getGroups();
+      const all = await getGroups();
+      // Savings-only groups (church groups) never lend, and the API rejects the
+      // request anyway. Keep them out of the picker rather than letting someone
+      // fill in the whole form and fail at submit.
+      const g = all.filter((x) => x.constitution?.internalLendingEnabled !== false);
+      setLendingBlocked(all.length > 0 && g.length === 0);
       setGroups(g);
       setGrp((groupId ? g.find((x) => x.id === groupId) ?? g[0] : g[0]) ?? null);
     } catch {
@@ -123,6 +130,12 @@ export default function Loan() {
           </View>
         ) : groupsError ? (
           <ErrorState onRetry={loadGroups} />
+        ) : lendingBlocked ? (
+          <NoGroupState
+            title="Your groups don't lend"
+            message="The groups you belong to pool savings without lending them back out, so there is no loan to request here. Your savings are still paid back to you at share-out."
+            testID="loan-no-lending"
+          />
         ) : (
           <NoGroupState
             message="Loans are paid out of your group's fund, and how much you can borrow depends on what you have saved with them. Join a group or start your own first."
