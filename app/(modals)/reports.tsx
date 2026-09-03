@@ -165,8 +165,16 @@ export default function Reports() {
         }
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* The group's own record, kept above the analytics and outside them.
+            The share-out screen clears itself for the next cycle the moment the
+            last member is paid, so this list is the permanent answer to who got
+            what — a roll call of people and amounts, not a statistic. */}
+        <ShareOutHistory groupId={primaryGroup?.id} />
+
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ANALYTICS</Text>
+
         {/* KPI cards */}
-        <View style={styles.kpiRow}>
+        <View style={[styles.kpiRow, { marginTop: 8 }]}>
           <KpiCard
             icon={<TrendingUp size={18} color={colors.success} />}
             label="Savings growth"
@@ -251,11 +259,6 @@ export default function Reports() {
           </View>
         </Card>
 
-        {/* Where a finished share-out lives. The share-out screen clears itself
-            for the next cycle the moment the last member is paid, so this is
-            the group's permanent record of what each one actually paid out. */}
-        <ShareOutHistory groupId={primaryGroup?.id} />
-
         {/* Consistency table */}
         <Card padding={20} style={{ marginTop: 14, marginBottom: 24 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Contribution consistency</Text>
@@ -318,6 +321,7 @@ const KpiCard = ({
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingBottom: 24 },
+  sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.6, marginTop: 22 },
   kpiRow: { flexDirection: "row" },
   kpiIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   cardTitle: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },

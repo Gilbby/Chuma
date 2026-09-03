@@ -6,3 +6,4 @@ export { PinPrompt } from "./PinPrompt";
 export { ScreenHeader } from "./ScreenHeader";
 export { TransactionRow } from "./TransactionRow";
 export { ShareOutHistory } from "./ShareOutHistory";
+export { ShareOutRunRow, formatRunDate } from "./ShareOutRunRow";
