@@ -809,7 +809,12 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
               </Card>
             </Pressable>
             <View style={{ height: 12 }} />
-            <Pressable onPress={() => router.push("/share-out")} testID="group-shareout-btn">
+            <Pressable
+              // Carry the group: the share-out screen resolves everything from
+              // groupId, and without it lands on an empty projection.
+              onPress={() => router.push({ pathname: "/share-out", params: { groupId: id } })}
+              testID="group-shareout-btn"
+            >
               <Card padding={18}>
                 <View style={styles.rowBetween}>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>

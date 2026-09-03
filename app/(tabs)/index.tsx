@@ -261,6 +261,14 @@ export default function Home() {
     can("approve.rule") ||
     can("approve.shareout");
 
+  // The share-out screen resolves the group from groupId and shows nothing
+  // without one. Prefer the group whose share-out is soonest — that is the one
+  // anyone opening this is thinking about — and fall back to their first group.
+  const shareOutGroupId = nextPayout?.groupId ?? groups[0]?.id;
+  const shareOutRoute = shareOutGroupId
+    ? `/share-out?groupId=${shareOutGroupId}`
+    : "/groups";
+
   // Church groups and any other savings-only type never lend, so Loan would
   // send them to a screen that can only turn them away. Their constitution is
   // what they actually come to check, and it is otherwise four taps deep.
@@ -279,7 +287,7 @@ export default function Home() {
     // Approvers get Approve; everyone else (Members) gets Share-out in its place.
     ...(canApprove
       ? [{ label: "Approve", icon: CheckSquare, route: "/approvals", badge: pendingApprovals }]
-      : [{ label: "Share-out", icon: Gift, route: "/share-out" }]),
+      : [{ label: "Share-out", icon: Gift, route: shareOutRoute }]),
   ];
 
   return (
