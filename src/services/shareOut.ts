@@ -211,7 +211,7 @@ export async function getShareOutPayouts(groupId: string): Promise<ShareOutPayou
   return api(`/shareout/${groupId}/payouts`);
 }
 
-/** One distribution the group has run, with its member-by-member detail. */
+/** One distribution the group has run, as a summary row. */
 export interface ShareOutRun {
   shareOutId: string;
   startedAt: string;
@@ -224,6 +224,14 @@ export interface ShareOutRun {
   totalPaid: number;
   totalAppliedToLoans: number;
   totals: ShareOutTotals;
+}
+
+/**
+ * One distribution with every member's payout. Fetched a run at a time: a
+ * forty-member share-out is a screen of its own, and the history list has no
+ * business carrying rows nobody has opened yet.
+ */
+export interface ShareOutRunDetail extends ShareOutRun {
   payouts: ShareOutPayout[];
 }
 
@@ -239,4 +247,15 @@ export async function getShareOutHistory(
     `/shareout/${encodeURIComponent(groupId)}/history?limit=${limit}`
   );
   return res.runs ?? [];
+}
+
+/** One past distribution in full, member by member. */
+export async function getShareOutRun(
+  groupId: string,
+  shareOutId: string
+): Promise<ShareOutRunDetail> {
+  const res = await api<{ run: ShareOutRunDetail }>(
+    `/shareout/${encodeURIComponent(groupId)}/history/${encodeURIComponent(shareOutId)}`
+  );
+  return res.run;
 }

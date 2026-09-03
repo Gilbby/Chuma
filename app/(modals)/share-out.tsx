@@ -646,7 +646,15 @@ export default function ShareOutScreen() {
             total say what is actually through there. */}
         {!distributionStarted && lastCompleted ? (
           <Pressable
-            onPress={() => router.push(`/reports?groupId=${activeGroupId}` as never)}
+            onPress={() =>
+              router.push(
+                // One run behind them and the list is a detour — go straight to
+                // the only thing on it.
+                (historyRuns === 1
+                  ? `/share-out-run?groupId=${activeGroupId}&shareOutId=${lastCompleted.shareOutId}`
+                  : `/reports?groupId=${activeGroupId}`) as never
+              )
+            }
             testID="shareout-last-completed"
             style={({ pressed }) => [
               styles.methodNote,
