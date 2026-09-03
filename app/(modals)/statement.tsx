@@ -431,14 +431,6 @@ export default function StatementScreen() {
             repayments, penalties and fees are real money, so they are itemised above —
             they just do not change your stake.
           </Text>
-
-          <Button
-            label="Export statement"
-            icon={<Download size={18} color="#fff" />}
-            onPress={() => setExportOpen(true)}
-            style={{ marginTop: 16 }}
-            testID="statement-export-cta"
-          />
         </ScrollView>
       )}
 
