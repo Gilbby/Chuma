@@ -20,7 +20,11 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { getLoans, repayLoan } from "@/src/services/loans";
 import { Loan } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, Clock } from "lucide-react-native";
+import {
+  MOBILE_MONEY_ON_HOLD,
+  MOBILE_MONEY_HOLD_NOTE,
+} from "@/src/constants";
+import { Check, Clock, Lock } from "lucide-react-native";
 
 export default function Repay() {
   const { colors } = useTheme();
@@ -121,7 +125,11 @@ export default function Repay() {
             )}
           </View>
           <Text style={{ color: colors.textMain, fontSize: 24, fontWeight: "700", letterSpacing: -0.4 }}>
-            {pending ? "Payment processing" : "Payment received"}
+            {pending
+            ? MOBILE_MONEY_ON_HOLD
+              ? "Repayment recorded"
+              : "Payment processing"
+            : "Payment received"}
           </Text>
           <Text
             style={{
@@ -133,7 +141,9 @@ export default function Repay() {
             }}
           >
             {pending
-              ? `Approve the ${formatZMW(amount)} payment on your phone. It will be applied to your loan with ${selected.groupName} as soon as it's confirmed, usually within seconds.`
+              ? MOBILE_MONEY_ON_HOLD
+                ? `Your ${formatZMW(amount)} cash repayment to ${selected.groupName} is recorded. It comes off your loan once an admin confirms they have the money.`
+                : `Approve the ${formatZMW(amount)} payment on your phone. It will be applied to your loan with ${selected.groupName} as soon as it's confirmed, usually within seconds.`
               : `${formatZMW(amount)} applied to your loan with ${selected.groupName}.`}
           </Text>
           <View style={{ flex: 1 }} />
@@ -291,6 +301,26 @@ export default function Repay() {
 
         <View style={{ height: 24 }} />
 
+        {MOBILE_MONEY_ON_HOLD ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              padding: 12,
+              borderRadius: 12,
+              marginBottom: 12,
+              backgroundColor: colors.surfaceSecondary,
+            }}
+          >
+            <Lock size={14} color={colors.textMuted} />
+            <Text style={{ flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
+              {MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer — it comes
+              off your loan once they confirm it.
+            </Text>
+          </View>
+        ) : null}
+
         {payError ? (
           <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 12, fontWeight: "500" }}>
             {payError}
@@ -306,7 +336,12 @@ export default function Repay() {
             setSubmitting(true);
             setPayError("");
             try {
-              const res = await repayLoan({ loanId: selected.id, amount });
+              const res = await repayLoan({
+                loanId: selected.id,
+                amount,
+                // Cash is the only method the API accepts while the hold is on.
+                ...(MOBILE_MONEY_ON_HOLD ? { paymentMethod: "Cash" } : {}),
+              });
               setResultTxn(res?.transaction ?? null);
               setSuccess(true);
             } catch (e: any) {

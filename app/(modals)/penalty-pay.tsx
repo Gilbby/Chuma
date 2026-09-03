@@ -10,7 +10,11 @@ import { payPenalty } from "@/src/services/penalties";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, Clock, Receipt } from "lucide-react-native";
+import { Check, Clock, Receipt, Lock } from "lucide-react-native";
+import {
+  MOBILE_MONEY_ON_HOLD,
+  MOBILE_MONEY_HOLD_NOTE,
+} from "@/src/constants";
 
 type Step = "confirm" | "success";
 
@@ -136,16 +140,22 @@ export default function PenaltyPay() {
           <View style={[styles.confirmRow, { borderBottomWidth: 0 }]}>
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>From</Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={[styles.dot, { backgroundColor: wallet.color }]} />
+              {MOBILE_MONEY_ON_HOLD ? (
+                <Lock size={13} color={colors.textMuted} style={{ marginRight: 6 }} />
+              ) : (
+                <View style={[styles.dot, { backgroundColor: wallet.color }]} />
+              )}
               <Text style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }}>
-                {wallet.network}
+                {MOBILE_MONEY_ON_HOLD ? "Cash" : wallet.network}
               </Text>
             </View>
           </View>
         </Card>
 
         <Text style={[styles.note, { color: colors.textMuted }]}>
-          Penalties are collected from your registered wallet.
+          {MOBILE_MONEY_ON_HOLD
+            ? `${MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer — the penalty clears once they confirm it.`
+            : "Penalties are collected from your registered wallet."}
         </Text>
 
         {error ? <Text style={[styles.errText, { color: colors.danger }]}>{error}</Text> : null}
@@ -159,7 +169,12 @@ export default function PenaltyPay() {
             setSubmitting(true);
             setError("");
             try {
-              const res = await payPenalty(String(penaltyId));
+              const res = await payPenalty(
+                String(penaltyId),
+                undefined,
+                // Cash is the only method the API accepts while the hold is on.
+                MOBILE_MONEY_ON_HOLD ? "Cash" : undefined
+              );
               setResultTxn(res?.transaction ?? null);
               setStep("success");
             } catch (e: any) {
@@ -226,7 +241,11 @@ const SuccessScreen = ({
         )}
       </View>
       <Text style={{ color: colors.textMain, fontSize: 24, fontWeight: "700", letterSpacing: -0.4 }}>
-        {pending ? "Payment processing" : "Penalty paid"}
+        {pending
+          ? MOBILE_MONEY_ON_HOLD
+            ? "Payment recorded"
+            : "Payment processing"
+          : "Penalty paid"}
       </Text>
       <Text
         style={{
@@ -238,7 +257,9 @@ const SuccessScreen = ({
         }}
       >
         {pending
-          ? `Approve the ${formatZMW(amount)} payment on your phone. The penalty will be marked paid as soon as the payment is confirmed.`
+          ? MOBILE_MONEY_ON_HOLD
+            ? `Your ${formatZMW(amount)} cash payment to ${group} is recorded. The penalty is marked paid once an admin confirms they have the money.`
+            : `Approve the ${formatZMW(amount)} payment on your phone. The penalty will be marked paid as soon as the payment is confirmed.`
           : `Your penalty payment of ${formatZMW(amount)} to ${group} has been recorded.`}
       </Text>
 

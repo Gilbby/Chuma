@@ -35,7 +35,8 @@ import { getRequiredApprovals } from "@/src/services/approvals";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
 import { Group } from "@/src/types";
-import { AlertCircle, Check, ChevronDown, Clock, Info } from "lucide-react-native";
+import { AlertCircle, Check, ChevronDown, Clock, Info, Lock } from "lucide-react-native";
+import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
 
 type Step = "request" | "breakdown" | "confirm" | "success";
 
@@ -234,7 +235,9 @@ export default function Loan() {
               paddingHorizontal: 40,
             }}
           >
-            Your request is now pending group approval. We&apos;ll notify you when members vote.
+            {MOBILE_MONEY_ON_HOLD
+              ? "Your request is now pending group approval. Once it passes, collect the cash from your treasurer."
+              : "Your request is now pending group approval. We'll notify you when members vote."}
           </Text>
           <View style={{ width: "100%", paddingHorizontal: 24, marginTop: 28 }}>
             <Card padding={18}>
@@ -515,6 +518,27 @@ export default function Loan() {
                 />
                 <Row label="Group" value={grp.name} colors={colors} last />
               </Card>
+
+              {MOBILE_MONEY_ON_HOLD ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: 8,
+                    padding: 12,
+                    borderRadius: 12,
+                    marginTop: 12,
+                    backgroundColor: colors.surfaceSecondary,
+                  }}
+                >
+                  <Lock size={14} color={colors.textMuted} style={{ marginTop: 2 }} />
+                  <Text style={{ flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 18 }}>
+                    Once approved, your treasurer hands you the {formatZMW(num)} in
+                    cash — nothing is deducted, so you receive the full amount and
+                    repay what the breakdown says.
+                  </Text>
+                </View>
+              ) : null}
 
               <View style={{ marginTop: 14, flexDirection: "row", alignItems: "flex-start" }}>
                 <Info size={16} color={colors.textMuted} style={{ marginTop: 2 }} />

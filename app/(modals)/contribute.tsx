@@ -40,7 +40,12 @@ import {
   PiggyBank,
   HandCoins,
   AlertTriangle,
+  Lock,
 } from "lucide-react-native";
+import {
+  MOBILE_MONEY_ON_HOLD,
+  MOBILE_MONEY_HOLD_NOTE,
+} from "@/src/constants";
 
 type Step = "entry" | "confirm" | "success";
 type LoanMode = "installment" | "full" | "custom";
@@ -76,7 +81,9 @@ export default function Contribute() {
   // The grand total shown in the field = base (sum of obligations) + top-up.
   const [amount, setAmount] = useState("");
   const [payerPhone, setPayerPhone] = useState("");
-  const [payCash, setPayCash] = useState(false);
+  // Cash is the only way member money moves while mobile money is on hold, so
+  // the toggle starts on and cannot be turned off — see MOBILE_MONEY_ON_HOLD.
+  const [payCash, setPayCash] = useState(MOBILE_MONEY_ON_HOLD);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -569,17 +576,24 @@ export default function Contribute() {
                   </Text>
                 )}
 
-                {/* Cash toggle — applies to the whole payment */}
+                {/* Cash toggle — applies to the whole payment. Locked on while
+                    mobile money is held: there is no other way to pay. */}
                 <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Pay with cash</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Pay with cash</Text>
+                      {MOBILE_MONEY_ON_HOLD ? <Lock size={13} color={colors.textMuted} /> : null}
+                    </View>
                     <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                      Recorded by an admin, no mobile money charge
+                      {MOBILE_MONEY_ON_HOLD
+                        ? MOBILE_MONEY_HOLD_NOTE
+                        : "Recorded by an admin, no mobile money charge"}
                     </Text>
                   </View>
                   <Switch
                     value={payCash}
                     onValueChange={setPayCash}
+                    disabled={MOBILE_MONEY_ON_HOLD}
                     trackColor={{ false: colors.border, true: colors.primary }}
                     testID="contribute-cash-toggle"
                   />

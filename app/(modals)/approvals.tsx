@@ -13,6 +13,7 @@ import { getApprovals, voteOnApproval, runApproval } from "@/src/services/approv
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
+import { formatDate } from "@/src/utils/date";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles, UserMinus, Trash2, HandCoins } from "lucide-react-native";
 
@@ -27,12 +28,31 @@ const TYPE_ICONS: Record<Approval["type"], typeof Banknote> = {
   "cash-receipt": HandCoins,
 };
 
+// How each status reads once the vote is over: "approved" means decided but
+// not yet carried out, "executed" means the action actually ran.
+const STATUS_LABEL: Record<Approval["status"], string> = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+  executed: "completed",
+};
+
+const STATUS_VARIANT: Record<
+  Approval["status"],
+  "success" | "danger" | "warning" | "info"
+> = {
+  pending: "warning",
+  approved: "info",
+  rejected: "danger",
+  executed: "success",
+};
+
 export default function Approvals() {
   const { colors } = useTheme();
   const { role, can } = useRole();
   const canVote = can("vote");
   const [items, setItems] = useState<Approval[]>([]);
-  const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [filter, setFilter] = useState<"pending" | "history">("pending");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,7 +72,9 @@ export default function Approvals() {
     setLoading(true);
     setError(false);
     try {
-      const res = await getApprovals();
+      // Both tabs come off one fetch, so the pending count stays right while
+      // the reader is looking at history.
+      const res = await getApprovals({ status: "all" });
       setItems(res);
     } catch (e) {
       setError(true);
@@ -74,7 +96,12 @@ export default function Approvals() {
     }
   }, [load]);
 
-  const data = items.filter((i) => (filter === "pending" ? i.status === "pending" : true));
+  const pendingCount = items.filter((i) => i.status === "pending").length;
+  // History is everything a vote has already settled — approved, rejected, or
+  // carried out.
+  const data = items.filter((i) =>
+    filter === "pending" ? i.status === "pending" : i.status !== "pending"
+  );
 
   // An approved action whose execution was blocked at the time — a refund the
   // wallet couldn't cover yet. The votes stand; this just runs it again.
@@ -110,10 +137,10 @@ export default function Approvals() {
     >
       <ScreenHeader
         title="Approval center"
-        subtitle={`${items.filter((i) => i.status === "pending").length} pending`}
+        subtitle={`${pendingCount} pending`}
       />
       <View style={styles.filters}>
-        {(["pending", "all"] as const).map((f) => {
+        {(["pending", "history"] as const).map((f) => {
           const active = filter === f;
           return (
             <Pressable
@@ -129,7 +156,9 @@ export default function Approvals() {
               ]}
             >
               <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600" }}>
-                {f === "pending" ? "Pending" : "All"}
+                {f === "pending"
+                  ? `Pending${pendingCount ? ` (${pendingCount})` : ""}`
+                  : "History"}
               </Text>
             </Pressable>
           );
@@ -150,10 +179,12 @@ export default function Approvals() {
               <Check size={28} color={colors.primary} />
             </View>
             <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 16, marginTop: 12 }}>
-              All caught up
+              {filter === "pending" ? "All caught up" : "No decisions yet"}
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: "center" }}>
-              No approvals waiting. We&apos;ll notify you when new requests come in.
+              {filter === "pending"
+                ? "No approvals waiting. We'll notify you when new requests come in."
+                : "Every request your group settles is kept here — who decided it, and when."}
             </Text>
           </Card>
         ) : (
@@ -170,8 +201,7 @@ export default function Approvals() {
           const isReceipt = a.type === "cash-receipt";
           const progress = a.totalVoters === 0 ? 0 : a.votesFor / a.totalVoters;
           const isPending = a.status === "pending";
-          const statusVariant =
-            a.status === "approved" ? "success" : a.status === "rejected" ? "danger" : "warning";
+          const statusVariant = STATUS_VARIANT[a.status] ?? "warning";
           return (
             <Card key={a.id} padding={18} style={{ marginBottom: 12 }}>
               <View style={styles.cardHead}>
@@ -183,10 +213,10 @@ export default function Approvals() {
                     {a.title}
                   </Text>
                   <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                    {a.requestedBy} · {a.timestamp}
+                    {a.requestedBy} · {formatDate(a.timestamp) || a.timestamp}
                   </Text>
                 </View>
-                <StatusBadge label={a.status} variant={statusVariant} />
+                <StatusBadge label={STATUS_LABEL[a.status] ?? a.status} variant={statusVariant} />
               </View>
 
               <Text style={{ color: colors.textBody, fontSize: 13, marginTop: 10, lineHeight: 20 }}>
@@ -224,6 +254,49 @@ export default function Approvals() {
                   </View>
                 </View>
               )}
+
+              {!isPending && a.votes && a.votes.length > 0 ? (
+                <View style={[styles.trail, { borderTopColor: colors.border }]}>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+                    DECISION TRAIL
+                  </Text>
+                  {a.votes.map((v, i) => (
+                    <View key={`${a.id}-vote-${i}`} style={styles.trailRow}>
+                      {v.decision === "approve" ? (
+                        <Check size={13} color={colors.success} />
+                      ) : (
+                        <X size={13} color={colors.danger} />
+                      )}
+                      <Text
+                        style={{ flex: 1, color: colors.textBody, fontSize: 12 }}
+                        numberOfLines={1}
+                      >
+                        {v.adminName}{" "}
+                        {v.decision === "approve"
+                          ? isReceipt
+                            ? "confirmed the cash"
+                            : "approved"
+                          : isReceipt
+                            ? "said it never arrived"
+                            : "rejected"}
+                      </Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+                        {formatDate(v.at)}
+                      </Text>
+                    </View>
+                  ))}
+                  {a.resolvedAt ? (
+                    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 8 }}>
+                      {a.status === "executed"
+                        ? "Carried out"
+                        : a.status === "rejected"
+                          ? "Rejected"
+                          : "Approved"}{" "}
+                      {formatDate(a.resolvedAt)}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
 
               {a.type === "withdrawal" ? (
                 <View
@@ -336,5 +409,7 @@ const styles = StyleSheet.create({
   amountBox: { padding: 14, borderRadius: 14, marginTop: 12 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   actions: { flexDirection: "row", marginTop: 16 },
+  trail: { marginTop: 14, paddingTop: 12, borderTopWidth: 1, gap: 8 },
+  trailRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
 });

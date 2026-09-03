@@ -34,12 +34,12 @@ const FAQS = [
   {
     id: "2",
     q: "How do contributions work?",
-    a: "Each cycle you contribute a set amount agreed by your group. You can pay via MTN MoMo, Airtel Money, Zamtel, bank transfer, or cash recorded by an admin. Your savings balance grows with every contribution.",
+    a: "Each cycle you contribute a set amount agreed by your group. Right now contributions are paid in cash and confirmed by an admin — your savings balance grows once they confirm they have the money. Mobile money payments are paused while we finish setting up payouts.",
   },
   {
     id: "3",
     q: "How do I get a loan?",
-    a: "Open the Loan screen, enter the amount and an optional reason, then submit. Your request goes to the group admins for approval. Once enough admins approve, the loan is disbursed to your preferred wallet.",
+    a: "Open the Loan screen, enter the amount and an optional reason, then submit. Your request goes to the group admins for approval. Once enough admins approve, your treasurer hands you the loan in cash — no fees are deducted, so you receive the full amount.",
   },
   {
     id: "4",

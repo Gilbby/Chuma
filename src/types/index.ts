@@ -148,6 +148,13 @@ export interface Loan {
   history: { date: string; amount: number; type: "disbursement" | "repayment" }[];
 }
 
+/** One admin's decision on an approval — the row of its history trail. */
+export interface ApprovalVote {
+  adminName: string;
+  decision: "approve" | "reject";
+  at: string;
+}
+
 export interface Approval {
   id: string;
   type:
@@ -178,6 +185,10 @@ export interface Approval {
   /** Who a member-removal is about — they never vote on their own removal. */
   targetUserId?: string;
   targetName?: string;
+  /** Who decided, and when — shown on resolved approvals in the history. */
+  votes?: ApprovalVote[];
+  /** When it stopped being pending. Absent while still pending. */
+  resolvedAt?: string;
 }
 
 export interface Penalty {

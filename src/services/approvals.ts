@@ -31,12 +31,33 @@ function mapApproval(raw: any): Approval {
     totalVoters: raw.requiredApprovals ?? 0,
     timestamp: raw.createdAt ?? raw.date ?? "",
     status: raw.status,
+    votes: votes.map((v: any) => ({
+      adminName: v.adminName || "An admin",
+      decision: v.decision,
+      at: v.at ?? "",
+    })),
+    // A resolved approval last changed when it was decided or carried out.
+    resolvedAt: raw.status && raw.status !== "pending" ? raw.updatedAt ?? "" : undefined,
   };
 }
 
-export async function getApprovals(opts?: { groupId?: string }): Promise<Approval[]> {
-  const qs = opts?.groupId ? `?groupId=${encodeURIComponent(opts.groupId)}` : "";
-  const res = await api<{ approvals: any[] }>(`/approvals${qs}`);
+/**
+ * "pending" is the work queue (the default — most screens want only that);
+ * "resolved" is the history (approved, rejected, executed); "all" is both.
+ */
+export type ApprovalScope = "pending" | "resolved" | "all";
+
+export async function getApprovals(opts?: {
+  groupId?: string;
+  status?: ApprovalScope;
+  limit?: number;
+}): Promise<Approval[]> {
+  const params = new URLSearchParams();
+  if (opts?.groupId) params.set("groupId", opts.groupId);
+  if (opts?.status && opts.status !== "pending") params.set("status", opts.status);
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  const res = await api<{ approvals: any[] }>(`/approvals${qs ? `?${qs}` : ""}`);
   return (res.approvals ?? []).map(mapApproval);
 }
 

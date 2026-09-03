@@ -175,20 +175,31 @@ export async function recordViolation(input: {
  */
 export async function payPenalties(
   penaltyIds: string[],
-  payerPhone?: string
-): Promise<{ message?: string; penalties?: any[]; transaction?: any }> {
+  payerPhone?: string,
+  /** "Cash" records the payment for an admin to confirm — the only method
+   *  accepted while the mobile money hold is on. */
+  paymentMethod?: string
+): Promise<{ message?: string; penalties?: any[]; transaction?: any; approval?: any }> {
   return api("/penalties/pay", {
     method: "POST",
-    body: { penaltyIds, ...(payerPhone ? { payerPhone } : {}) },
+    body: {
+      penaltyIds,
+      ...(payerPhone ? { payerPhone } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+    },
   });
 }
 
 export async function payPenalty(
   penaltyId: string,
-  payerPhone?: string
-): Promise<{ message?: string; penalty?: any; transaction?: any }> {
+  payerPhone?: string,
+  paymentMethod?: string
+): Promise<{ message?: string; penalty?: any; transaction?: any; approval?: any }> {
   return api(`/penalties/${penaltyId}/pay`, {
     method: "POST",
-    body: payerPhone ? { payerPhone } : {},
+    body: {
+      ...(payerPhone ? { payerPhone } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+    },
   });
 }

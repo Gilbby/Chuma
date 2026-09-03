@@ -16,6 +16,7 @@ import { getPenalties } from "@/src/services/penalties";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { Group, Penalty, Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
+import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
 import { usePricingPreview, PayoutPreview } from "@/src/hooks/usePricingPreview";
 import { useRole } from "@/src/contexts/RoleContext";
 import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
@@ -300,9 +301,21 @@ export default function ShareOutScreen() {
                 </Text>
                 <View style={[styles.netDivider, { backgroundColor: colors.border }]} />
                 <NetRow label="Owed" value={formatZMW(payout.owed)} colors={colors} />
-                <NetRow label="Transaction fee" value={formatZMW(payout.transactionFee)} colors={colors} />
-                <NetRow label="Platform fee" value={formatZMW(payout.platformFee)} colors={colors} />
-                <NetRow label="You receive" value={formatZMW(payout.netReceived)} colors={colors} last />
+                {MOBILE_MONEY_ON_HOLD ? (
+                  // Cash has no transfer or platform fee to deduct, so the
+                  // member takes the whole share — say that instead of listing
+                  // three zeroes.
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 10, lineHeight: 17 }}>
+                    Paid in cash by your treasurer — no fees are deducted, so you
+                    take the full share.
+                  </Text>
+                ) : (
+                  <>
+                    <NetRow label="Transaction fee" value={formatZMW(payout.transactionFee)} colors={colors} />
+                    <NetRow label="Platform fee" value={formatZMW(payout.platformFee)} colors={colors} />
+                    <NetRow label="You receive" value={formatZMW(payout.netReceived)} colors={colors} last />
+                  </>
+                )}
               </>
             ) : null}
           </Card>

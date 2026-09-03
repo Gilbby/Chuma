@@ -193,10 +193,17 @@ export async function repayLoan(payload: {
   loanId: string;
   amount: number;
   payerPhone?: string;
-}): Promise<{ loan?: any; transaction?: any }> {
-  const { loanId, amount, payerPhone } = payload;
+  /** "Cash" records the repayment for an admin to confirm — the only method
+   *  accepted while the mobile money hold is on. */
+  paymentMethod?: string;
+}): Promise<{ loan?: any; transaction?: any; approval?: any; message?: string }> {
+  const { loanId, amount, payerPhone, paymentMethod } = payload;
   return api(`/loans/${loanId}/repay`, {
     method: "POST",
-    body: payerPhone ? { amount, payerPhone } : { amount },
+    body: {
+      amount,
+      ...(payerPhone ? { payerPhone } : {}),
+      ...(paymentMethod ? { paymentMethod } : {}),
+    },
   });
 }
