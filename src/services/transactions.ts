@@ -72,3 +72,19 @@ export async function retryPayout(
 ): Promise<{ transaction: any }> {
   return api(`/transactions/${transactionId}/retry-payout`, { method: "POST" });
 }
+
+/**
+ * Treasurer/chairperson marks a payout the group settled outside the app as
+ * paid — notes, mobile money sent from their own phone, a bank transfer. This
+ * is what settles it AND what sends the member their receipt; they are owed the
+ * money until someone taps it.
+ */
+export async function confirmPayout(
+  transactionId: string,
+  paymentMethod?: string
+): Promise<{ transaction: any }> {
+  return api(`/transactions/${transactionId}/confirm-payout`, {
+    method: "POST",
+    body: paymentMethod ? { paymentMethod } : {},
+  });
+}

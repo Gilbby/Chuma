@@ -178,6 +178,10 @@ export interface Approval {
   votesFor: number;
   votesAgainst: number;
   totalVoters: number;
+  /** share-out only: how this run pays. Voters are approving the method too —
+   *  "manual" means the group pays each member itself (notes, the treasurer's
+   *  own mobile money, a bank transfer) and confirms each one in the app. */
+  payoutMethod?: "manual" | "mobile-money";
   timestamp: string;
   // "executed" = approved AND its action has run (a refund paid, a share-out
   // distributed). An approved-but-not-executed action can be run again.

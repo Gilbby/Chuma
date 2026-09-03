@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
@@ -9,7 +9,16 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { computeShareOut, estimateGroupProfit, getMyShare, proposeShareOut } from "@/src/services/shareOut";
+import {
+  computeShareOut,
+  estimateGroupProfit,
+  getMyShare,
+  proposeShareOut,
+  getShareOutPayouts,
+  ShareOutPayout,
+  ShareOutPayouts,
+} from "@/src/services/shareOut";
+import { confirmPayout } from "@/src/services/transactions";
 import { getApprovals, getRequiredApprovals, voteOnApproval } from "@/src/services/approvals";
 import { getGroups } from "@/src/services/groups";
 import { getPenalties } from "@/src/services/penalties";
@@ -19,7 +28,15 @@ import { formatZMW } from "@/src/utils/currency";
 import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
 import { usePricingPreview, PayoutPreview } from "@/src/hooks/usePricingPreview";
 import { useRole } from "@/src/contexts/RoleContext";
-import { Sparkles, Check, Calendar, TrendingUp, Lock } from "lucide-react-native";
+import {
+  Sparkles,
+  Check,
+  Lock,
+  Clock,
+  HandCoins,
+  AlertTriangle,
+  Smartphone,
+} from "lucide-react-native";
 
 function addDays(iso: string, days: number): string {
   const d = new Date(iso);
@@ -36,11 +53,47 @@ function fmtDate(iso: string): string {
   });
 }
 
+/**
+ * Where one member's money actually is. The distinction that matters is not
+ * paid vs unpaid but who we are waiting on: pawaPay answers for itself, while a
+ * payout the group makes on its own is unpaid until an admin says otherwise.
+ */
+function PayoutStatus({ p, colors }: { p: ShareOutPayout; colors: any }) {
+  const line = (Icon: any, color: string, text: string) => (
+    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3 }}>
+      <Icon size={12} color={color} strokeWidth={2.5} />
+      <Text style={{ color, fontSize: 11, fontWeight: "600", marginLeft: 4 }} numberOfLines={1}>
+        {text}
+      </Text>
+    </View>
+  );
+
+  if (p.status === "failed")
+    return line(AlertTriangle, colors.danger, "Payout failed");
+
+  if (p.status === "completed") {
+    // Their whole share went to their own loan, so there was never anything to
+    // hand over — say that rather than claiming we paid them nothing.
+    if (p.amount <= 0 && p.appliedToLoan > 0)
+      return line(Check, colors.textMuted, "Cleared against their loan");
+    if (p.viaMobileMoney) return line(Check, colors.success, "Sent to mobile wallet");
+    return line(
+      Check,
+      colors.success,
+      [p.paymentMethod ? `Paid · ${p.paymentMethod}` : "Paid", p.confirmedByName]
+        .filter(Boolean)
+        .join(" · ")
+    );
+  }
+
+  if (p.viaMobileMoney) return line(Clock, colors.textMuted, "Sending to wallet…");
+  return line(Clock, colors.warning, "Not paid yet");
+}
+
 export default function ShareOutScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { role, can } = useRole();
-  const canApprove = can("approve.shareout");
+  const { role } = useRole();
 
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const activeGroupId = groupId ?? "";
@@ -56,19 +109,51 @@ export default function ShareOutScreen() {
   const [justApproved, setJustApproved] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // The distribution itself, once it has been run: one row per member saying
+  // whether they have their money yet.
+  const [payouts, setPayouts] = useState<ShareOutPayout[]>([]);
+  const [payoutTotals, setPayoutTotals] = useState<ShareOutPayouts["totals"]>(null);
+  const [confirmingId, setConfirmingId] = useState("");
+  const [confirmError, setConfirmError] = useState("");
+
+  // How the group pays this time. The constant is only the opening guess — the
+  // server is the authority on whether pawaPay can disburse today, so the
+  // picker unlocks the moment the hold lifts without shipping a new build.
+  const [mobileMoneyHold, setMobileMoneyHold] = useState(MOBILE_MONEY_ON_HOLD);
+  const [runMethod, setRunMethod] = useState<"manual" | "mobile-money" | null>(null);
+  const [chosenMethod, setChosenMethod] = useState<"manual" | "mobile-money">("manual");
+
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
-      const [g, p, user, approvalsForGroup] = await Promise.all([
+      const [g, p, user, approvalsForGroup, dist] = await Promise.all([
         getGroups(),
         getPenalties({ groupId: activeGroupId }),
         getCurrentUser<{ _id: string }>(),
         getApprovals({ groupId: activeGroupId }),
+        // A group that has never distributed has no payouts; that is not an
+        // error and must not blank the rest of the screen.
+        getShareOutPayouts(activeGroupId).catch(
+          () =>
+            ({
+              shareOutId: null,
+              payouts: [],
+              totals: null,
+              method: null,
+              mobileMoneyHold: MOBILE_MONEY_ON_HOLD,
+            }) as ShareOutPayouts
+        ),
       ]);
       setGroups(g);
       setPenalties(p);
       setMyUserId(user?._id ? String(user._id) : "");
       setShareOutApproval(approvalsForGroup.find((a) => a.type === "share-out") ?? null);
+      setPayouts(dist.payouts);
+      setPayoutTotals(dist.totals);
+      setRunMethod(dist.method);
+      setMobileMoneyHold(dist.mobileMoneyHold);
+      // Nothing to choose while pawaPay cannot pay anyone.
+      if (dist.mobileMoneyHold) setChosenMethod("manual");
     } finally {
       setLoading(false);
     }
@@ -113,6 +198,92 @@ export default function ShareOutScreen() {
 
   const myId = myUserId;
   const myShare = getMyShare(result.members, myId);
+
+  // Once a distribution has run, the allocations list stops being a projection
+  // and becomes the record of it. It has to: settling a member's payout zeroes
+  // their savings, so recomputing shares mid-distribution would show everyone
+  // already paid as being owed nothing.
+  const distributionStarted = payouts.length > 0;
+
+  // Only the treasurer and chairperson can confirm a handover — the API says so
+  // too. Read the caller's REAL role in this group, not the demo role switcher,
+  // or the button appears for people the server will refuse.
+  const myRole = (group?.members ?? []).find(
+    (m: any) => String(m.userId ?? m.id) === myUserId
+  )?.role;
+  // The treasurer pays members and marks them off. The chairperson stands in
+  // only for a group that currently has no treasurer, matching the API.
+  const hasTreasurer = (group?.members ?? []).some(
+    (m: any) => m.status === "active" && m.role === "Treasurer"
+  );
+  const canConfirmPayout =
+    myRole === "Treasurer" || (myRole === "Chairperson" && !hasTreasurer);
+
+  // Ending the cycle starts with the chairperson and nobody else.
+  const isChairperson = myRole === "Chairperson";
+  const isAdmin =
+    myRole === "Chairperson" || myRole === "Treasurer" || myRole === "Secretary";
+
+  // What this distribution pays by, in order of how settled it is: what the
+  // transactions actually did, then what the pending approval committed to,
+  // then what the picker is currently showing.
+  const effectiveMethod =
+    runMethod ?? shareOutApproval?.payoutMethod ?? chosenMethod;
+  const payingManually = effectiveMethod === "manual";
+
+  const allocationRows = distributionStarted
+    ? payouts.map((p) => ({
+        key: p.transactionId,
+        name: p.memberName,
+        subtitle:
+          p.appliedToLoan > 0
+            ? `${formatZMW(p.appliedToLoan, { compact: true })} cleared their loan`
+            : "",
+        amount: p.amount,
+        growthPct: null as number | null,
+        payout: p,
+      }))
+    : result.members.map((m) => ({
+        key: m.id,
+        name: m.name,
+        subtitle: `Contributed ${formatZMW(m.contribution, { compact: true })}`,
+        amount: m.share,
+        growthPct: m.growthPct as number | null,
+        payout: null as ShareOutPayout | null,
+      }));
+
+  // Confirming is not undoable — it settles the member's stake, closes their
+  // part of the cycle and sends them their receipt — so it asks first. It asks
+  // HOW as well as whether: the group may have paid in notes or sent mobile
+  // money from its own phone, and the ledger should say which.
+  const handleMarkPaid = (p: ShareOutPayout) => {
+    const settle = async (paymentMethod: string) => {
+      setConfirmingId(p.transactionId);
+      setConfirmError("");
+      try {
+        await confirmPayout(p.transactionId, paymentMethod);
+        // Re-read everything: settling changes the group's wallet and the
+        // member's savings, not just this one row.
+        await load({ silent: true });
+      } catch (e: any) {
+        setConfirmError(
+          e?.message || "Could not confirm the payment. Please try again."
+        );
+      } finally {
+        setConfirmingId("");
+      }
+    };
+
+    Alert.alert(
+      `Paid ${p.memberName}?`,
+      `How did you pay their ${formatZMW(p.amount)}? This settles their share-out, sends their receipt, and cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Cash", onPress: () => settle("Cash") },
+        { text: "Mobile money", onPress: () => settle("Mobile Money") },
+      ]
+    );
+  };
 
   // What the CURRENT member will actually receive after fees, computed by the
   // server (never on the client). Debounced; only runs once we know their share.
@@ -161,12 +332,19 @@ export default function ShareOutScreen() {
       m.status !== "pending" &&
       ["Chairperson", "Treasurer", "Secretary"].includes(m.role)
   ).length;
-  const threshold = group?.constitution?.approvalThreshold ?? "majority";
-  const requiredApprovals = getRequiredApprovals(threshold, adminCount);
+  // A share-out needs EVERY active admin, not the group's usual threshold:
+  // this is the one decision that empties the pool and closes everyone's
+  // savings. Mirrors getRequiredApprovals("all", …) on the server.
+  const requiredApprovals = getRequiredApprovals("all", adminCount);
 
   const votesFor = shareOutApproval?.votesFor ?? 0;
   const required = shareOutApproval?.totalVoters ?? requiredApprovals;
   const approved = shareOutApproval?.status === "approved" || justApproved;
+
+  // The picker only exists while there is still a choice to make: before anyone
+  // has proposed this cycle's distribution.
+  const showMethodPicker =
+    !distributionStarted && !approved && !shareOutApproval && isChairperson;
 
   const handleApprove = async () => {
     setVoting(true);
@@ -178,7 +356,7 @@ export default function ShareOutScreen() {
       if (!approvalId) {
         // no pending approval yet — propose one, then re-fetch to get its id
         try {
-          await proposeShareOut(activeGroupId);
+          await proposeShareOut(activeGroupId, chosenMethod);
         } catch (e: any) {
           // "Share-out already pending" is fine — it means one exists; fall through to re-fetch
           if (!String(e?.message || "").toLowerCase().includes("already pending")) throw e;
@@ -274,7 +452,7 @@ export default function ShareOutScreen() {
         </Card>
 
         {/* What the current member actually receives after fees */}
-        {myShare > 0 && (
+        {!distributionStarted && myShare > 0 && (
           <Card padding={18} style={{ marginTop: 16 }} testID="shareout-net-receive">
             {payoutLoading && !payout ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -301,7 +479,7 @@ export default function ShareOutScreen() {
                 </Text>
                 <View style={[styles.netDivider, { backgroundColor: colors.border }]} />
                 <NetRow label="Owed" value={formatZMW(payout.owed)} colors={colors} />
-                {MOBILE_MONEY_ON_HOLD ? (
+                {payingManually ? (
                   // Cash has no transfer or platform fee to deduct, so the
                   // member takes the whole share — say that instead of listing
                   // three zeroes.
@@ -322,41 +500,93 @@ export default function ShareOutScreen() {
         )}
 
         {/* Allocations */}
-        <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>MEMBER ALLOCATIONS</Text>
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8 }}>
-          {`Profit from loan interest${penaltyIncome > 0 ? " + penalty income" : ""} this cycle`}
+        <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
+          {distributionStarted ? "DISTRIBUTION" : "MEMBER ALLOCATIONS"}
         </Text>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 8 }}>
+          {distributionStarted && payoutTotals
+            ? `${payoutTotals.paid} of ${payoutTotals.count} paid${
+                payoutTotals.outstanding > 0
+                  ? ` · ${formatZMW(payoutTotals.outstanding)} still to pay`
+                  : ""
+              }`
+            : `Profit from loan interest${penaltyIncome > 0 ? " + penalty income" : ""} this cycle`}
+        </Text>
+        {distributionStarted && payoutTotals ? (
+          <View style={{ marginBottom: 10 }} testID="shareout-payout-progress">
+            <ProgressBar
+              progress={payoutTotals.count > 0 ? payoutTotals.paid / payoutTotals.count : 0}
+            />
+          </View>
+        ) : null}
+        {confirmError ? (
+          <Text
+            style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}
+            testID="shareout-confirm-error"
+          >
+            {confirmError}
+          </Text>
+        ) : null}
         <Card padding={0}>
-          {result.members.map((m, i) => (
-            <View
-              key={m.id}
-              style={[
-                styles.allocRow,
-                i < result.members.length - 1 && {
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.border,
-                },
-              ]}
-            >
-              <Avatar name={m.name} size={36} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>
-                  {m.name}
-                </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                  Contributed {formatZMW(m.contribution, { compact: true })}
-                </Text>
+          {allocationRows.map((row, i) => {
+            const p = row.payout;
+            const busy = !!p && confirmingId === p.transactionId;
+            return (
+              <View
+                key={row.key}
+                style={[
+                  styles.allocRow,
+                  i < allocationRows.length - 1 && {
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border,
+                  },
+                ]}
+              >
+                <Avatar name={row.name} size={36} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>
+                    {row.name}
+                  </Text>
+                  {p ? <PayoutStatus p={p} colors={colors} /> : null}
+                  {row.subtitle ? (
+                    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                      {row.subtitle}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={{ color: colors.textMain, fontWeight: "700" }}>
+                    {formatZMW(row.amount)}
+                  </Text>
+                  {row.growthPct !== null ? (
+                    <Text style={{ color: colors.success, fontSize: 11, fontWeight: "600", marginTop: 2 }}>
+                      +{row.growthPct}%
+                    </Text>
+                  ) : null}
+                  {p && p.awaitsConfirmation && canConfirmPayout ? (
+                    <Pressable
+                      onPress={() => handleMarkPaid(p)}
+                      disabled={busy}
+                      testID={`shareout-mark-paid-${row.key}`}
+                      style={({ pressed }) => [
+                        styles.markPaid,
+                        { backgroundColor: colors.primary, opacity: pressed || busy ? 0.6 : 1 },
+                      ]}
+                    >
+                      {busy ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <HandCoins size={13} color="#fff" strokeWidth={2.5} />
+                          <Text style={styles.markPaidText}>Mark paid</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={{ color: colors.textMain, fontWeight: "700" }}>
-                  {formatZMW(m.share)}
-                </Text>
-                <Text style={{ color: colors.success, fontSize: 11, fontWeight: "600", marginTop: 2 }}>
-                  +{m.growthPct}%
-                </Text>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </Card>
 
         {/* Timeline */}
@@ -399,6 +629,108 @@ export default function ShareOutScreen() {
         </Card>
 
         <View style={{ height: 24 }} />
+
+        {/* How this distribution pays. Chosen once, before the vote, because it
+            is half of what the admins are approving: paying members yourselves
+            is a fortnight of work and a confirmation each, while mobile money
+            is one tap and pawaPay does the rest. */}
+        {showMethodPicker ? (
+          <>
+            <Text style={[styles.label, { color: colors.textMuted }]}>PAY MEMBERS BY</Text>
+            <View style={styles.methodRow}>
+              {([
+                {
+                  key: "manual" as const,
+                  icon: HandCoins,
+                  title: "Pay members yourselves",
+                  blurb:
+                    "Cash, your own mobile money, a bank transfer — however the group agreed. Mark each member paid here as you go.",
+                },
+                {
+                  key: "mobile-money" as const,
+                  icon: Smartphone,
+                  title: "Pay through Chuma",
+                  blurb:
+                    "Every member's share goes to their mobile wallet automatically once approved.",
+                },
+              ]).map((opt) => {
+                const selected = chosenMethod === opt.key;
+                // Mobile money cannot pay anyone while the hold is on, so it is
+                // offered but locked, with the reason underneath — hiding it
+                // would just look like the feature does not exist.
+                const locked = opt.key === "mobile-money" && mobileMoneyHold;
+                const Icon = locked ? Lock : opt.icon;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    onPress={() => !locked && setChosenMethod(opt.key)}
+                    disabled={locked}
+                    testID={`shareout-method-${opt.key}`}
+                    style={[
+                      styles.methodCard,
+                      {
+                        borderColor: selected ? colors.primary : colors.border,
+                        backgroundColor: selected ? colors.primary + "12" : colors.surface,
+                        opacity: locked ? 0.55 : 1,
+                      },
+                    ]}
+                  >
+                    <Icon
+                      size={18}
+                      color={selected ? colors.primary : colors.textMuted}
+                      strokeWidth={2.2}
+                    />
+                    <Text
+                      style={{
+                        color: selected ? colors.primary : colors.textMain,
+                        fontWeight: "700",
+                        fontSize: 14,
+                        marginTop: 6,
+                      }}
+                    >
+                      {opt.title}
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 3, lineHeight: 15 }}>
+                      {opt.blurb}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {mobileMoneyHold ? (
+              <Text
+                style={{ color: colors.textMuted, fontSize: 11, marginBottom: 14, lineHeight: 16 }}
+                testID="shareout-method-locked-note"
+              >
+                Automatic payouts are paused, so the group pays members directly this
+                time. Nothing is deducted — members take their full share.
+              </Text>
+            ) : (
+              <View style={{ height: 14 }} />
+            )}
+          </>
+        ) : null}
+
+        {/* Already proposed: the method is settled, and anyone voting needs to
+            see which one they are voting for. */}
+        {!showMethodPicker && !distributionStarted && shareOutApproval ? (
+          <View
+            style={[styles.methodNote, { backgroundColor: colors.surfaceSecondary }]}
+            testID="shareout-method-note"
+          >
+            {payingManually ? (
+              <HandCoins size={16} color={colors.textMuted} strokeWidth={2.2} />
+            ) : (
+              <Smartphone size={16} color={colors.textMuted} strokeWidth={2.2} />
+            )}
+            <Text style={{ color: colors.textBody, fontSize: 12, flex: 1, lineHeight: 17 }}>
+              {payingManually
+                ? "The group pays members directly. Once approved, the treasurer pays each one and marks them paid here — every member gets their receipt as it happens."
+                : "Paid through Chuma. Once approved, every member's share goes to their mobile wallet automatically."}
+            </Text>
+          </View>
+        ) : null}
+
         {approved ? (
           <Card
             padding={16}
@@ -411,14 +743,31 @@ export default function ShareOutScreen() {
                 Distribution plan approved
               </Text>
               <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                {`${votesFor} of ${required} approvals`}
+                {`${votesFor} of ${required} approvals · ${
+                  payingManually ? "paid by the group" : "paid through Chuma"
+                }`}
               </Text>
             </View>
           </Card>
-        ) : canApprove ? (
+        ) : !shareOutApproval && !isChairperson ? (
+          // Nobody has started the cycle yet, and only the chairperson can.
+          // Everyone else — treasurer and secretary included — is waiting.
+          <View
+            style={[styles.methodNote, { backgroundColor: colors.surfaceSecondary, marginBottom: 0 }]}
+            testID="shareout-awaiting-chair"
+          >
+            <Lock size={18} color={colors.textMuted} />
+            <Text style={{ flex: 1, color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+              The chairperson starts the share-out. Once they do, every admin has to
+              approve it before any money moves.
+            </Text>
+          </View>
+        ) : isAdmin ? (
           <>
             <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 6 }}>
-              {`${votesFor} of ${required} required approvals`}
+              {shareOutApproval
+                ? `${votesFor} of ${required} approvals · every admin must approve`
+                : `Needs all ${required} admin${required === 1 ? "" : "s"} to approve`}
             </Text>
             <ProgressBar progress={required > 0 ? votesFor / required : 0} />
             <View style={{ height: 12 }} />
@@ -428,7 +777,15 @@ export default function ShareOutScreen() {
               </Text>
             ) : null}
             <Button
-              label={voting ? "Recording…" : hasVoted ? "Approval recorded" : "Approve distribution plan"}
+              label={
+                voting
+                  ? "Recording…"
+                  : hasVoted
+                    ? "Approval recorded"
+                    : shareOutApproval
+                      ? "Approve distribution plan"
+                      : "Start share-out"
+              }
               disabled={voting || hasVoted}
               onPress={handleApprove}
               testID="shareout-approve-btn"
@@ -448,7 +805,8 @@ export default function ShareOutScreen() {
           >
             <Lock size={18} color={colors.textMuted} />
             <Text style={{ flex: 1, color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
-              Only group admins can approve the distribution plan. Your current role is{" "}
+              Only the group&apos;s admins approve the distribution plan. Your current role
+              is{" "}
               <Text style={{ fontWeight: "700", color: colors.textMain }}>{role}</Text>.
             </Text>
           </View>
@@ -496,6 +854,27 @@ const styles = StyleSheet.create({
   heroStatVal: { color: "#fff", fontSize: 15, fontWeight: "700", marginTop: 2 },
   heroDivider: { width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.18)", marginHorizontal: 14 },
   allocRow: { flexDirection: "row", alignItems: "center", padding: 14 },
+  markPaid: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    minHeight: 30,
+  },
+  markPaidText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  methodRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  methodCard: { flex: 1, borderWidth: 1.5, borderRadius: 14, padding: 14 },
+  methodNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 14,
+  },
   timelineRow: { flexDirection: "row", paddingHorizontal: 16, paddingTop: 16 },
   timelineLeft: { alignItems: "center", marginRight: 12 },
   timelineDot: {

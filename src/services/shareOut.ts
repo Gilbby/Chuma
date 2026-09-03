@@ -110,6 +110,66 @@ export function getMyShare(
   return members.find((m) => m.id === myId)?.share ?? 0;
 }
 
-export async function proposeShareOut(groupId: string): Promise<{ approval: any }> {
-  return api(`/shareout/${groupId}/propose`, { method: "POST" });
+/**
+ * Put a distribution to the group's admins, choosing how it will pay.
+ *
+ * The method is part of what they vote on: "manual" commits the group to
+ * paying every member itself and confirming each one, mobile money is one vote
+ * and then pawaPay does the rest. While the hold is on the server corrects any
+ * request to manual and says so in `mobileMoneyHold`.
+ */
+export async function proposeShareOut(
+  groupId: string,
+  payoutMethod: "manual" | "mobile-money" = "manual"
+): Promise<{ approval: any; method: "manual" | "mobile-money"; mobileMoneyHold: boolean }> {
+  return api(`/shareout/${groupId}/propose`, {
+    method: "POST",
+    body: { method: payoutMethod },
+  });
+}
+
+/**
+ * One member's row in a distribution: what they are owed and whether they
+ * actually have it yet.
+ *
+ * `awaitsConfirmation` is the one that drives the UI. A pawaPay payout answers
+ * for itself when the provider settles it; a payment the group made outside the
+ * app only settles when an admin says they made it.
+ */
+export interface ShareOutPayout {
+  transactionId: string;
+  memberId: string | null;
+  memberName: string;
+  owed: number;
+  amount: number;          // what they receive, after their own loan is netted
+  appliedToLoan: number;
+  status: "pending" | "completed" | "failed";
+  paymentMethod: string | null;
+  awaitsConfirmation: boolean; // waiting on an admin to say they paid, not on a provider
+  viaMobileMoney: boolean;
+  confirmedByName: string | null;
+  confirmedAt: string | null;
+  receiptId: string;
+  date: string;
+}
+
+export interface ShareOutPayouts {
+  shareOutId: string | null;
+  payouts: ShareOutPayout[];
+  /** How the last run paid. null before a group has ever distributed. */
+  method: "manual" | "mobile-money" | null;
+  /** pawaPay disbursement is down — the next run has to be paid manually. */
+  mobileMoneyHold: boolean;
+  totals: {
+    count: number;
+    paid: number;
+    pending: number;
+    failed: number;
+    outstanding: number;
+  } | null;
+}
+
+/** The group's most recent distribution, member by member. Empty before one runs. */
+export async function getShareOutPayouts(groupId: string): Promise<ShareOutPayouts> {
+  return api(`/shareout/${groupId}/payouts`);
 }
