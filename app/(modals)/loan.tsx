@@ -534,7 +534,7 @@ export default function Loan() {
                   <Lock size={14} color={colors.textMuted} style={{ marginTop: 2 }} />
                   <Text style={{ flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 18 }}>
                     Once approved, your treasurer hands you the {formatZMW(num)} in
-                    cash — nothing is deducted, so you receive the full amount and
+                    cash. Nothing is deducted, so you receive the full amount and
                     repay what the breakdown says.
                   </Text>
                 </View>

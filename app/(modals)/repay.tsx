@@ -315,7 +315,7 @@ export default function Repay() {
           >
             <Lock size={14} color={colors.textMuted} />
             <Text style={{ flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
-              {MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer — it comes
+              {MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer. It comes
               off your loan once they confirm it.
             </Text>
           </View>

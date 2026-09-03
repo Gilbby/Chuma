@@ -154,7 +154,7 @@ export default function PenaltyPay() {
 
         <Text style={[styles.note, { color: colors.textMuted }]}>
           {MOBILE_MONEY_ON_HOLD
-            ? `${MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer — the penalty clears once they confirm it.`
+            ? `${MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer. The penalty clears once they confirm it.`
             : "Penalties are collected from your registered wallet."}
         </Text>
 

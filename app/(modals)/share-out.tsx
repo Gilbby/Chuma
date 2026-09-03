@@ -306,7 +306,7 @@ export default function ShareOutScreen() {
                   // member takes the whole share — say that instead of listing
                   // three zeroes.
                   <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 10, lineHeight: 17 }}>
-                    Paid in cash by your treasurer — no fees are deducted, so you
+                    Paid in cash by your treasurer. No fees are deducted, so you
                     take the full share.
                   </Text>
                 ) : (

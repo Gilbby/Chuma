@@ -22,4 +22,4 @@ export const MOBILE_MONEY_ON_HOLD = true;
 
 /** One line, used wherever a payment screen has to explain the lock. */
 export const MOBILE_MONEY_HOLD_NOTE =
-  "Mobile money is paused for now — payments are cash, confirmed by an admin.";
+  "Mobile money is paused for now. Payments are cash, confirmed by an admin.";

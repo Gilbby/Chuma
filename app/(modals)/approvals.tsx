@@ -184,7 +184,7 @@ export default function Approvals() {
             <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 6, textAlign: "center" }}>
               {filter === "pending"
                 ? "No approvals waiting. We'll notify you when new requests come in."
-                : "Every request your group settles is kept here — who decided it, and when."}
+                : "Every request your group settles is kept here: who decided it, and when."}
             </Text>
           </Card>
         ) : (
@@ -236,7 +236,7 @@ export default function Approvals() {
 
               {isReceipt ? (
                 <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 14, lineHeight: 16 }}>
-                  One admin confirms this — whoever is holding the cash. Nothing
+                  One admin confirms this: whoever is holding the cash. Nothing
                   is credited to them until you do.
                 </Text>
               ) : (
@@ -332,7 +332,7 @@ export default function Approvals() {
                 >
                   <Info size={14} color={colors.warning} />
                   <Text style={{ flex: 1, color: colors.textMuted, fontSize: 11, lineHeight: 16 }}>
-                    This is about you. The group&apos;s other admins decide it — you
+                    This is about you. The group&apos;s other admins decide it. You
                     have no vote on your own removal.
                   </Text>
                 </View>
@@ -341,7 +341,7 @@ export default function Approvals() {
               {a.status === "approved" ? (
                 <View style={{ marginTop: 12 }}>
                   <Text style={{ color: colors.textMuted, fontSize: 11, lineHeight: 16, marginBottom: 8 }}>
-                    Approved, but not carried out yet — usually the group wallet
+                    Approved, but not carried out yet. Usually the group wallet
                     could not cover it at the time.
                   </Text>
                   <Button

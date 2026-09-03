@@ -242,7 +242,7 @@ export default function GroupDetails() {
         "Propose removal",
         `Remove ${member.name} from ${group?.name ?? "this group"}?
 
-The group's other admins vote on this — ${member.name} does not. If it carries, their ${formatZMW(savings)} in savings is refunded to their mobile wallet${owed > 0 ? ` after ${formatZMW(owed)} clears their outstanding loan` : ""}.`,
+The group's other admins vote on this. ${member.name} does not. If it carries, their ${formatZMW(savings)} in savings is refunded to their mobile wallet${owed > 0 ? ` after ${formatZMW(owed)} clears their outstanding loan` : ""}.`,
         [
           { text: "Cancel", style: "cancel" },
           {
