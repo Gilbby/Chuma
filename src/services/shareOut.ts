@@ -153,23 +153,76 @@ export interface ShareOutPayout {
   date: string;
 }
 
+export interface ShareOutTotals {
+  count: number;
+  paid: number;
+  pending: number;
+  failed: number;
+  outstanding: number;
+}
+
+/**
+ * The receipt of a distribution that has finished. Enough to say a share-out
+ * happened and point at the report, deliberately not enough to be mistaken for
+ * a live one — a settled run belongs in the history, not on the share-out screen.
+ */
+export interface ShareOutCompleted {
+  shareOutId: string;
+  completedAt: string | null;
+  memberCount: number;
+  totalPaid: number;
+  method: "manual" | "mobile-money";
+}
+
 export interface ShareOutPayouts {
   shareOutId: string | null;
   payouts: ShareOutPayout[];
-  /** How the last run paid. null before a group has ever distributed. */
+  /** How the run in progress pays. null when there is no run in progress. */
   method: "manual" | "mobile-money" | null;
   /** pawaPay disbursement is down — the next run has to be paid manually. */
   mobileMoneyHold: boolean;
-  totals: {
-    count: number;
-    paid: number;
-    pending: number;
-    failed: number;
-    outstanding: number;
-  } | null;
+  totals: ShareOutTotals | null;
+  /** Set only when the last run is over and the screen is clear for the next. */
+  lastCompleted: ShareOutCompleted | null;
 }
 
-/** The group's most recent distribution, member by member. Empty before one runs. */
+/**
+ * The distribution the group is CURRENTLY paying out, member by member.
+ *
+ * Empty before a group has ever distributed AND once the last one has settled:
+ * a finished run stops being what this screen is about. `lastCompleted` says so
+ * when that is why the list is empty.
+ */
 export async function getShareOutPayouts(groupId: string): Promise<ShareOutPayouts> {
   return api(`/shareout/${groupId}/payouts`);
+}
+
+/** One distribution the group has run, with its member-by-member detail. */
+export interface ShareOutRun {
+  shareOutId: string;
+  startedAt: string;
+  /** null while the run is still being paid out. */
+  completedAt: string | null;
+  closed: boolean;
+  method: "manual" | "mobile-money";
+  memberCount: number;
+  totalOwed: number;
+  totalPaid: number;
+  totalAppliedToLoans: number;
+  totals: ShareOutTotals;
+  payouts: ShareOutPayout[];
+}
+
+/**
+ * Every distribution the group has run, newest first. The permanent record the
+ * share-out screen hands off to once a cycle closes.
+ */
+export async function getShareOutHistory(
+  groupId: string,
+  limit = 12
+): Promise<ShareOutRun[]> {
+  const res = await api<{ runs: ShareOutRun[] }>(
+    `/shareout/${encodeURIComponent(groupId)}/history?limit=${limit}`
+  );
+  return res.runs ?? [];
 }

@@ -17,6 +17,7 @@ import {
   getShareOutPayouts,
   ShareOutPayout,
   ShareOutPayouts,
+  ShareOutCompleted,
 } from "@/src/services/shareOut";
 import { confirmPayout } from "@/src/services/transactions";
 import { getApprovals, getRequiredApprovals, voteOnApproval } from "@/src/services/approvals";
@@ -114,12 +115,20 @@ export default function ShareOutScreen() {
   // votes and the method a run in progress was approved with.
   const [latestShareOut, setLatestShareOut] = useState<Approval | null>(null);
 
-  // The distribution itself, once it has been run: one row per member saying
-  // whether they have their money yet.
+  // The distribution the group is CURRENTLY paying out: one row per member
+  // saying whether they have their money yet. It empties when the last member
+  // is settled — a finished share-out is history, and history lives in Reports.
   const [payouts, setPayouts] = useState<ShareOutPayout[]>([]);
   const [payoutTotals, setPayoutTotals] = useState<ShareOutPayouts["totals"]>(null);
   const [confirmingId, setConfirmingId] = useState("");
   const [confirmError, setConfirmError] = useState("");
+
+  // The last distribution, once it is over. Kept only to say it happened and
+  // point at the report — the screen itself is back to the next cycle.
+  const [lastCompleted, setLastCompleted] = useState<ShareOutCompleted | null>(null);
+  // The run finished on THIS screen, in this session. Marking the final member
+  // paid should land as an ending, not as the list silently emptying.
+  const [justFinished, setJustFinished] = useState(false);
 
   // How the group pays this time. The constant is only the opening guess — the
   // server is the authority on whether pawaPay can disburse today, so the
@@ -149,6 +158,7 @@ export default function ShareOutScreen() {
               payouts: [],
               totals: null,
               method: null,
+              lastCompleted: null,
               mobileMoneyHold: MOBILE_MONEY_ON_HOLD,
             }) as ShareOutPayouts
         ),
@@ -170,9 +180,13 @@ export default function ShareOutScreen() {
       setPayouts(dist.payouts);
       setPayoutTotals(dist.totals);
       setRunMethod(dist.method);
+      setLastCompleted(dist.lastCompleted ?? null);
       setMobileMoneyHold(dist.mobileMoneyHold);
       // Nothing to choose while pawaPay cannot pay anyone.
       if (dist.mobileMoneyHold) setChosenMethod("manual");
+      // Handed back so the caller can tell the difference between a run that is
+      // still going and one that just ended on this screen.
+      return dist;
     } finally {
       setLoading(false);
     }
@@ -297,7 +311,10 @@ export default function ShareOutScreen() {
         await confirmPayout(p.transactionId, paymentMethod);
         // Re-read everything: settling changes the group's wallet and the
         // member's savings, not just this one row.
-        await load({ silent: true });
+        const dist = await load({ silent: true });
+        // That was the last one. The server has already retired the run, so
+        // without this the list would just vanish under the treasurer's finger.
+        if (dist && !dist.payouts.length && dist.lastCompleted) setJustFinished(true);
       } catch (e: any) {
         setConfirmError(
           e?.message || "Could not confirm the payment. Please try again."
@@ -453,6 +470,67 @@ export default function ShareOutScreen() {
     );
   }
 
+  // The last member was just marked paid. The cycle is done, and this screen
+  // has nothing left to run — so it says so and hands off to the record,
+  // rather than dropping the treasurer back into a projection of the next one.
+  if (justFinished && lastCompleted) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        edges={["top"]}
+        testID="shareout-screen"
+      >
+        <ScreenHeader title="Share-out" subtitle={displayName} />
+        <ScrollView contentContainerStyle={styles.content}>
+          <Card
+            padding={24}
+            style={{ backgroundColor: colors.primary, borderColor: colors.primary }}
+            testID="shareout-complete"
+          >
+            <View style={styles.completeCheck}>
+              <Check size={26} color={colors.primary} strokeWidth={3} />
+            </View>
+            <Text
+              style={{ color: "#fff", fontSize: 22, fontWeight: "700", marginTop: 16, letterSpacing: -0.3 }}
+            >
+              Share-out complete
+            </Text>
+            <Text style={{ color: "rgba(255,255,255,0.85)", marginTop: 6, lineHeight: 20 }}>
+              {`All ${lastCompleted.memberCount} member${
+                lastCompleted.memberCount === 1 ? "" : "s"
+              } have been paid. ${formatZMW(
+                lastCompleted.totalPaid
+              )} was distributed and everyone has their receipt.`}
+            </Text>
+          </Card>
+
+          <View
+            style={[styles.methodNote, { backgroundColor: colors.surfaceSecondary, marginTop: 16 }]}
+          >
+            <Sparkles size={16} color={colors.textMuted} strokeWidth={2.2} />
+            <Text style={{ flex: 1, color: colors.textBody, fontSize: 12, lineHeight: 17 }}>
+              This cycle is closed. The full breakdown is kept in the group&apos;s
+              share-out history, and this screen is now ready for the next one.
+            </Text>
+          </View>
+
+          <Button
+            label="View share-out report"
+            onPress={() => router.replace(`/reports?groupId=${activeGroupId}` as never)}
+            testID="shareout-complete-report-btn"
+          />
+          <View style={{ height: 10 }} />
+          <Button
+            label="Done"
+            variant="outline"
+            onPress={() => router.back()}
+            testID="shareout-complete-done-btn"
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -543,6 +621,34 @@ export default function ShareOutScreen() {
             ) : null}
           </Card>
         )}
+
+        {/* A share-out the group has already been through. It is not this
+            screen's business any more — but saying nothing would read as the
+            last cycle never happening, so it gets one line and a way in. */}
+        {!distributionStarted && lastCompleted ? (
+          <Pressable
+            onPress={() => router.push(`/reports?groupId=${activeGroupId}` as never)}
+            testID="shareout-last-completed"
+            style={({ pressed }) => [
+              styles.methodNote,
+              {
+                backgroundColor: colors.surfaceSecondary,
+                marginTop: 16,
+                marginBottom: 0,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Check size={16} color={colors.success} strokeWidth={2.5} />
+            <Text style={{ flex: 1, color: colors.textBody, fontSize: 12, lineHeight: 17 }}>
+              {`Last share-out: ${formatZMW(lastCompleted.totalPaid)} paid to ${
+                lastCompleted.memberCount
+              } member${lastCompleted.memberCount === 1 ? "" : "s"}${
+                lastCompleted.completedAt ? ` on ${fmtDate(lastCompleted.completedAt)}` : ""
+              }. Tap to see the full breakdown.`}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {/* Allocations */}
         <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
@@ -933,6 +1039,14 @@ const styles = StyleSheet.create({
     minHeight: 30,
   },
   markPaidText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  completeCheck: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   methodRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   methodCard: { flex: 1, borderWidth: 1.5, borderRadius: 14, padding: 14 },
   methodNote: {

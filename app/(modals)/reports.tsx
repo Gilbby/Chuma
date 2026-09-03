@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { Card } from "@/src/components/ui/Card";
 import { SkeletonGroup } from "@/src/components/ui";
-import { ScreenHeader, ErrorState, ExportSheet } from "@/src/components/common";
+import { ScreenHeader, ErrorState, ExportSheet, ShareOutHistory } from "@/src/components/common";
 import { LineChart, BarChart } from "@/src/components/charts/Charts";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { getGroups } from "@/src/services/groups";
@@ -250,6 +250,11 @@ export default function Reports() {
             ))}
           </View>
         </Card>
+
+        {/* Where a finished share-out lives. The share-out screen clears itself
+            for the next cycle the moment the last member is paid, so this is
+            the group's permanent record of what each one actually paid out. */}
+        <ShareOutHistory groupId={primaryGroup?.id} />
 
         {/* Consistency table */}
         <Card padding={20} style={{ marginTop: 14, marginBottom: 24 }}>

@@ -776,7 +776,7 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
                         View detailed reports
                       </Text>
                       <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                        Savings trends, loan analytics, repayment rates
+                        Savings trends, loan analytics, share-out history
                       </Text>
                     </View>
                   </View>

@@ -5,3 +5,4 @@ export { NoGroupState } from "./NoGroupState";
 export { PinPrompt } from "./PinPrompt";
 export { ScreenHeader } from "./ScreenHeader";
 export { TransactionRow } from "./TransactionRow";
+export { ShareOutHistory } from "./ShareOutHistory";
