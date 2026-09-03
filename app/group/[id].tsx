@@ -70,6 +70,7 @@ import {
   Send,
   X,
   Clock,
+  History,
 } from "lucide-react-native";
 
 type TabKey = "members" | "contributions" | "loans" | "approvals" | "reports" | "governance";
@@ -762,21 +763,50 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
         {tab === "reports" && (
           <View style={{ paddingHorizontal: 20 }}>
             <Pressable
+              // The permanent record, and the first thing on the tab: "what did
+              // we each get" is the question members bring here, and it is
+              // answered by names and amounts, not by the analytics below it.
+              onPress={() =>
+                router.push({ pathname: "/share-out-history", params: { groupId: id } })
+              }
+              testID="group-shareout-history-btn"
+            >
+              <Card padding={18}>
+                <View style={styles.rowBetween}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                    <View style={[styles.iconSm, { backgroundColor: colors.primarySoft }]}>
+                      <History size={20} color={colors.primary} />
+                    </View>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
+                        Past share-outs
+                      </Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                        Every distribution, and who got what
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight size={20} color={colors.textMuted} />
+                </View>
+              </Card>
+            </Pressable>
+            <View style={{ height: 12 }} />
+            <Pressable
               onPress={() => router.push({ pathname: "/reports", params: { groupId: id } })}
               testID="group-reports-btn"
             >
               <Card padding={18}>
                 <View style={styles.rowBetween}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                     <View style={[styles.iconSm, { backgroundColor: colors.primarySoft }]}>
                       <FileBarChart size={20} color={colors.primary} />
                     </View>
-                    <View style={{ marginLeft: 12 }}>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
                       <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
                         View detailed reports
                       </Text>
                       <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                        Savings trends, loan analytics, share-out history
+                        Savings trends, loans and repayment rate
                       </Text>
                     </View>
                   </View>
@@ -791,11 +821,11 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
             >
               <Card padding={18}>
                 <View style={styles.rowBetween}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                     <View style={[styles.iconSm, { backgroundColor: colors.primarySoft }]}>
                       <FileText size={20} color={colors.primary} />
                     </View>
-                    <View style={{ marginLeft: 12 }}>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
                       <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
                         My statement
                       </Text>
@@ -817,11 +847,11 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
             >
               <Card padding={18}>
                 <View style={styles.rowBetween}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                     <View style={[styles.iconSm, { backgroundColor: colors.primarySoft }]}>
                       <Wallet size={20} color={colors.primary} />
                     </View>
-                    <View style={{ marginLeft: 12 }}>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
                       <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
                         Share-out forecast
                       </Text>
@@ -842,11 +872,11 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
             <Pressable onPress={() => router.push("/governance")} testID="group-governance-btn">
               <Card padding={18}>
                 <View style={styles.rowBetween}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
                     <View style={[styles.iconSm, { backgroundColor: colors.primarySoft }]}>
                       <Scale size={20} color={colors.primary} />
                     </View>
-                    <View style={{ marginLeft: 12 }}>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
                       <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
                         Group rules & voting
                       </Text>

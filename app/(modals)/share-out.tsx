@@ -648,11 +648,13 @@ export default function ShareOutScreen() {
           <Pressable
             onPress={() =>
               router.push(
-                // One run behind them and the list is a detour — go straight to
-                // the only thing on it.
+                // The record itself, not the reports screen that also carries a
+                // preview of it — the same list the group's Reports tab opens.
+                // One run behind them and even that list is a detour, so go
+                // straight to the only thing on it.
                 (historyRuns === 1
                   ? `/share-out-run?groupId=${activeGroupId}&shareOutId=${lastCompleted.shareOutId}`
-                  : `/reports?groupId=${activeGroupId}`) as never
+                  : `/share-out-history?groupId=${activeGroupId}`) as never
               )
             }
             testID="shareout-last-completed"

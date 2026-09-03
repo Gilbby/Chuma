@@ -13,7 +13,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatZMW } from "@/src/utils/currency";
 import { TxnItem } from "@/src/types";
-import type { Statement } from "@/src/services/statement";
+import type { Statement, StatementPurpose } from "@/src/services/statement";
 
 /** Chuma mark, inlined so generated PDFs stay self-contained (no network). */
 export const CHUMA_LOGO_DATA_URI =
@@ -290,13 +290,52 @@ export function statementTitle(s: Statement) {
   return `${fmtDate(s.period.from)} – ${fmtDate(s.period.to)}`;
 }
 
+/**
+ * One side of the cash summary as table rows: the legs, then their total.
+ *
+ * The exported PDF is the copy a member keeps and shows to people, so it has
+ * to answer "where did the money go" on its own — a bare "money out K15,000"
+ * puts the reader back where they started. Rows always sum to the total under
+ * them; with no rows (older API) the total still prints by itself.
+ */
+function purposeBlock(
+  title: string,
+  rows: StatementPurpose[],
+  total: number,
+  totalLabel: string,
+  sign: "+" | "−",
+  cls: "pos" | "neg"
+) {
+  const body = rows.length
+    ? rows
+        .map(
+          (r) =>
+            `<tr><td class="ind">${esc(r.label)}</td><td class="num ${cls}">${sign}${formatZMW(r.amount)}</td></tr>`
+        )
+        .join("")
+    : total > 0
+      ? ""
+      : `<tr><td class="ind muted">Nothing this period</td><td class="num muted">—</td></tr>`;
+  return (
+    `<tr><td class="grp">${esc(title)}</td><td class="num"></td></tr>` +
+    body +
+    `<tr><td class="sub">${esc(totalLabel)}</td><td class="num sub ${cls}">${sign}${formatZMW(total)}</td></tr>`
+  );
+}
+
 export async function exportStatementPdf(s: Statement) {
+  const detail = (groupName: string, note: string) => (s.group ? note : groupName);
+
   const ledgerRows = s.lines
     .map(
       (l) => `
         <tr>
           <td>${fmtDate(l.date)}</td>
-          <td>${esc(l.description)}${l.groupName ? `<span class="muted"> · ${esc(l.groupName)}</span>` : ""}</td>
+          <td>${esc(l.description)}${
+            detail(l.groupName, l.note)
+              ? `<br /><span class="muted">${esc(detail(l.groupName, l.note))}</span>`
+              : ""
+          }</td>
           <td class="num ${l.delta < 0 ? "neg" : "pos"}">${signed(l.delta)}</td>
           <td class="num">${formatZMW(l.balance)}</td>
         </tr>`
@@ -308,7 +347,8 @@ export async function exportStatementPdf(s: Statement) {
       (a) => `
         <tr>
           <td>${fmtDate(a.date)}</td>
-          <td>${esc(a.description)}${a.groupName ? `<span class="muted"> · ${esc(a.groupName)}</span>` : ""}</td>
+          <td>${esc(a.description)}</td>
+          <td class="muted">${esc(a.groupName)}</td>
           <td class="num ${a.direction === "out" ? "neg" : "pos"}">${a.direction === "out" ? "−" : "+"}${formatZMW(a.amount)}</td>
           <td style="text-transform:capitalize">${esc(a.status)}</td>
         </tr>`
@@ -329,10 +369,6 @@ export async function exportStatementPdf(s: Statement) {
   .period { font-size: 20px; font-weight: 700; margin-top: 4px; }
   .who { margin-top: 14px; font-size: 12px; color: rgba(255,255,255,0.85); line-height: 18px; }
   .body { border: 1px solid #E5E7EB; border-top: 0; border-radius: 0 0 16px 16px; padding: 22px 26px; }
-  .summary { display: flex; gap: 10px; margin-bottom: 22px; }
-  .box { flex: 1; border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; }
-  .box .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #6B7280; }
-  .box .v { font-size: 16px; font-weight: 700; margin-top: 4px; color: #064E3B; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #6B7280; margin: 24px 0 8px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { background: #F3F5F4; color: #374151; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
@@ -343,6 +379,9 @@ export async function exportStatementPdf(s: Statement) {
   .muted { color: #9CA3AF; }
   tfoot td { font-weight: 700; border-top: 2px solid #E5E7EB; border-bottom: 0; color: #064E3B; }
   .empty { padding: 14px 10px; color: #9CA3AF; font-size: 12px; }
+  .grp { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #6B7280; padding-top: 12px; }
+  .ind { padding-left: 22px; }
+  .sub { font-weight: 700; color: #064E3B; border-top: 1px solid #E5E7EB; }
   .foot { margin-top: 26px; text-align: center; color: #9CA3AF; font-size: 10px; line-height: 16px; }
 </style></head>
 <body>
@@ -361,12 +400,16 @@ export async function exportStatementPdf(s: Statement) {
       </div>
     </div>
     <div class="body">
-      <div class="summary">
-        <div class="box"><div class="k">Opening balance</div><div class="v">${formatZMW(s.openingBalance)}</div></div>
-        <div class="box"><div class="k">Savings in</div><div class="v">+${formatZMW(s.savingsIn)}</div></div>
-        <div class="box"><div class="k">Savings out</div><div class="v">−${formatZMW(s.savingsOut)}</div></div>
-        <div class="box"><div class="k">Closing balance</div><div class="v">${formatZMW(s.closingBalance)}</div></div>
-      </div>
+      <h2>Savings summary</h2>
+      <table>
+        <thead><tr><th>Item</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+          <tr><td>Opening balance</td><td class="num">${formatZMW(s.openingBalance)}</td></tr>
+          <tr><td>Contributions</td><td class="num pos">+${formatZMW(s.savingsIn)}</td></tr>
+          <tr><td>Share-out paid</td><td class="num neg">−${formatZMW(s.savingsOut)}</td></tr>
+        </tbody>
+        <tfoot><tr><td>Closing balance</td><td class="num">${formatZMW(s.closingBalance)}</td></tr></tfoot>
+      </table>
 
       <h2>Savings account</h2>
       <table>
@@ -380,19 +423,31 @@ export async function exportStatementPdf(s: Statement) {
 
       <h2>All activity</h2>
       <table>
-        <thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th>Status</th></tr></thead>
-        <tbody>${activityRows || `<tr><td colspan="4" class="empty">No transactions in this period.</td></tr>`}</tbody>
-        <tfoot>
-          <tr><td colspan="2">Money in</td><td class="num pos">+${formatZMW(s.totals.moneyIn)}</td><td></td></tr>
-          <tr><td colspan="2">Money out</td><td class="num neg">−${formatZMW(s.totals.moneyOut)}</td><td></td></tr>
-          <tr><td colspan="2">Net</td><td class="num">${signed(s.totals.net)}</td><td></td></tr>
-        </tfoot>
+        <thead><tr><th>Date</th><th>Description</th><th>Group</th><th class="num">Amount</th><th>Status</th></tr></thead>
+        <tbody>${activityRows || `<tr><td colspan="5" class="empty">No transactions in this period.</td></tr>`}</tbody>
+      </table>
+
+      <h2>Where your money went</h2>
+      <table>
+        <thead><tr><th>What it was for</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+          ${purposeBlock("Money you received", s.breakdown?.in ?? [], s.totals.moneyIn, "Total received", "+", "pos")}
+          ${purposeBlock("Money you paid", s.breakdown?.out ?? [], s.totals.moneyOut, "Total paid", "−", "neg")}
+          ${
+            s.totals.pending > 0
+              ? `<tr><td class="grp">Still pending</td><td class="num">${formatZMW(s.totals.pending)}</td></tr>
+          <tr><td colspan="2" class="ind muted">Not counted in the net below until it settles.</td></tr>`
+              : ""
+          }
+        </tbody>
+        <tfoot><tr><td>Net movement</td><td class="num">${signed(s.totals.net)}</td></tr></tfoot>
       </table>
 
       <div class="foot">
         This is an official Chuma statement. The balance shown is your savings
-        stake in the group; loans, repayments, penalties and fees are listed
-        under All activity and do not change it.<br />
+        stake in the group — contributions and share-outs only. Loans, repayments,
+        penalties and fees are real money and are itemised under Where your money
+        went; they do not change your stake.<br />
         Verify at chuma.app · Community Chuma, Digitally.
       </div>
     </div>
@@ -407,34 +462,67 @@ export async function exportStatementPdf(s: Statement) {
 }
 
 export async function exportStatementCsv(s: Statement) {
-  const meta = [
+  const day = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
+  const detail = (groupName: string, note: string) => (s.group ? note : groupName);
+
+  // The same four sections the app shows, in the same order and with the same
+  // columns. A member exporting what is on their screen should get what is on
+  // their screen; a file shaped differently reads as a different statement, and
+  // the copy they hand to someone else is the one that has to agree.
+  const table: (string | number)[][] = [
     ["Chuma savings statement"],
     ["Statement no.", s.statementId],
     ["Member", s.member.name, s.member.phone],
     ["Group", s.group ? s.group.name : "All groups"],
     ["Period", fmtDate(s.period.from), fmtDate(s.period.to)],
-    ["Opening balance", s.openingBalance],
-    ["Savings in", s.savingsIn],
-    ["Savings out", s.savingsOut],
-    ["Closing balance", s.closingBalance],
-    ["Money in", s.totals.moneyIn],
-    ["Money out", s.totals.moneyOut],
+    ["Issued", fmtDate(s.generatedAt)],
     [],
-    ["Date", "Description", "Group", "Amount", "Direction", "Status", "Balance"],
-  ];
-  const rows = s.activity.map((a) => {
-    const line = s.lines.find((l) => l.id === a.id);
-    return [
-      new Date(a.date).toISOString().slice(0, 10),
+
+    ["Savings summary"],
+    ["Item", "Amount"],
+    ["Opening balance", s.openingBalance],
+    ["Contributions", s.savingsIn],
+    ["Share-out paid", -s.savingsOut],
+    ["Closing balance", s.closingBalance],
+    [],
+
+    ["Savings account"],
+    ["Date", "Description", "Detail", "Amount", "Balance"],
+    [day(s.period.from), "Opening balance", "", "", s.openingBalance],
+    ...s.lines.map((l) => [
+      day(l.date),
+      l.description,
+      detail(l.groupName, l.note),
+      l.delta,
+      l.balance,
+    ]),
+    [day(s.period.to), "Closing balance", "", "", s.closingBalance],
+    [],
+
+    ["All activity"],
+    ["Date", "Description", "Group", "Amount", "Status"],
+    ...s.activity.map((a) => [
+      day(a.date),
       a.description,
       a.groupName,
       a.direction === "out" ? -a.amount : a.amount,
-      a.direction,
       a.status,
-      line ? line.balance : "",
-    ];
-  });
-  const csv = [...meta, ...rows]
+    ]),
+    [],
+
+    ["Where your money went"],
+    ["Direction", "What it was for", "Amount"],
+    ...(s.breakdown?.in ?? []).map((r) => ["Received", r.label, r.amount]),
+    ["Received", "Total received", s.totals.moneyIn],
+    ...(s.breakdown?.out ?? []).map((r) => ["Paid", r.label, -r.amount]),
+    ["Paid", "Total paid", -s.totals.moneyOut],
+    ...(s.totals.pending > 0
+      ? [["Pending", "Not counted in net until it settles", s.totals.pending]]
+      : []),
+    ["", "Net movement", s.totals.net],
+  ];
+
+  const csv = table
     .map((row) => row.map(csvCell).join(","))
     .join("\n");
   await saveCsv(

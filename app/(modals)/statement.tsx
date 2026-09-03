@@ -15,7 +15,7 @@ import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
 import { getGroups } from "@/src/services/groups";
-import { getStatement, Statement } from "@/src/services/statement";
+import { getStatement, Statement, StatementPurpose } from "@/src/services/statement";
 import { exportStatementPdf, exportStatementCsv } from "@/src/utils/exports";
 import { formatZMW } from "@/src/utils/currency";
 import { Group } from "@/src/types";
@@ -251,13 +251,13 @@ export default function StatementScreen() {
               colors={colors}
             />
             <SummaryRow
-              k="Savings in"
+              k="Contributions"
               v={`+${formatZMW(statement.savingsIn)}`}
               tint={colors.success}
               colors={colors}
             />
             <SummaryRow
-              k="Savings out"
+              k="Share-out paid"
               v={`−${formatZMW(statement.savingsOut)}`}
               tint={statement.savingsOut > 0 ? colors.danger : undefined}
               colors={colors}
@@ -380,29 +380,45 @@ export default function StatementScreen() {
             )}
           </Card>
 
-          {/* Cash totals */}
-          <Card padding={18} style={{ marginTop: 12 }}>
-            <SummaryRow
-              k="Money in"
-              v={`+${formatZMW(statement.totals.moneyIn)}`}
+          {/* Cash totals, itemised by what the money was for */}
+          <SectionTitle colors={colors}>WHERE YOUR MONEY WENT</SectionTitle>
+          <Card padding={18}>
+            <PurposeGroup
+              title="Money you received"
+              rows={statement.breakdown?.in ?? []}
+              total={statement.totals.moneyIn}
+              totalLabel="Total received"
+              sign="+"
               tint={colors.success}
               colors={colors}
             />
-            <SummaryRow
-              k="Money out"
-              v={`−${formatZMW(statement.totals.moneyOut)}`}
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <PurposeGroup
+              title="Money you paid"
+              rows={statement.breakdown?.out ?? []}
+              total={statement.totals.moneyOut}
+              totalLabel="Total paid"
+              sign="−"
               colors={colors}
             />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             {statement.totals.pending > 0 ? (
-              <SummaryRow
-                k="Pending"
-                v={formatZMW(statement.totals.pending)}
-                tint={colors.warning}
-                colors={colors}
-              />
+              <>
+                <SummaryRow
+                  k="Still pending"
+                  v={formatZMW(statement.totals.pending)}
+                  tint={colors.warning}
+                  colors={colors}
+                />
+                <Text
+                  style={{ color: colors.textMuted, fontSize: 11, marginTop: -4, marginBottom: 6 }}
+                >
+                  Not counted below until it settles
+                </Text>
+              </>
             ) : null}
             <SummaryRow
-              k="Net"
+              k="Net movement"
               v={`${statement.totals.net < 0 ? "−" : "+"}${formatZMW(Math.abs(statement.totals.net))}`}
               bold
               colors={colors}
@@ -411,8 +427,9 @@ export default function StatementScreen() {
 
           <Text style={[styles.note, { color: colors.textMuted }]}>
             Statement no. {statement.statementId} · issued {fmtDay(statement.generatedAt)}.
-            {"\n"}The balance is your savings stake. Loans, repayments, penalties and fees appear
-            under All activity and do not change it.
+            {"\n"}Your savings balance counts contributions and share-outs only. Loans,
+            repayments, penalties and fees are real money, so they are itemised above —
+            they just do not change your stake.
           </Text>
 
           <Button
@@ -563,6 +580,57 @@ const SummaryRow: React.FC<{
     >
       {v}
     </Text>
+  </View>
+);
+
+/**
+ * One side of the cash summary, itemised.
+ *
+ * "Money out K15,000" is a number, not an account — it hides that K14,860 of it
+ * became savings and K140 cleared a penalty. The rows are the payment's own
+ * legs and always sum to the total printed beneath them, so the itemisation
+ * reads as the explanation of that total rather than as a second opinion.
+ *
+ * With no rows (an older API, or a quiet period) the total still stands on its
+ * own, so the card never depends on the breakdown being there.
+ */
+const PurposeGroup: React.FC<{
+  title: string;
+  rows: StatementPurpose[];
+  total: number;
+  totalLabel: string;
+  sign: "+" | "−";
+  colors: Colors;
+  tint?: string;
+}> = ({ title, rows, total, totalLabel, sign, colors, tint }) => (
+  <View>
+    <Text
+      style={{
+        color: colors.textMuted,
+        fontSize: 11,
+        fontWeight: "700",
+        letterSpacing: 0.4,
+        marginBottom: 2,
+      }}
+    >
+      {title.toUpperCase()}
+    </Text>
+    {rows.length > 0 ? (
+      rows.map((r) => (
+        <View key={r.key} style={styles.summaryRow}>
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{r.label}</Text>
+          <Text style={{ color: tint ?? colors.textMain, fontSize: 13, fontWeight: "600" }}>
+            {sign}
+            {formatZMW(r.amount)}
+          </Text>
+        </View>
+      ))
+    ) : total <= 0 ? (
+      <Text style={{ color: colors.textMuted, fontSize: 13, paddingVertical: 6 }}>
+        Nothing this period
+      </Text>
+    ) : null}
+    <SummaryRow k={totalLabel} v={`${sign}${formatZMW(total)}`} bold colors={colors} />
   </View>
 );
 

@@ -3,7 +3,7 @@
  *
  * A share-out is a record, not a metric: "what did we each get last year" is a
  * question a savings group asks constantly, and it is answered by naming people
- * and amounts, not by a chart. So it sits above the analytics under its own
+ * and amounts, not by a chart. So it sits below the analytics under its own
  * heading rather than in the run of report cards, where it read as one more
  * statistic. Every member sees it, not just the treasurer.
  *

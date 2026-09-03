@@ -72,15 +72,7 @@ export default function Reports() {
       .catch(() => setReport(null));
   }, [primaryGroup?.id]);
 
-  const repaymentByGroup = groups.map((g) => ({
-    name: g.name,
-    value: getRepaymentRate(g, loans),
-  }));
-
-  const avgRepayment = Math.round(
-    repaymentByGroup.reduce((s, r) => s + r.value, 0) /
-    (repaymentByGroup.length || 1)
-  );
+  const groupRepayment = primaryGroup ? getRepaymentRate(primaryGroup, loans) : 0;
 
   const savingsGrowthPct = getSavingsGrowth(primaryGroup);
 
@@ -89,12 +81,6 @@ export default function Reports() {
         groups.reduce((s, g) => s + (g.memberRetention ?? 0), 0) / groups.length
       )
     : 0;
-
-  // Real on-time consistency % computed by the backend from contribution
-  // history; rate is null until a member has a completed contribution window
-  const topMembers = [...(report?.memberConsistency ?? [])]
-    .sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || b.contributions - a.contributions)
-    .slice(0, 5);
 
   // Disbursements binned into the trailing 4 calendar quarters (oldest → current)
   const loanAnalytics = (() => {
@@ -165,13 +151,9 @@ export default function Reports() {
         }
       />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* The group's own record, kept above the analytics and outside them.
-            The share-out screen clears itself for the next cycle the moment the
-            last member is paid, so this list is the permanent answer to who got
-            what — a roll call of people and amounts, not a statistic. */}
-        <ShareOutHistory groupId={primaryGroup?.id} />
-
-        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>ANALYTICS</Text>
+        <Text style={[styles.sectionLabel, { color: colors.textMuted, marginTop: 4 }]}>
+          ANALYTICS
+        </Text>
 
         {/* KPI cards */}
         <View style={[styles.kpiRow, { marginTop: 8 }]}>
@@ -210,6 +192,14 @@ export default function Reports() {
           />
         </View>
 
+        {/* The group's own record, ahead of the charts and outside them. The
+            share-out screen clears itself for the next cycle the moment the last
+            member is paid, so this list is the permanent answer to who got what —
+            a roll call of people and amounts, not a statistic. */}
+        <View style={{ marginTop: 22 }}>
+          <ShareOutHistory groupId={primaryGroup?.id} />
+        </View>
+
         {/* Savings trend chart */}
         <Card padding={20} style={{ marginTop: 18 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Savings trend</Text>
@@ -230,55 +220,34 @@ export default function Reports() {
           </View>
         </Card>
 
-        {/* Repayment rate by group */}
-        <Card padding={20} style={{ marginTop: 14 }}>
+        {/* Repayment rate for this group */}
+        <Card padding={20} style={{ marginTop: 14, marginBottom: 24 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Repayment rate</Text>
           <Text style={[styles.cardSub, { color: colors.textMuted }]}>
-            {`By group (% on-time) · avg ${avgRepayment}%`}
+            % of loan principal repaid
           </Text>
           <View style={{ marginTop: 18 }}>
-            {repaymentByGroup.map((r, i) => (
-              <View key={i} style={{ marginBottom: 14 }}>
-                <View style={styles.rowBetween}>
-                  <Text style={{ color: colors.textMain, fontWeight: "600" }}>{r.name}</Text>
-                  <Text style={{ color: colors.textMain, fontWeight: "700" }}>{r.value}%</Text>
-                </View>
-                <View style={{ marginTop: 6, height: 8, borderRadius: 999, backgroundColor: colors.surfaceSecondary, overflow: "hidden" }}>
-                  <View
-                    style={{
-                      height: 8,
-                      width: `${r.value}%`,
-                      backgroundColor:
-                        r.value > 90 ? colors.success : r.value > 80 ? colors.warning : colors.danger,
-                      borderRadius: 999,
-                    }}
-                  />
-                </View>
-              </View>
-            ))}
-          </View>
-        </Card>
-
-        {/* Consistency table */}
-        <Card padding={20} style={{ marginTop: 14, marginBottom: 24 }}>
-          <Text style={[styles.cardTitle, { color: colors.textMain }]}>Contribution consistency</Text>
-          <Text style={[styles.cardSub, { color: colors.textMuted }]}>Top performing members</Text>
-          <View style={{ marginTop: 14 }}>
-            {topMembers.length === 0 ? (
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                No contribution history yet
+            <View style={styles.rowBetween}>
+              <Text style={{ color: colors.textMain, fontWeight: "600" }}>
+                {primaryGroup?.name ?? "This group"}
               </Text>
-            ) : (
-              topMembers.map((p, i) => (
-                <View key={p.userId} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                  <Text style={{ color: colors.textMuted, fontWeight: "700", width: 24 }}>#{i + 1}</Text>
-                  <Text style={{ color: colors.textMain, fontWeight: "600", flex: 1 }}>{p.name}</Text>
-                  <Text style={{ color: p.rate == null ? colors.textMuted : colors.success, fontWeight: "700" }}>
-                    {p.rate == null ? "—" : `${p.rate}%`}
-                  </Text>
-                </View>
-              ))
-            )}
+              <Text style={{ color: colors.textMain, fontWeight: "700" }}>{groupRepayment}%</Text>
+            </View>
+            <View style={{ marginTop: 6, height: 8, borderRadius: 999, backgroundColor: colors.surfaceSecondary, overflow: "hidden" }}>
+              <View
+                style={{
+                  height: 8,
+                  width: `${groupRepayment}%`,
+                  backgroundColor:
+                    groupRepayment > 90
+                      ? colors.success
+                      : groupRepayment > 80
+                        ? colors.warning
+                        : colors.danger,
+                  borderRadius: 999,
+                }}
+              />
+            </View>
           </View>
         </Card>
       </ScrollView>
@@ -327,5 +296,4 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
   cardSub: { fontSize: 12, marginTop: 4 },
   rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  row: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
 });

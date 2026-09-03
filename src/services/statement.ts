@@ -44,6 +44,21 @@ export interface StatementActivity {
   receiptId: string | null;
 }
 
+/**
+ * One line of the cash breakdown: what a slice of the period's money was FOR.
+ *
+ * Built by the backend from each transaction's own meta, so a single combined
+ * payment shows up as its legs — savings, loan repayment, penalties — rather
+ * than as one lump the member cannot account for. The rows on each side always
+ * sum to that side's total.
+ */
+export interface StatementPurpose {
+  key: string;
+  label: string;
+  amount: number; // positive magnitude
+  count: number;
+}
+
 export interface Statement {
   statementId: string;
   generatedAt: string;
@@ -60,6 +75,11 @@ export interface Statement {
     net: number;
     pending: number;
     byType: Record<string, { count: number; in: number; out: number }>;
+  };
+  /** Optional: absent when talking to an API older than the breakdown. */
+  breakdown?: {
+    in: StatementPurpose[];
+    out: StatementPurpose[];
   };
   lines: StatementLine[];
   activity: StatementActivity[];
