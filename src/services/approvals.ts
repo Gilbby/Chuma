@@ -32,6 +32,9 @@ function mapApproval(raw: any): Approval {
     timestamp: raw.createdAt ?? raw.date ?? "",
     status: raw.status,
     votes: votes.map((v: any) => ({
+      // Carried through so a screen can ask "did I vote on this?" — the name
+      // alone cannot answer that in a group with two Marys.
+      adminId: v.adminId ? String(v.adminId) : undefined,
       adminName: v.adminName || "An admin",
       decision: v.decision,
       at: v.at ?? "",

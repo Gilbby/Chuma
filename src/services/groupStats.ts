@@ -3,8 +3,10 @@
 
 import type { Group, Loan } from "@/src/types";
 
-export function getSavingsGrowth(group: Group): number {
-  const t = (group as Group & { trend?: { value: number }[] }).trend;
+export function getSavingsGrowth(group: Group | undefined): number {
+  // Callers resolve the group from a list that is empty on first render, so
+  // undefined is a normal state here, not a bug to crash on.
+  const t = (group as (Group & { trend?: { value: number }[] }) | undefined)?.trend;
   if (!t || t.length < 2) return 0;
   const latest = t[t.length - 1].value;
   const prev = t[t.length - 2].value;

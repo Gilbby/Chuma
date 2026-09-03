@@ -27,7 +27,6 @@ import { Group, Penalty, Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
 import { usePricingPreview, PayoutPreview } from "@/src/hooks/usePricingPreview";
-import { useRole } from "@/src/contexts/RoleContext";
 import {
   Sparkles,
   Check,
@@ -93,7 +92,6 @@ function PayoutStatus({ p, colors }: { p: ShareOutPayout; colors: any }) {
 export default function ShareOutScreen() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { role } = useRole();
 
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const activeGroupId = groupId ?? "";
@@ -108,6 +106,13 @@ export default function ShareOutScreen() {
   const [approvalError, setApprovalError] = useState("");
   const [justApproved, setJustApproved] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
+  // Whether MY approve vote is on this cycle's share-out, read back from the
+  // server so it survives a reload — not just something this session did.
+  const [approvedShareOutMyself, setApprovedShareOutMyself] = useState(false);
+  // The newest share-out approval whatever its status. The pending fetch above
+  // loses it the moment the vote carries; this is what still remembers the
+  // votes and the method a run in progress was approved with.
+  const [latestShareOut, setLatestShareOut] = useState<Approval | null>(null);
 
   // The distribution itself, once it has been run: one row per member saying
   // whether they have their money yet.
@@ -126,11 +131,15 @@ export default function ShareOutScreen() {
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     try {
-      const [g, p, user, approvalsForGroup, dist] = await Promise.all([
+      const [g, p, user, approvalsForGroup, everyApproval, dist] = await Promise.all([
         getGroups(),
         getPenalties({ groupId: activeGroupId }),
         getCurrentUser<{ _id: string }>(),
         getApprovals({ groupId: activeGroupId }),
+        // The pending list above empties the moment the vote carries, so the
+        // record of who approved this distribution only survives in the
+        // resolved history. Handing out money depends on it — see myApproval.
+        getApprovals({ groupId: activeGroupId, status: "all" }).catch(() => []),
         // A group that has never distributed has no payouts; that is not an
         // error and must not blank the rest of the screen.
         getShareOutPayouts(activeGroupId).catch(
@@ -146,8 +155,18 @@ export default function ShareOutScreen() {
       ]);
       setGroups(g);
       setPenalties(p);
-      setMyUserId(user?._id ? String(user._id) : "");
+      const uid = user?._id ? String(user._id) : "";
+      setMyUserId(uid);
       setShareOutApproval(approvalsForGroup.find((a) => a.type === "share-out") ?? null);
+      // Newest first from the API, so the first share-out row is this cycle's.
+      const latestShareOut = everyApproval.find((a) => a.type === "share-out");
+      setLatestShareOut(latestShareOut ?? null);
+      setApprovedShareOutMyself(
+        !!uid &&
+          !!latestShareOut?.votes?.some(
+            (v) => v.decision === "approve" && String(v.adminId ?? "") === uid
+          )
+      );
       setPayouts(dist.payouts);
       setPayoutTotals(dist.totals);
       setRunMethod(dist.method);
@@ -205,19 +224,33 @@ export default function ShareOutScreen() {
   // already paid as being owed nothing.
   const distributionStarted = payouts.length > 0;
 
-  // Only the treasurer and chairperson can confirm a handover — the API says so
-  // too. Read the caller's REAL role in this group, not the demo role switcher,
-  // or the button appears for people the server will refuse.
-  const myRole = (group?.members ?? []).find(
-    (m: any) => String(m.userId ?? m.id) === myUserId
-  )?.role;
+  // A run that still owes somebody is mid-flight. It matters because the
+  // approval that authorised it stops being pending the moment it carries, and
+  // GET /approvals returns pending only — so on the next load there is nothing
+  // left saying this group already voted, and the screen would offer to start
+  // the share-out it is in the middle of paying out.
+  const distributionInProgress =
+    distributionStarted && !!payoutTotals && payoutTotals.paid < payoutTotals.count;
+
+  // Every lock on this screen hangs off the caller's REAL role in THIS group,
+  // never the demo role switcher, or buttons appear for people the server will
+  // refuse. services/groups already derives it from the active membership with
+  // the id shapes normalised — re-deriving it here let a pending invite row, or
+  // a populated userId, hand someone the wrong buttons.
+  const myRole = group?.yourRole;
   // The treasurer pays members and marks them off. The chairperson stands in
   // only for a group that currently has no treasurer, matching the API.
   const hasTreasurer = (group?.members ?? []).some(
     (m: any) => m.status === "active" && m.role === "Treasurer"
   );
-  const canConfirmPayout =
+  const payoutRole =
     myRole === "Treasurer" || (myRole === "Chairperson" && !hasTreasurer);
+
+  // Holding the role is not enough: whoever hands out the money must have put
+  // their own name on the plan first. hasVoted covers the vote just cast in
+  // this session, before the reload that would read it back from the server.
+  const iApprovedShareOut = approvedShareOutMyself || hasVoted;
+  const canConfirmPayout = payoutRole && iApprovedShareOut;
 
   // Ending the cycle starts with the chairperson and nobody else.
   const isChairperson = myRole === "Chairperson";
@@ -337,9 +370,16 @@ export default function ShareOutScreen() {
   // savings. Mirrors getRequiredApprovals("all", …) on the server.
   const requiredApprovals = getRequiredApprovals("all", adminCount);
 
-  const votesFor = shareOutApproval?.votesFor ?? 0;
-  const required = shareOutApproval?.totalVoters ?? requiredApprovals;
-  const approved = shareOutApproval?.status === "approved" || justApproved;
+  // While a run is in progress its approval has already resolved, so fall back
+  // to the historical record rather than reporting "0 of 3 approvals" for a
+  // distribution the group unanimously voted through.
+  const activeApproval =
+    shareOutApproval ?? (distributionInProgress ? latestShareOut : null);
+
+  const votesFor = activeApproval?.votesFor ?? 0;
+  const required = activeApproval?.totalVoters ?? requiredApprovals;
+  const approved =
+    shareOutApproval?.status === "approved" || justApproved || distributionInProgress;
 
   // The picker only exists while there is still a choice to make: before anyone
   // has proposed this cycle's distribution.
@@ -390,6 +430,11 @@ export default function ShareOutScreen() {
       } else {
         setShareOutApproval(null);
       }
+
+      // A deciding vote runs the distribution server-side. Without this the
+      // screen keeps showing the projection it was voting on, and the payout
+      // rows only appear if you leave and come back.
+      await load({ silent: true });
     } catch (e: any) {
       setApprovalError(e?.message || "Could not record approval. Please try again.");
     } finally {
@@ -526,6 +571,23 @@ export default function ShareOutScreen() {
           >
             {confirmError}
           </Text>
+        ) : null}
+        {/* Normally unreachable — every admin has to approve before a single
+            payout exists. It catches the treasurer appointed AFTER the vote
+            carried, who would otherwise be handing out money on a plan they
+            never signed. Say why the buttons are missing, or it reads as the
+            screen being broken. */}
+        {distributionStarted && payoutRole && !iApprovedShareOut ? (
+          <View
+            style={[styles.methodNote, { backgroundColor: colors.surfaceSecondary }]}
+            testID="shareout-confirm-locked"
+          >
+            <Lock size={16} color={colors.textMuted} strokeWidth={2.2} />
+            <Text style={{ flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
+              Only the admins who approved this share-out can mark members paid, and
+              your approval is not on this one.
+            </Text>
+          </View>
         ) : null}
         <Card padding={0}>
           {allocationRows.map((row, i) => {
@@ -749,9 +811,34 @@ export default function ShareOutScreen() {
               </Text>
             </View>
           </Card>
+        ) : !isAdmin ? (
+          // A member never votes on this, so tell them that first. Sending them
+          // through the awaiting-chairperson copy below would read as "your turn
+          // is coming", which it never is.
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: colors.surfaceSecondary,
+              padding: 16,
+              borderRadius: 16,
+              gap: 12,
+            }}
+            testID="shareout-locked"
+          >
+            <Lock size={18} color={colors.textMuted} />
+            <Text style={{ flex: 1, color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+              Only the group&apos;s admins approve the distribution plan. Your current role
+              is{" "}
+              <Text style={{ fontWeight: "700", color: colors.textMain }}>
+                {myRole ?? "Member"}
+              </Text>
+              .
+            </Text>
+          </View>
         ) : !shareOutApproval && !isChairperson ? (
-          // Nobody has started the cycle yet, and only the chairperson can.
-          // Everyone else — treasurer and secretary included — is waiting.
+          // The cycle has not started, and only the chairperson can start it.
+          // The treasurer and secretary are waiting on them.
           <View
             style={[styles.methodNote, { backgroundColor: colors.surfaceSecondary, marginBottom: 0 }]}
             testID="shareout-awaiting-chair"
@@ -762,7 +849,7 @@ export default function ShareOutScreen() {
               approve it before any money moves.
             </Text>
           </View>
-        ) : isAdmin ? (
+        ) : (
           <>
             <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 6 }}>
               {shareOutApproval
@@ -791,25 +878,6 @@ export default function ShareOutScreen() {
               testID="shareout-approve-btn"
             />
           </>
-        ) : (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: colors.surfaceSecondary,
-              padding: 16,
-              borderRadius: 16,
-              gap: 12,
-            }}
-            testID="shareout-locked"
-          >
-            <Lock size={18} color={colors.textMuted} />
-            <Text style={{ flex: 1, color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
-              Only the group&apos;s admins approve the distribution plan. Your current role
-              is{" "}
-              <Text style={{ fontWeight: "700", color: colors.textMain }}>{role}</Text>.
-            </Text>
-          </View>
         )}
         <View style={{ height: 10 }} />
         <Button

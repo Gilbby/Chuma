@@ -150,6 +150,8 @@ export interface Loan {
 
 /** One admin's decision on an approval — the row of its history trail. */
 export interface ApprovalVote {
+  /** Who voted. Absent on older votes recorded before the id was stored. */
+  adminId?: string;
   adminName: string;
   decision: "approve" | "reject";
   at: string;
