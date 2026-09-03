@@ -18,6 +18,7 @@ import {
   ShareOutPayout,
   ShareOutPayouts,
   ShareOutCompleted,
+  ShareOutHistorySummary,
 } from "@/src/services/shareOut";
 import { confirmPayout } from "@/src/services/transactions";
 import { getApprovals, getRequiredApprovals, voteOnApproval } from "@/src/services/approvals";
@@ -36,6 +37,7 @@ import {
   HandCoins,
   AlertTriangle,
   Smartphone,
+  ChevronRight,
 } from "lucide-react-native";
 
 function addDays(iso: string, days: number): string {
@@ -126,6 +128,9 @@ export default function ShareOutScreen() {
   // The last distribution, once it is over. Kept only to say it happened and
   // point at the report — the screen itself is back to the next cycle.
   const [lastCompleted, setLastCompleted] = useState<ShareOutCompleted | null>(null);
+  // Every cycle the group has ever closed, as a count and a running total. The
+  // receipt line is about the group's record, not about one run.
+  const [history, setHistory] = useState<ShareOutHistorySummary | null>(null);
   // The run finished on THIS screen, in this session. Marking the final member
   // paid should land as an ending, not as the list silently emptying.
   const [justFinished, setJustFinished] = useState(false);
@@ -159,6 +164,7 @@ export default function ShareOutScreen() {
               totals: null,
               method: null,
               lastCompleted: null,
+              history: null,
               mobileMoneyHold: MOBILE_MONEY_ON_HOLD,
             }) as ShareOutPayouts
         ),
@@ -181,6 +187,7 @@ export default function ShareOutScreen() {
       setPayoutTotals(dist.totals);
       setRunMethod(dist.method);
       setLastCompleted(dist.lastCompleted ?? null);
+      setHistory(dist.history ?? null);
       setMobileMoneyHold(dist.mobileMoneyHold);
       // Nothing to choose while pawaPay cannot pay anyone.
       if (dist.mobileMoneyHold) setChosenMethod("manual");
@@ -231,6 +238,12 @@ export default function ShareOutScreen() {
 
   const myId = myUserId;
   const myShare = getMyShare(result.members, myId);
+
+  // The group's share-out record. An API that predates the summary still has a
+  // finished run to report, so fall back to counting that one rather than
+  // dropping the line the moment the numbers are missing.
+  const historyRuns = history?.runs ?? (lastCompleted ? 1 : 0);
+  const historyDistributed = history?.totalDistributed ?? lastCompleted?.totalPaid ?? 0;
 
   // Once a distribution has run, the allocations list stops being a projection
   // and becomes the record of it. It has to: settling a member's payout zeroes
@@ -622,9 +635,15 @@ export default function ShareOutScreen() {
           </Card>
         )}
 
-        {/* A share-out the group has already been through. It is not this
-            screen's business any more — but saying nothing would read as the
-            last cycle never happening, so it gets one line and a way in. */}
+        {/* The cycles the group has already been through. Not this screen's
+            business any more — but saying nothing would read as them never
+            happening, so they get one line and a way in.
+
+            Framed as the group's record rather than as the last run: a group
+            four years in has four of these behind it, and a line that names
+            only the most recent one both hides the others and promises a
+            single breakdown where the tap opens a list. Count and running
+            total say what is actually through there. */}
         {!distributionStarted && lastCompleted ? (
           <Pressable
             onPress={() => router.push(`/reports?groupId=${activeGroupId}` as never)}
@@ -640,13 +659,29 @@ export default function ShareOutScreen() {
             ]}
           >
             <Check size={16} color={colors.success} strokeWidth={2.5} />
-            <Text style={{ flex: 1, color: colors.textBody, fontSize: 12, lineHeight: 17 }}>
-              {`Last share-out: ${formatZMW(lastCompleted.totalPaid)} paid to ${
-                lastCompleted.memberCount
-              } member${lastCompleted.memberCount === 1 ? "" : "s"}${
-                lastCompleted.completedAt ? ` on ${fmtDate(lastCompleted.completedAt)}` : ""
-              }. Tap to see the full breakdown.`}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.textMain, fontSize: 13, fontWeight: "600" }}>
+                {`${historyRuns} share-out${historyRuns === 1 ? "" : "s"} · ${formatZMW(
+                  historyDistributed
+                )} distributed`}
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
+                {historyRuns === 1
+                  ? `Paid to ${lastCompleted.memberCount} member${
+                      lastCompleted.memberCount === 1 ? "" : "s"
+                    }${
+                      lastCompleted.completedAt
+                        ? ` on ${fmtDate(lastCompleted.completedAt)}`
+                        : ""
+                    }`
+                  : `Most recent ${
+                      lastCompleted.completedAt ? fmtDate(lastCompleted.completedAt) : "run"
+                    } · ${lastCompleted.memberCount} member${
+                      lastCompleted.memberCount === 1 ? "" : "s"
+                    }`}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} />
           </Pressable>
         ) : null}
 

@@ -174,6 +174,18 @@ export interface ShareOutCompleted {
   method: "manual" | "mobile-money";
 }
 
+/**
+ * What the group has distributed across every cycle it has ever closed.
+ *
+ * A group four years in has four of these behind it, so a line naming only the
+ * most recent one reads as if it were the only one. The count and the running
+ * total are what a member is actually owed off that line.
+ */
+export interface ShareOutHistorySummary {
+  runs: number;
+  totalDistributed: number;
+}
+
 export interface ShareOutPayouts {
   shareOutId: string | null;
   payouts: ShareOutPayout[];
@@ -184,6 +196,8 @@ export interface ShareOutPayouts {
   totals: ShareOutTotals | null;
   /** Set only when the last run is over and the screen is clear for the next. */
   lastCompleted: ShareOutCompleted | null;
+  /** Served alongside `lastCompleted`, and null for the same reasons. */
+  history: ShareOutHistorySummary | null;
 }
 
 /**
