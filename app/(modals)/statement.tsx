@@ -118,6 +118,16 @@ export default function StatementScreen() {
   const scopedGroup = groupId ? groups.find((g) => g.id === groupId) : undefined;
   const groupLabel = groupId ? scopedGroup?.name ?? "Selected group" : "All groups";
 
+  // Settled money only, matching the export. A statement answers "what do I
+  // have and how did it get there" — a payment that might still fail belongs to
+  // the question "did my payment go through", which the Transactions tab and
+  // the payment's own receipt answer. Printing the two side by side invites the
+  // pending one being counted as though it had landed.
+  const activity = useMemo(
+    () => (statement?.activity ?? []).filter((a) => a.status === "completed"),
+    [statement]
+  );
+
   // A church group's money is given, not saved. Same figures, different words —
   // see statementCopy. Scoped to one group it follows that group; across all of
   // them only an all-project-fund member gets the giving wording.
@@ -293,21 +303,21 @@ export default function StatementScreen() {
               tap away on the receipt, or in the export. */}
           <SectionTitle colors={colors}>{copy.activityTitle.toUpperCase()}</SectionTitle>
           <Card padding={0}>
-            {statement.activity.length === 0 ? (
+            {activity.length === 0 ? (
               <View style={{ padding: 16 }}>
                 <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                  No transactions in this period.
+                  No completed transactions in this period.
                 </Text>
               </View>
             ) : (
-              statement.activity.map((a, i) => (
+              activity.map((a, i) => (
                 <ActivityRow
                   key={a.id}
                   item={a}
                   label={movementLabel(copy, a)}
                   showGroup={!statement.group}
                   colors={colors}
-                  last={i === statement.activity.length - 1}
+                  last={i === activity.length - 1}
                   onPress={() =>
                     router.push({
                       pathname: "/receipt",
@@ -319,8 +329,8 @@ export default function StatementScreen() {
                         note: a.note,
                         status: a.status,
                         direction: a.direction,
-                        // A settled movement has a real receipt number; one
-                        // still pending has none, so the screen derives from id.
+                        // Every line here has settled, so it has a real receipt
+                        // number; the id fallback is belt and braces.
                         ...(a.receiptId ? { txnId: a.receiptId } : { id: a.id }),
                       },
                     })
@@ -469,9 +479,8 @@ const ActivityRow: React.FC<{
   last?: boolean;
   onPress: () => void;
 }> = ({ item, label, showGroup, colors, last, onPress }) => {
-  // Nothing has moved yet on a pending line, so it stays grey rather than
-  // claiming a colour it has not earned.
-  const settled = item.status === "completed";
+  // Every line the statement lists has settled, so the amount always earns its
+  // colour and there is no status to caveat it with.
   return (
     <Pressable
       onPress={onPress}
@@ -492,16 +501,11 @@ const ActivityRow: React.FC<{
         <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
           {fmtShort(item.date)}
           {showGroup && item.groupName ? ` · ${item.groupName}` : ""}
-          {settled ? "" : ` · ${item.status}`}
         </Text>
       </View>
       <Text
         style={{
-          color: !settled
-            ? colors.textMuted
-            : item.direction === "in"
-              ? colors.success
-              : colors.danger,
+          color: item.direction === "in" ? colors.success : colors.danger,
           fontWeight: "700",
           fontSize: 13,
           marginLeft: 12,

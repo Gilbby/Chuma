@@ -13,7 +13,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatZMW } from "@/src/utils/currency";
 import { TxnItem } from "@/src/types";
-import type { Statement, StatementPurpose } from "@/src/services/statement";
+import type { Statement } from "@/src/services/statement";
 import {
   movementLabel,
   statementCopy,
@@ -329,71 +329,34 @@ export async function exportTransactionsCsv(data: TxnItem[]) {
 
 // ─── Account statement ───────────────────────────────────────────────────────
 
-const signed = (n: number) => `${n < 0 ? "−" : "+"}${formatZMW(Math.abs(n))}`;
-
 export function statementTitle(s: Statement) {
   return `${fmtDate(s.period.from)} – ${fmtDate(s.period.to)}`;
 }
 
 /**
- * The statement as the exports need it, with every collection present.
+ * The statement as the exports need it: every collection present, and only the
+ * money that actually moved.
  *
  * The screen renders the closing balance and the activity list and nothing
- * else, so a payload missing `lines`, `totals` or `projects` looks perfectly
- * healthy on the phone and only blows up when someone taps Export — which is
- * exactly the failure this hit. An API older than a field is a normal thing to
- * meet in the wild (the client ships ahead of Render), so the export degrades
- * to an empty section instead of throwing.
+ * else, so a payload missing `activity` or `member` looks perfectly healthy on
+ * the phone and only blows up when someone taps Export. An API older than a
+ * field is a normal thing to meet in the wild (the client ships ahead of
+ * Render), so the export degrades to an empty section instead of throwing.
+ *
+ * Pending and failed movements are dropped here rather than printed with a
+ * status beside them. On screen a pending line is useful — it is the member's
+ * own view, it updates, and they can tap it. The export is a document handed to
+ * someone else: a treasurer, a bank, a family member settling an estate. A row
+ * that might still fail is a row that reader cannot act on, and printing it
+ * next to real ones invites it being counted. So the exported statement carries
+ * settled money only, which is also what the balances above it are made of.
  */
 function exportable(s: Statement) {
   return {
     ...s,
     member: s.member ?? { name: "", phone: "" },
-    lines: s.lines ?? [],
-    activity: s.activity ?? [],
-    projects: s.projects ?? [],
-    totals: {
-      ...(s.totals ?? {}),
-      moneyIn: s.totals?.moneyIn ?? 0,
-      moneyOut: s.totals?.moneyOut ?? 0,
-      net: s.totals?.net ?? 0,
-      pending: s.totals?.pending ?? 0,
-      byType: s.totals?.byType ?? {},
-    },
+    activity: (s.activity ?? []).filter((a) => a.status === "completed"),
   };
-}
-
-/**
- * One side of the cash summary as table rows: the legs, then their total.
- *
- * The exported PDF is the copy a member keeps and shows to people, so it has
- * to answer "where did the money go" on its own — a bare "money out K15,000"
- * puts the reader back where they started. Rows always sum to the total under
- * them; with no rows (older API) the total still prints by itself.
- */
-function purposeBlock(
-  title: string,
-  rows: StatementPurpose[],
-  total: number,
-  totalLabel: string,
-  sign: "+" | "−",
-  cls: "pos" | "neg"
-) {
-  const body = rows.length
-    ? rows
-        .map(
-          (r) =>
-            `<tr><td class="ind">${esc(r.label)}</td><td class="num ${cls}">${sign}${formatZMW(r.amount)}</td></tr>`
-        )
-        .join("")
-    : total > 0
-      ? ""
-      : `<tr><td class="ind muted">Nothing this period</td><td class="num muted">—</td></tr>`;
-  return (
-    `<tr><td class="grp">${esc(title)}</td><td class="num"></td></tr>` +
-    body +
-    `<tr><td class="sub">${esc(totalLabel)}</td><td class="num sub ${cls}">${sign}${formatZMW(total)}</td></tr>`
-  );
 }
 
 export async function exportStatementPdf(
@@ -424,23 +387,6 @@ function statementHtml(
   flavour: StatementFlavour
 ): string {
   const copy = statementCopy(flavour);
-  const detail = (groupName: string, note: string) => (s.group ? note : groupName);
-
-  const ledgerRows = s.lines
-    .map(
-      (l) => `
-        <tr>
-          <td>${fmtDate(l.date)}</td>
-          <td>${esc(movementLabel(copy, l))}${
-            detail(l.groupName, l.note)
-              ? `<br /><span class="muted">${esc(detail(l.groupName, l.note))}</span>`
-              : ""
-          }</td>
-          <td class="num ${l.delta < 0 ? "neg" : "pos"}">${signed(l.delta)}</td>
-          <td class="num">${formatZMW(l.balance)}</td>
-        </tr>`
-    )
-    .join("");
 
   const activityRows = s.activity
     .map(
@@ -450,7 +396,6 @@ function statementHtml(
           <td>${esc(movementLabel(copy, a))}</td>
           <td class="muted">${esc(a.groupName)}</td>
           <td class="num ${a.direction === "out" ? "neg" : "pos"}">${a.direction === "out" ? "−" : "+"}${formatZMW(a.amount)}</td>
-          <td style="text-transform:capitalize">${esc(a.status)}</td>
         </tr>`
     )
     .join("");
@@ -479,9 +424,6 @@ function statementHtml(
   .muted { color: #9CA3AF; }
   tfoot td { font-weight: 700; border-top: 2px solid #E5E7EB; border-bottom: 0; color: #064E3B; }
   .empty { padding: 14px 10px; color: #9CA3AF; font-size: 12px; }
-  .grp { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #6B7280; padding-top: 12px; }
-  .ind { padding-left: 22px; }
-  .sub { font-weight: 700; color: #064E3B; border-top: 1px solid #E5E7EB; }
   .foot { margin-top: 26px; text-align: center; color: #9CA3AF; font-size: 10px; line-height: 16px; }
 </style></head>
 <body>
@@ -515,58 +457,10 @@ function statementHtml(
         <tfoot><tr><td>${esc(copy.closingLabel)}</td><td class="num">${formatZMW(s.closingBalance)}</td></tr></tfoot>
       </table>
 
-      <h2>${esc(copy.ledgerTitle)}</h2>
+      <h2>${esc(copy.activityTitle)}</h2>
       <table>
-        <thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th class="num">Balance</th></tr></thead>
-        <tbody>
-          <tr><td>${fmtDate(s.period.from)}</td><td class="muted">${esc(copy.ledgerOpeningRow)}</td><td class="num muted">—</td><td class="num">${formatZMW(s.openingBalance)}</td></tr>
-          ${ledgerRows || `<tr><td colspan="4" class="empty">${esc(copy.ledgerEmpty)}</td></tr>`}
-        </tbody>
-        <tfoot><tr><td colspan="3">${esc(copy.ledgerClosingRow)}</td><td class="num">${formatZMW(s.closingBalance)}</td></tr></tfoot>
-      </table>
-
-      ${
-        (s.projects ?? []).length > 0
-          ? `<h2>${esc(copy.projectsTitle)}</h2>
-      <table>
-        <thead><tr><th>Project</th><th>Group</th><th class="num">Gifts</th><th class="num">You gave</th><th class="num">Project raised</th></tr></thead>
-        <tbody>
-          ${(s.projects ?? [])
-            .map(
-              (p) => `<tr>
-            <td>${esc(p.name)}${p.status && p.status !== "active" ? ` <span class="muted">(${esc(p.status)})</span>` : ""}</td>
-            <td class="muted">${esc(p.groupName)}</td>
-            <td class="num">${p.count}</td>
-            <td class="num pos">+${formatZMW(p.amount)}</td>
-            <td class="num">${formatZMW(p.collected)}${p.targetAmount ? ` / ${formatZMW(p.targetAmount)}` : ""}</td>
-          </tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
-
-      `
-          : ""
-      }<h2>${esc(copy.activityTitle)}</h2>
-      <table>
-        <thead><tr><th>Date</th><th>Description</th><th>Group</th><th class="num">Amount</th><th>Status</th></tr></thead>
-        <tbody>${activityRows || `<tr><td colspan="5" class="empty">No transactions in this period.</td></tr>`}</tbody>
-      </table>
-
-      <h2>Where your money went</h2>
-      <table>
-        <thead><tr><th>What it was for</th><th class="num">Amount</th></tr></thead>
-        <tbody>
-          ${purposeBlock("Money you received", s.breakdown?.in ?? [], s.totals.moneyIn, "Total received", "+", "pos")}
-          ${purposeBlock("Money you paid", s.breakdown?.out ?? [], s.totals.moneyOut, "Total paid", "−", "neg")}
-          ${
-            s.totals.pending > 0
-              ? `<tr><td class="grp">Still pending</td><td class="num">${formatZMW(s.totals.pending)}</td></tr>
-          <tr><td colspan="2" class="ind muted">Not counted in the net below until it settles.</td></tr>`
-              : ""
-          }
-        </tbody>
-        <tfoot><tr><td>Net movement</td><td class="num">${signed(s.totals.net)}</td></tr></tfoot>
+        <thead><tr><th>Date</th><th>Description</th><th>Group</th><th class="num">Amount</th></tr></thead>
+        <tbody>${activityRows || `<tr><td colspan="4" class="empty">No completed transactions in this period.</td></tr>`}</tbody>
       </table>
 
       <div class="foot">
@@ -587,7 +481,6 @@ export async function exportStatementCsv(
   const s = exportable(statement);
   const copy = statementCopy(flavour);
   const day = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
-  const detail = (groupName: string, note: string) => (s.group ? note : groupName);
 
   // The same four sections the app shows, in the same order and with the same
   // columns. A member exporting what is on their screen should get what is on
@@ -610,56 +503,16 @@ export async function exportStatementCsv(
     [copy.closingLabel, s.closingBalance],
     [],
 
-    [copy.ledgerTitle],
-    ["Date", "Description", "Detail", "Amount", "Balance"],
-    [day(s.period.from), copy.ledgerOpeningRow, "", "", s.openingBalance],
-    ...s.lines.map((l) => [
-      day(l.date),
-      movementLabel(copy, l),
-      detail(l.groupName, l.note),
-      l.delta,
-      l.balance,
-    ]),
-    [day(s.period.to), copy.ledgerClosingRow, "", "", s.closingBalance],
-    [],
-
-    ...((s.projects ?? []).length > 0
-      ? [
-          [copy.projectsTitle],
-          ["Project", "Group", "Gifts", "You gave", "Project raised", "Goal"],
-          ...(s.projects ?? []).map((p) => [
-            p.name,
-            p.groupName,
-            p.count,
-            p.amount,
-            p.collected,
-            p.targetAmount ?? "",
-          ]),
-          [],
-        ]
-      : []),
-
     [copy.activityTitle],
-    ["Date", "Description", "Group", "Amount", "Status"],
-    ...s.activity.map((a) => [
-      day(a.date),
-      movementLabel(copy, a),
-      a.groupName,
-      a.direction === "out" ? -a.amount : a.amount,
-      a.status,
-    ]),
-    [],
-
-    ["Where your money went"],
-    ["Direction", "What it was for", "Amount"],
-    ...(s.breakdown?.in ?? []).map((r) => ["Received", r.label, r.amount]),
-    ["Received", "Total received", s.totals.moneyIn],
-    ...(s.breakdown?.out ?? []).map((r) => ["Paid", r.label, -r.amount]),
-    ["Paid", "Total paid", -s.totals.moneyOut],
-    ...(s.totals.pending > 0
-      ? [["Pending", "Not counted in net until it settles", s.totals.pending]]
-      : []),
-    ["", "Net movement", s.totals.net],
+    ["Date", "Description", "Group", "Amount"],
+    ...(s.activity.length > 0
+      ? s.activity.map((a) => [
+          day(a.date),
+          movementLabel(copy, a),
+          a.groupName,
+          a.direction === "out" ? -a.amount : a.amount,
+        ])
+      : [["No completed transactions in this period."]]),
   ];
 
   const csv = table

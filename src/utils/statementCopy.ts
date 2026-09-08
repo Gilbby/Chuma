@@ -10,12 +10,12 @@
 // and the copy they hand to someone else cannot drift apart. Adding a group
 // type means adding a flavour below, not hunting for strings in three files.
 //
-// Shape does NOT vary by flavour, only wording. Every statement reads the same
-// way on screen — the totals card, then the activity, and the detail behind any
-// one line a tap away on its receipt — because a phone statement is read
-// standing up. The exports stay full for every flavour: a document handed to
-// someone else is read at a desk, and the itemisation is why it exists. So the
-// ledger and breakdown labels below are export-only copy.
+// Shape does NOT vary by flavour, and it does not vary by medium either. Every
+// statement is the totals card then the activity, on screen and in the export
+// alike — a phone statement is read standing up, and the printed copy has to be
+// recognisable as the same document. The per-line detail (reference, method,
+// running balance) lives on the receipt behind a tap, which is the one thing
+// paper cannot do.
 
 import { GroupType, isProjectFundType } from "@/src/types";
 import type { StatementTxnType } from "@/src/services/statement";
@@ -35,9 +35,6 @@ export interface StatementCopy {
    *  the row rather than showing a permanent zero. */
   outLabel: string | null;
   closingLabel: string;
-  /** Exports only — the screen carries no ledger. See the note at the top. */
-  ledgerTitle: string;
-  ledgerEmpty: string;
   /** Heading over the movement list. */
   activityTitle: string;
   /**
@@ -46,13 +43,6 @@ export interface StatementCopy {
    * everything else falls through to the description the API sent.
    */
   activityLabels: Partial<Record<StatementTxnType, string>>;
-  /** Heading over the per-project rows. Only a flavour with projects uses it. */
-  projectsTitle: string;
-  /** Column heading for what this member gave to each project. */
-  projectsAmountLabel: string;
-  /** The ledger's own first and last rows, which bracket the running balance. */
-  ledgerOpeningRow: string;
-  ledgerClosingRow: string;
   /** Sits under the figures on screen; the PDF uses `footnotePdf`. */
   footnote: string;
   footnotePdf: string;
@@ -69,20 +59,13 @@ const COPY: Record<StatementFlavour, StatementCopy> = {
     inLabel: "Contributions",
     outLabel: "Share-out paid",
     closingLabel: "Closing balance",
-    ledgerTitle: "Savings account",
-    ledgerEmpty: "No savings movement in this period.",
     activityTitle: "All activity",
     // The API already words these for a savings group.
     activityLabels: {},
-    // A savings group has no projects, so these never render.
-    projectsTitle: "Projects",
-    projectsAmountLabel: "You gave",
-    ledgerOpeningRow: "Opening balance",
-    ledgerClosingRow: "Closing balance",
     footnote:
       "Your savings balance counts contributions and share-outs only. Loans, repayments, penalties and fees are real money and show in your activity, but they do not change your stake. Tap any line for its receipt.",
     footnotePdf:
-      "This is an official Chuma statement. The balance shown is your savings stake in the group — contributions and share-outs only. Loans, repayments, penalties and fees are real money and are itemised under Where your money went; they do not change your stake.",
+      "This is an official Chuma statement. The balance shown is your savings stake in the group — contributions and share-outs only. Loans, repayments, penalties and fees are real money and are listed under activity, but they do not change your stake.",
     fileStem: "Chuma-Statement",
   },
   "project-fund": {
@@ -94,8 +77,6 @@ const COPY: Record<StatementFlavour, StatementCopy> = {
     // A project fund never shares out, so there is no counterpart to giving.
     outLabel: null,
     closingLabel: "Total given",
-    ledgerTitle: "Giving record",
-    ledgerEmpty: "No giving in this period.",
     activityTitle: "Activity",
     activityLabels: {
       // "Cycle contribution" is a savings group's word for it, and a member
@@ -105,14 +86,10 @@ const COPY: Record<StatementFlavour, StatementCopy> = {
       contribution: "Giving",
       combined: "Payment",
     },
-    projectsTitle: "What you gave toward",
-    projectsAmountLabel: "You gave",
-    ledgerOpeningRow: "Brought forward",
-    ledgerClosingRow: "Total given",
     footnote:
       "This total is what you have given, not a balance you can draw on — a project fund is never shared out. Fees and penalties show in your activity, but they do not count as giving. Tap any line for its receipt.",
     footnotePdf:
-      "This is an official Chuma statement. The total shown is what this member has given toward the group's projects. A project fund is not repaid and is never shared out, so nothing here is a claim on the group. Fees are real money and are itemised under Where your money went; they do not count as giving.",
+      "This is an official Chuma statement. The total shown is what this member has given toward the group's projects. A project fund is not repaid and is never shared out, so nothing here is a claim on the group. Fees are real money and are listed under activity, but they do not count as giving.",
     fileStem: "Chuma-Giving-Statement",
   },
 };
