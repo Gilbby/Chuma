@@ -795,7 +795,9 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
             <View style={{ height: 14 }} />
             <Button
               label="Give toward a project"
-              onPress={() => router.push("/contribute")}
+              onPress={() =>
+                router.push({ pathname: "/contribute", params: { groupId: id } })
+              }
               testID="group-give-btn"
             />
           </View>
@@ -805,7 +807,9 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
           <View style={{ paddingHorizontal: 20 }}>
             <Button
               label="Give toward a project"
-              onPress={() => router.push("/contribute")}
+              onPress={() =>
+                router.push({ pathname: "/contribute", params: { groupId: id } })
+              }
               testID="group-contribute-btn"
             />
             <View style={{ height: 16 }} />
@@ -843,7 +847,9 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
           <View style={{ paddingHorizontal: 20 }}>
             <Button
               label="Make a contribution"
-              onPress={() => router.push("/contribute")}
+              onPress={() =>
+                router.push({ pathname: "/contribute", params: { groupId: id } })
+              }
               testID="group-contribute-btn"
             />
             <View style={{ height: 16 }} />
