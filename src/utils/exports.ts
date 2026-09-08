@@ -28,6 +28,19 @@ const BODY_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
 /**
+ * Tell the user the export failed, and tell the developer WHY.
+ *
+ * These catches used to swallow the error object, which left "Export failed"
+ * as the only evidence there was — the same message whether the print module
+ * choked, a folder grant went stale, or the statement arrived missing a field.
+ * The alert stays deliberately plain; the cause goes to the log.
+ */
+function exportFailed(context: string, error: unknown, message: string) {
+  console.error(`[export] ${context}`, error);
+  Alert.alert("Export failed", message);
+}
+
+/**
  * Render HTML to a PDF and hand it to the user. Native gets the share sheet
  * (save to Files, WhatsApp, email); web gets the browser print dialog, which
  * is the only way to produce a file there.
@@ -38,7 +51,7 @@ export async function printOrShareHtml(html: string, dialogTitle: string) {
       await Print.printAsync({ html });
       return;
     }
-    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    const { uri } = await renderPdf(html, "Chuma");
     if (await Sharing.isAvailableAsync()) {
       await Sharing.shareAsync(uri, {
         mimeType: "application/pdf",
@@ -49,8 +62,40 @@ export async function printOrShareHtml(html: string, dialogTitle: string) {
       Alert.alert("Sharing unavailable", "Your device cannot share files right now.");
     }
   } catch (e) {
-    Alert.alert("Export failed", "Could not generate the PDF. Please try again.");
+    exportFailed("printOrShareHtml", e, "Could not generate the PDF. Please try again.");
   }
+}
+
+/**
+ * Print HTML to a PDF that the rest of the app is actually allowed to touch.
+ *
+ * expo-print writes its output to its own cache location, which sits OUTSIDE
+ * the directories expo-file-system and expo-sharing will read — sharing that
+ * path straight off fails with "Not allowed to read file under given URL", and
+ * so does copying from it, which is why the old copy-then-share fallback died
+ * silently and handed the unreadable path to the share sheet anyway.
+ *
+ * So we take the bytes print already produced and write them ourselves into
+ * the app's own cache directory. That path is readable by definition, and it
+ * carries a real file name instead of the print module's UUID, which is what
+ * "Save to Files" and WhatsApp end up showing.
+ */
+async function renderPdf(
+  html: string,
+  baseName: string
+): Promise<{ uri: string; base64: string | null }> {
+  const printed = await Print.printToFileAsync({ html, base64: true });
+  const base64 = printed.base64 ?? null;
+
+  // No base64 (older print module) leaves the original path as the only
+  // option — it still works wherever print writes inside the sandbox.
+  if (!base64) return { uri: printed.uri, base64: null };
+
+  const uri = `${FileSystem.cacheDirectory}${baseName}.pdf`;
+  await FileSystem.writeAsStringAsync(uri, base64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return { uri, base64 };
 }
 
 // Remember the folder the user picked for downloads so we prompt only once.
@@ -85,44 +130,38 @@ export async function savePdf(html: string, baseName: string, dialogTitle: strin
       return;
     }
 
-    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    // Already re-homed into our own cache directory, with the bytes in hand —
+    // both of which the Android branch below needs.
+    const { uri: shareUri, base64 } = await renderPdf(html, baseName);
 
     if (Platform.OS === "android") {
       const dir = await androidDownloadDir();
       if (dir) {
         try {
-          const base64 = await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          const bytes =
+            base64 ??
+            (await FileSystem.readAsStringAsync(shareUri, {
+              encoding: FileSystem.EncodingType.Base64,
+            }));
           const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
             dir,
             baseName,
             "application/pdf"
           );
-          await FileSystem.writeAsStringAsync(destUri, base64, {
+          await FileSystem.writeAsStringAsync(destUri, bytes, {
             encoding: FileSystem.EncodingType.Base64,
           });
           Alert.alert("Downloaded", `${baseName}.pdf was saved to your chosen folder.`);
           return;
-        } catch {
+        } catch (e) {
           // The saved grant may be stale (folder deleted / permission revoked):
           // forget it so the next download re-prompts, and share this one.
+          console.warn("[export] SAF download failed, falling back to share", e);
           await AsyncStorage.removeItem(SAF_DIR_KEY);
         }
       }
       // Folder picker dismissed → fall through to the share sheet so the export
       // isn't lost.
-    }
-
-    // iOS + Android fallback: rename the temp file so "Save to Files" / share
-    // targets show a readable name instead of the print module's UUID.
-    let shareUri = uri;
-    try {
-      const named = `${FileSystem.cacheDirectory}${baseName}.pdf`;
-      await FileSystem.copyAsync({ from: uri, to: named });
-      shareUri = named;
-    } catch {
-      // keep the original temp uri
     }
 
     if (await Sharing.isAvailableAsync()) {
@@ -135,7 +174,7 @@ export async function savePdf(html: string, baseName: string, dialogTitle: strin
       Alert.alert("Save unavailable", "Your device cannot save files right now.");
     }
   } catch (e) {
-    Alert.alert("Export failed", "Could not generate the PDF. Please try again.");
+    exportFailed("savePdf", e, "Could not generate the PDF. Please try again.");
   }
 }
 
@@ -174,9 +213,10 @@ export async function saveCsv(csv: string, baseName: string, dialogTitle: string
           });
           Alert.alert("Downloaded", `${baseName}.csv was saved to your chosen folder.`);
           return;
-        } catch {
+        } catch (e) {
           // Stale grant (folder deleted / permission revoked): forget it so the
           // next download re-prompts, and share this one.
+          console.warn("[export] SAF download failed, falling back to share", e);
           await AsyncStorage.removeItem(SAF_DIR_KEY);
         }
       }
@@ -198,7 +238,7 @@ export async function saveCsv(csv: string, baseName: string, dialogTitle: string
       Alert.alert("Save unavailable", "Your device cannot save files right now.");
     }
   } catch (e) {
-    Alert.alert("Export failed", "Could not export the CSV. Please try again.");
+    exportFailed("saveCsv", e, "Could not export the CSV. Please try again.");
   }
 }
 
@@ -296,6 +336,34 @@ export function statementTitle(s: Statement) {
 }
 
 /**
+ * The statement as the exports need it, with every collection present.
+ *
+ * The screen renders the closing balance and the activity list and nothing
+ * else, so a payload missing `lines`, `totals` or `projects` looks perfectly
+ * healthy on the phone and only blows up when someone taps Export — which is
+ * exactly the failure this hit. An API older than a field is a normal thing to
+ * meet in the wild (the client ships ahead of Render), so the export degrades
+ * to an empty section instead of throwing.
+ */
+function exportable(s: Statement) {
+  return {
+    ...s,
+    member: s.member ?? { name: "", phone: "" },
+    lines: s.lines ?? [],
+    activity: s.activity ?? [],
+    projects: s.projects ?? [],
+    totals: {
+      ...(s.totals ?? {}),
+      moneyIn: s.totals?.moneyIn ?? 0,
+      moneyOut: s.totals?.moneyOut ?? 0,
+      net: s.totals?.net ?? 0,
+      pending: s.totals?.pending ?? 0,
+      byType: s.totals?.byType ?? {},
+    },
+  };
+}
+
+/**
  * One side of the cash summary as table rows: the legs, then their total.
  *
  * The exported PDF is the copy a member keeps and shows to people, so it has
@@ -329,9 +397,32 @@ function purposeBlock(
 }
 
 export async function exportStatementPdf(
-  s: Statement,
+  statement: Statement,
   flavour: StatementFlavour = "savings"
 ) {
+  let html: string;
+  try {
+    html = statementHtml(exportable(statement), flavour);
+  } catch (e) {
+    // Building the document is pure string work, so a throw here means the
+    // payload was shaped in a way we did not anticipate. It used to reject
+    // unhandled — the user tapped Export and simply got nothing.
+    exportFailed("exportStatementPdf/build", e, "Could not build the statement. Please try again.");
+    return;
+  }
+
+  const copy = statementCopy(flavour);
+  await savePdf(
+    html,
+    `${copy.fileStem}-${new Date(statement.period.from).toISOString().slice(0, 10)}`,
+    `Chuma statement · ${statementTitle(statement)}`
+  );
+}
+
+function statementHtml(
+  s: ReturnType<typeof exportable>,
+  flavour: StatementFlavour
+): string {
   const copy = statementCopy(flavour);
   const detail = (groupName: string, note: string) => (s.group ? note : groupName);
 
@@ -486,17 +577,14 @@ export async function exportStatementPdf(
   </div>
 </body></html>`;
 
-  await savePdf(
-    html,
-    `${copy.fileStem}-${new Date(s.period.from).toISOString().slice(0, 10)}`,
-    `Chuma statement · ${statementTitle(s)}`
-  );
+  return html;
 }
 
 export async function exportStatementCsv(
-  s: Statement,
+  statement: Statement,
   flavour: StatementFlavour = "savings"
 ) {
+  const s = exportable(statement);
   const copy = statementCopy(flavour);
   const day = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
   const detail = (groupName: string, note: string) => (s.group ? note : groupName);
