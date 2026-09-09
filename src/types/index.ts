@@ -49,6 +49,7 @@ export interface GroupProject {
   id: string;
   name: string;
   targetAmount: number | null; // null = no goal set
+  deadline?: string | null; // ISO date; null = collect for as long as it takes
   collected: number;
   status: "active" | "completed" | "archived";
   createdAt?: string;
@@ -91,7 +92,9 @@ export interface GroupGovernance {
 }
 
 export interface FeeStatus {
-  status: "paid" | "grace" | "locked";
+  // "pending-payment" is a brand-new group whose registration fee has not
+  // settled yet — not overdue, just not started. `locked` is true for it too.
+  status: "paid" | "grace" | "locked" | "pending-payment";
   daysIntoGrace: number;
   daysLeft: number;
   monthsOwed: number;
@@ -103,6 +106,9 @@ export interface Group {
   id: string;
   name: string;
   description: string;
+  /** "pending-payment" means the registration fee has not landed: the group
+   *  exists but nothing inside it can be opened or used yet. */
+  status?: "pending-payment" | "active" | "closed" | "deletion-pending";
   groupType?: GroupType;
   constitution?: GroupConstitution;
   governance?: GroupGovernance;

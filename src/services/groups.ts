@@ -40,6 +40,7 @@ function mapGroup(raw: any, currentUserId?: string): Group {
     ...p,
     id: String(p._id ?? p.id ?? ""),
     targetAmount: p.targetAmount ?? null,
+    deadline: p.deadline ?? null,
     collected: p.collected ?? 0,
     status: p.status ?? "active",
   }));
@@ -57,10 +58,68 @@ function mapGroup(raw: any, currentUserId?: string): Group {
   };
 }
 
-export async function getGroups(): Promise<Group[]> {
+/**
+ * The caller's groups.
+ *
+ * Groups still waiting on their registration fee are left out by default: the
+ * API refuses every action inside one (423), so offering it in a contribute /
+ * loan / report picker only leads to an error. Pass `includePending` on screens
+ * whose job is to show the founder that the payment is still outstanding — the
+ * Groups tab.
+ */
+export async function getGroups(
+  {
+    includePending = false,
+    includeClosed = false,
+  }: { includePending?: boolean; includeClosed?: boolean } = {}
+): Promise<Group[]> {
   const user = await getCurrentUser<{ _id: string }>();
-  const res = await api<{ groups: any[] }>("/groups");
-  return (res.groups ?? []).map((g) => mapGroup(g, user?._id));
+  const res = await api<{ groups: any[] }>(
+    includeClosed ? "/groups?includeClosed=true" : "/groups"
+  );
+  return (res.groups ?? [])
+    .filter((g) => includePending || g.status !== "pending-payment")
+    .map((g) => mapGroup(g, user?._id));
+}
+
+/**
+ * Delete a group. Nothing is erased: the API closes the group, and every
+ * transaction, receipt, penalty and statement line under it is kept and stays
+ * readable — a member can still pull a statement for a group that ended a year
+ * ago. What goes is the group itself: it leaves everyone's list and nothing new
+ * can be written into it.
+ *
+ * Whether it happens now depends on who else is there. `deleted: true` means it
+ * is done — there was no other admin to ask. `deleted: false` means it is a
+ * proposal the group's other admins vote on, exactly like a member removal.
+ *
+ * The API refuses while the group still holds savings or has open loans (400):
+ * closing over either would strand real money.
+ */
+export async function requestGroupDeletion(
+  groupId: string,
+  reason?: string
+): Promise<{
+  message: string;
+  deleted: boolean;
+  requiredApprovals: number;
+  eligibleVoters: number;
+}> {
+  const res = await api<{
+    message: string;
+    deleted?: boolean;
+    requiredApprovals?: number;
+    eligibleVoters?: number;
+  }>(`/groups/${groupId}/delete-request`, {
+    method: "POST",
+    body: reason ? { reason } : {},
+  });
+  return {
+    message: res.message,
+    deleted: !!res.deleted,
+    requiredApprovals: res.requiredApprovals ?? 0,
+    eligibleVoters: res.eligibleVoters ?? 0,
+  };
 }
 
 export async function getGroupById(id: string): Promise<Group | undefined> {
@@ -89,16 +148,21 @@ export async function createGroup(payload: any): Promise<{ group: any; transacti
  */
 export async function addGroupProject(
   groupId: string,
-  project: { name: string; targetAmount?: number | null }
+  project: { name: string; targetAmount?: number | null; deadline?: string | null }
 ): Promise<GroupProject> {
   const res = await api<{ project: any }>(`/groups/${groupId}/projects`, {
     method: "POST",
-    body: { name: project.name, targetAmount: project.targetAmount ?? null },
+    body: {
+      name: project.name,
+      targetAmount: project.targetAmount ?? null,
+      deadline: project.deadline ?? null,
+    },
   });
   return {
     ...res.project,
     id: String(res.project._id ?? res.project.id ?? ""),
     targetAmount: res.project.targetAmount ?? null,
+    deadline: res.project.deadline ?? null,
     collected: res.project.collected ?? 0,
     status: res.project.status ?? "active",
   };

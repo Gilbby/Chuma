@@ -96,7 +96,10 @@ export default function StatementScreen() {
   const [customStart, setCustomStart] = useState<Date | null>(null);
 
   useEffect(() => {
-    getGroups()
+    // A statement is the record of what happened, so a group that has since
+    // been deleted still belongs in the picker — closing a group never takes
+    // its history with it.
+    getGroups({ includeClosed: true })
       .then(setGroups)
       .catch(() => setGroups([]));
   }, []);

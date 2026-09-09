@@ -31,6 +31,7 @@ import {
   resendInvite,
   cancelInvite,
   requestMemberRemoval,
+  requestGroupDeletion,
   addGroupProject,
 } from "@/src/services/groups";
 import type { Role } from "@/src/types";
@@ -73,6 +74,7 @@ import {
   Clock,
   History,
   Target,
+  Trash2,
 } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
@@ -95,6 +97,22 @@ const TAB_KEYS: TabKey[] = [
   "governance",
 ];
 
+// A project deadline is an ISO date the API stores as a Date. Compared against
+// the start of today so a deadline of today itself never reads as passed.
+const formatProjectDeadline = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+const projectOverdue = (p: { deadline?: string | null; status?: string }) => {
+  if (!p.deadline || p.status === "completed") return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(p.deadline) < today;
+};
+
 export default function GroupDetails() {
   const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
   const { colors } = useTheme();
@@ -113,6 +131,8 @@ export default function GroupDetails() {
   const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
   // member row id whose removal is being proposed
   const [removingId, setRemovingId] = useState<string | null>(null);
+  // true while a group deletion is being requested
+  const [deletingGroup, setDeletingGroup] = useState(false);
   // Add-a-project form (project-fund groups; Chairperson only)
   const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [projectName, setProjectName] = useState("");
@@ -300,6 +320,61 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
     [group?.name, id, load]
   );
 
+  /**
+   * Delete the group. Two things have to be said before anyone taps yes, and
+   * both are said here rather than in a toast afterwards:
+   *
+   *   1. Records survive. Closing a group never takes its history with it —
+   *      contributions, receipts, penalties and statements all stay readable,
+   *      which is the whole reason this is a close and not a delete.
+   *   2. It may not happen now. With other admins in the group this is a
+   *      proposal they vote on, exactly like a member removal. Alone, it is
+   *      final the moment it is confirmed.
+   */
+  const onDeleteGroup = useCallback(
+    (groupName: string, alone: boolean) => {
+      Alert.alert(
+        alone ? "Delete group" : "Propose deletion",
+        `Delete ${groupName}?
+
+${alone ? "This cannot be undone." : "The group's other admins vote on this first."} The group closes for everyone and leaves your list of groups.
+
+Its records are kept: every contribution, receipt, penalty and statement stays in the app and can still be opened from Transactions.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: alone ? "Delete group" : "Propose deletion",
+            style: "destructive",
+            onPress: async () => {
+              setDeletingGroup(true);
+              try {
+                const res = await requestGroupDeletion(id);
+                if (res.deleted) {
+                  router.replace("/(tabs)/groups");
+                  Alert.alert(
+                    "Group deleted",
+                    `${groupName} is closed. Its records stay in the app — open Transactions or a statement to see them.`
+                  );
+                  return;
+                }
+                await load();
+                Alert.alert(
+                  "Deletion proposed",
+                  `${res.requiredApprovals} of ${res.eligibleVoters} other admin${res.eligibleVoters === 1 ? "" : "s"} must approve. Nothing changes until they do.`
+                );
+              } catch (e: any) {
+                Alert.alert("Could not delete group", e?.message || "Please try again.");
+              } finally {
+                setDeletingGroup(false);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [id, load, router]
+  );
+
   const onAddProject = useCallback(async () => {
     const name = projectName.trim();
     if (!name) {
@@ -354,8 +429,14 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
   }
 
   const locked = group.feeStatus?.locked ?? isGroupLocked(group);
-  const monthsOwed = group.feeStatus?.monthsOwed ?? getMonthsOwed(group);
-  const amountOwed = group.feeStatus?.amountOwed ?? getAmountOwed(group);
+  // A group still waiting on its registration fee owes exactly month 1. The
+  // server's monthsOwed reads 0 there (feePaidThrough was stamped at creation),
+  // so the amount has to come from the fee itself or the overlay offers "K0".
+  const awaitingFirstPayment = group.status === "pending-payment";
+  const monthsOwed = awaitingFirstPayment ? 1 : (group.feeStatus?.monthsOwed ?? getMonthsOwed(group));
+  const amountOwed = awaitingFirstPayment
+    ? (group.monthlyFee ?? group.registrationFee ?? 0)
+    : (group.feeStatus?.amountOwed ?? getAmountOwed(group));
   // Privileges inside a group follow the user's role IN THIS GROUP, not their
   // app-wide menu role — a global Chairperson is only a Member here if that's
   // how they joined this group.
@@ -366,6 +447,16 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
   // Resending or withdrawing an invite is an admin action — same set the API
   // enforces on /invite (requireGroupAdmin).
   const isAdmin = effectiveRole !== "Member";
+  // Deleting is the group's most destructive act, so the app says up front
+  // whether it takes a vote. An admin looking at a group whose only admin is
+  // them has nobody to ask, and the API closes it on the spot.
+  const adminCount = (group.members ?? []).filter(
+    (m) => m.status === "active" && m.role !== "Member"
+  ).length;
+  const soloAdmin = adminCount <= 1;
+  // A deletion the other admins are still voting on. The group works normally
+  // meanwhile — the vote can fail — but nobody should propose it twice.
+  const deletionPending = group.status === "deletion-pending";
 
   // Church-style group: gives toward named projects. No cycle, no dues, no
   // loans, no penalties and no share-out — so none of that is shown here.
@@ -792,6 +883,18 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
                         No goal set · raised so far
                       </Text>
                     )}
+                    {p.deadline ? (
+                      <Text
+                        style={{
+                          color: projectOverdue(p) ? colors.danger : colors.textMuted,
+                          fontSize: 12,
+                          marginTop: 4,
+                        }}
+                      >
+                        {projectOverdue(p) ? "Deadline passed" : "Deadline"}{" "}
+                        {formatProjectDeadline(p.deadline)}
+                      </Text>
+                    ) : null}
                   </View>
                 ))}
                 <View style={[styles.rowBetween, { marginTop: 14 }]}>
@@ -1136,7 +1239,12 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
 
         {tab === "governance" && (
           <View style={{ paddingHorizontal: 20 }}>
-            <Pressable onPress={() => router.push("/governance")} testID="group-governance-btn">
+            {/* Carry the group: governance falls back to the caller's first
+                group otherwise, which is the wrong constitution to read. */}
+            <Pressable
+              onPress={() => router.push(`/governance?groupId=${group.id}`)}
+              testID="group-governance-btn"
+            >
               <Card padding={18}>
                 <View style={styles.rowBetween}>
                   <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
@@ -1156,6 +1264,71 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
                 </View>
               </Card>
             </Pressable>
+
+            {/* Deleting the group. Admins only — the API refuses anyone else —
+                and it says plainly that the records outlive the group, because
+                that is the question anyone about to tap this is asking. */}
+            {isAdmin && (
+              <>
+                <Text
+                  style={{
+                    color: colors.textMuted,
+                    fontSize: 11,
+                    fontWeight: "700",
+                    letterSpacing: 1.2,
+                    marginTop: 22,
+                    marginBottom: 8,
+                  }}
+                >
+                  DANGER ZONE
+                </Text>
+                <Card padding={18}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={[styles.iconSm, { backgroundColor: colors.danger + "1A" }]}>
+                      <Trash2 size={20} color={colors.danger} />
+                    </View>
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15 }}>
+                        Delete this group
+                      </Text>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                        {soloAdmin
+                          ? "Closes the group for everyone"
+                          : "The group's other admins vote on it"}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 19, marginTop: 12 }}>
+                    Records are kept. Contributions, receipts, penalties and statements all
+                    stay in the app and can still be opened from Transactions — deleting the
+                    group only closes it, it never erases what happened in it.
+                  </Text>
+                  {(group.totalSavings ?? 0) > 0 || (group.loanCirculation ?? 0) > 0 ? (
+                    <Text style={{ color: colors.warning, fontSize: 12, lineHeight: 19, marginTop: 10 }}>
+                      The group still holds money. Share out and settle any open loans first —
+                      it cannot be deleted while savings or loans are still in it.
+                    </Text>
+                  ) : null}
+                  <View style={{ marginTop: 14 }}>
+                    <Button
+                      label={
+                        deletionPending
+                          ? "Deletion awaiting votes"
+                          : soloAdmin
+                            ? "Delete group"
+                            : "Propose deletion"
+                      }
+                      variant="danger"
+                      size="md"
+                      loading={deletingGroup}
+                      disabled={deletingGroup || deletionPending}
+                      onPress={() => onDeleteGroup(group.name, soloAdmin)}
+                      testID="group-delete-btn"
+                    />
+                  </View>
+                </Card>
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -1634,7 +1807,7 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
                   marginTop: 16,
                 }}
               >
-                Group locked
+                {awaitingFirstPayment ? "Not active yet" : "Group locked"}
               </Text>
               <Text
                 style={{
@@ -1646,18 +1819,50 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
                   lineHeight: 21,
                 }}
               >
-                {canPayFee
-                  ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
-                  : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}
+                {awaitingFirstPayment
+                  ? canPayFee
+                    ? `${group.name} opens once its ${formatZMW(amountOwed)} registration fee is received. Nothing can be added or contributed until then.`
+                    : "This group has not started yet — its registration fee is still being confirmed. Please check back soon."
+                  : canPayFee
+                    ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
+                    : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}
               </Text>
               {canPayFee && (
                 <View style={{ marginTop: 24 }}>
                   <Button
-                    label={`Pay ${formatZMW(amountOwed)} now`}
+                    label={
+                      awaitingFirstPayment
+                        ? `Pay ${formatZMW(amountOwed)} registration fee`
+                        : `Pay ${formatZMW(amountOwed)} now`
+                    }
                     onPress={() => router.push(`/group-fee?groupId=${group.id}`)}
                     testID="group-pay-fee-btn"
                   />
                 </View>
+              )}
+              {/* The other way out. A group created by mistake, or one whose
+                  fee is never going to be paid, is otherwise a locked screen
+                  the founder can do nothing with — and this overlay is the
+                  only screen they can reach inside it. */}
+              {isAdmin && (
+                <Pressable
+                  onPress={() => onDeleteGroup(group.name, soloAdmin)}
+                  disabled={deletingGroup || deletionPending}
+                  style={{ marginTop: 18, paddingVertical: 10, paddingHorizontal: 16 }}
+                  testID="group-delete-locked-btn"
+                >
+                  <Text
+                    style={{
+                      color: "rgba(255,255,255,0.85)",
+                      fontSize: 14,
+                      fontWeight: "700",
+                      textDecorationLine: "underline",
+                      opacity: deletingGroup || deletionPending ? 0.5 : 1,
+                    }}
+                  >
+                    {deletionPending ? "Deletion awaiting votes" : "Delete this group"}
+                  </Text>
+                </Pressable>
               )}
             </View>
           </View>

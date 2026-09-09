@@ -27,11 +27,21 @@ export function getAmountOwed(group: Group): number {
   return getMonthsOwed(group) * (group.monthlyFee ?? 0);
 }
 
+/** A brand-new group whose registration fee has not settled yet. */
+export function isAwaitingFirstPayment(group: Group): boolean {
+  return group.status === "pending-payment";
+}
+
 export function getGraceInfo(group: Group): {
-  status: "paid" | "grace" | "locked";
+  status: "paid" | "grace" | "locked" | "pending-payment";
   daysIntoGrace: number;
   daysLeft: number;
 } {
+  // Not a lapsed fee — a group that has not started. Reported separately so
+  // screens can say "waiting for payment" instead of "your fee is overdue".
+  if (isAwaitingFirstPayment(group)) {
+    return { status: "pending-payment", daysIntoGrace: 0, daysLeft: 0 };
+  }
   if (!group.feePaidThrough || !group.monthlyFee) {
     return { status: "paid", daysIntoGrace: 0, daysLeft: GRACE_PERIOD_DAYS };
   }
@@ -54,8 +64,11 @@ export function getGraceInfo(group: Group): {
   return { status: "locked", daysIntoGrace: GRACE_PERIOD_DAYS, daysLeft: 0 };
 }
 
+// Locked covers both reasons a group cannot be used: the fee lapsed past its
+// grace window, or it never started because the first fee has not settled.
 export function isGroupLocked(group: Group): boolean {
-  return getGraceInfo(group).status === "locked";
+  const { status } = getGraceInfo(group);
+  return status === "locked" || status === "pending-payment";
 }
 
 export function advancePaidThrough(group: Group, monthsPaid: number): string {

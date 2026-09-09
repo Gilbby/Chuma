@@ -65,7 +65,12 @@ export default function Groups() {
       // Invitations come from the groups themselves, not from notifications:
       // reading or clearing a notification must never make an invitation
       // disappear. Only accepting or declining removes one.
-      const [g, inv] = await Promise.all([getGroups(), getMyInvites()]);
+      // Include groups whose registration fee has not landed — this is the one
+      // screen where the founder can see that and go finish the payment.
+      const [g, inv] = await Promise.all([
+        getGroups({ includePending: true }),
+        getMyInvites(),
+      ]);
       setGroups(g);
       setInvites(inv);
     } catch (e) {
@@ -260,13 +265,21 @@ export default function Groups() {
                       <Text style={[styles.groupName, { color: colors.textMain }]} numberOfLines={1}>
                         {g.name}
                       </Text>
+                      {/* A group whose registration fee has not landed cannot
+                          be used at all — say so here rather than let the card
+                          read like any other group. */}
                       <Text
-                        style={[styles.groupSub, { color: colors.textMuted }]}
+                        style={[
+                          styles.groupSub,
+                          { color: g.status === "pending-payment" ? colors.warning : colors.textMuted },
+                        ]}
                         numberOfLines={1}
                       >
-                        {isProjectFundType(g.groupType)
-                          ? projectSubtitle(g)
-                          : `${g.contributionFrequency} · ${formatZMW(g.contributionAmount)}`}
+                        {g.status === "pending-payment"
+                          ? "Awaiting registration fee — tap to finish"
+                          : isProjectFundType(g.groupType)
+                            ? projectSubtitle(g)
+                            : `${g.contributionFrequency} · ${formatZMW(g.contributionAmount)}`}
                       </Text>
                     </View>
                   </View>

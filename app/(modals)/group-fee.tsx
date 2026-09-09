@@ -66,8 +66,15 @@ export default function GroupFeeScreen() {
     }
   }, [paid, navigation]);
 
-  const monthsOwed = group?.feeStatus?.monthsOwed ?? (group ? getMonthsOwed(group) : 0);
-  const amountOwed = group?.feeStatus?.amountOwed ?? (group ? getAmountOwed(group) : 0);
+  // A group still waiting on its registration fee owes exactly month 1, even
+  // though feePaidThrough was stamped at creation and so reads as nothing owed.
+  const awaitingFirstPayment = group?.status === "pending-payment";
+  const monthsOwed = awaitingFirstPayment
+    ? 1
+    : (group?.feeStatus?.monthsOwed ?? (group ? getMonthsOwed(group) : 0));
+  const amountOwed = awaitingFirstPayment
+    ? (group?.monthlyFee ?? group?.registrationFee ?? 0)
+    : (group?.feeStatus?.amountOwed ?? (group ? getAmountOwed(group) : 0));
   const account = detectNetwork(me?.phone ?? "");
 
   if (loading) {
@@ -307,7 +314,9 @@ export default function GroupFeeScreen() {
           <Text style={[styles.overline, { color: colors.textMuted }]}>AMOUNT DUE</Text>
           <Text style={[styles.amount, { color: colors.textMain }]}>{formatZMW(amountOwed)}</Text>
           <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 4 }}>
-            {monthsOwed} month{monthsOwed === 1 ? "" : "s"} × {formatZMW(group.monthlyFee ?? 100)}
+            {awaitingFirstPayment
+              ? "Registration fee — month 1"
+              : `${monthsOwed} month${monthsOwed === 1 ? "" : "s"} × ${formatZMW(group.monthlyFee ?? 100)}`}
           </Text>
         </Card>
 

@@ -13,6 +13,7 @@ import {
   Platform,
   Image,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -22,13 +23,14 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { createGroup, inviteMember } from "@/src/services/groups";
+import { createGroup, inviteMember, getGroupById } from "@/src/services/groups";
 import { defaultTiersForCycle, tierBandLabel } from "@/src/services/loans";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, Camera, X, CreditCard, Contact, Plus } from "lucide-react-native";
+import { Check, Camera, X, CreditCard, Contact, Plus, Calendar } from "lucide-react-native";
 import Slider from "@react-native-community/slider";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { isProjectFundType } from "@/src/types";
 import type { GroupType, GroupConstitution, LoanRepaymentTier } from "@/src/types";
 
@@ -132,10 +134,16 @@ export default function CreateGroup() {
   // Step 2 (project-fund types) — the projects the group is raising money for.
   // One blank row to start: at least one project must be named before the group
   // can be created, because every contribution has to be given toward one.
-  const [projects, setProjects] = useState<{ key: string; name: string; target: string }[]>(
-    [{ key: "p0", name: "", target: "" }]
+  // `deadline` is an ISO yyyy-mm-dd string, or "" for "no deadline" — most
+  // church projects simply collect until it's enough, but some (a conference,
+  // a roof before the rains) have a real date to hit.
+  type ProjectRow = { key: string; name: string; target: string; deadline: string };
+  const [projects, setProjects] = useState<ProjectRow[]>(
+    [{ key: "p0", name: "", target: "", deadline: "" }]
   );
   const projectKeyRef = useRef(1);
+  // Which project row currently has the date picker open (its key), if any.
+  const [deadlinePickerFor, setDeadlinePickerFor] = useState<string | null>(null);
 
   // Step 3 — Loan Rules
   const [internalLending, setInternalLending] = useState(true);
@@ -187,6 +195,15 @@ export default function CreateGroup() {
   // new group id after creation
   const [newGroupId, setNewGroupId] = useState("");
 
+  // The API creates the group the moment PawaPay *accepts* the fee request —
+  // which is before the founder has entered their mobile-money PIN. Until the
+  // deposit actually completes the group sits at status "pending-payment" and
+  // refuses every action, so step 7 waits here rather than claiming success.
+  //   waiting → PIN prompt is on their phone, we are polling
+  //   active  → fee settled, the group is usable
+  //   timeout → still pending after POLL_LIMIT; they can retry from the group
+  const [feeState, setFeeState] = useState<"waiting" | "active" | "timeout">("waiting");
+
   //  Helpers 
 
   const toNum = (s: string) => parseFloat(s) || 0;
@@ -207,6 +224,38 @@ export default function CreateGroup() {
     }
     setRepaymentTiers(defaultTiersForCycle(cycleMonths));
   }, [cycleMonths]);
+
+  // Poll the new group until its registration fee settles. The PawaPay callback
+  // lands on the API a few seconds after the founder confirms the PIN, and the
+  // group flips from "pending-payment" to "active" there — GET /groups/:id is
+  // one of the two routes a pending group still answers.
+  useEffect(() => {
+    if (step !== 7 || !newGroupId || feeState !== "waiting") return;
+    const POLL_MS = 4000;
+    const POLL_LIMIT = 38; // ~2.5 minutes — longer than any PIN prompt lives
+    let tries = 0;
+    let cancelled = false;
+
+    const timer = setInterval(async () => {
+      tries += 1;
+      try {
+        const g = await getGroupById(newGroupId);
+        if (cancelled) return;
+        if (g && g.status !== "pending-payment") {
+          setFeeState("active");
+          return;
+        }
+      } catch {
+        // A dropped request is not an answer — keep waiting for the next tick.
+      }
+      if (!cancelled && tries >= POLL_LIMIT) setFeeState("timeout");
+    }, POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [step, newGroupId, feeState]);
 
   // Guards direct navigation (deep link) into a 6-step wizard that would only
   // 403 at the payment step — the Groups + button already checks this first.
@@ -312,10 +361,10 @@ export default function CreateGroup() {
     setProjects((prev) =>
       prev.length >= MAX_PROJECTS
         ? prev
-        : [...prev, { key: `p${projectKeyRef.current++}`, name: "", target: "" }]
+        : [...prev, { key: `p${projectKeyRef.current++}`, name: "", target: "", deadline: "" }]
     );
 
-  const updateProject = (key: string, patch: { name?: string; target?: string }) => {
+  const updateProject = (key: string, patch: Partial<Omit<ProjectRow, "key">>) => {
     setProjects((prev) => prev.map((p) => (p.key === key ? { ...p, ...patch } : p)));
     clearErr(`project-${key}`);
     clearErr("projects");
@@ -325,6 +374,39 @@ export default function CreateGroup() {
   // one project, so there is always a row to type into.
   const removeProjectRow = (key: string) =>
     setProjects((prev) => (prev.length <= 1 ? prev : prev.filter((p) => p.key !== key)));
+
+  // ── Project deadlines ───────────────────────────────────────────────────────
+  // Stored as yyyy-mm-dd built from the LOCAL date parts, never toISOString():
+  // in a UTC+2 zone that would roll an evening pick back to the previous day.
+  const toISODate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")}`;
+
+  const parseISODate = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  };
+
+  const formatDeadline = (iso: string) =>
+    parseISODate(iso).toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+  const startOfToday = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  // `onValueChange` fires with the picked date and `onDismiss` when the dialog
+  // is cancelled — both unmount the picker so the next tap reopens it.
+  const onDeadlinePicked = (key: string, date: Date) => {
+    setDeadlinePickerFor(null);
+    updateProject(key, { deadline: toISODate(date) });
+  };
 
   const namedProjects = projects.filter((p) => p.name.trim());
 
@@ -345,7 +427,7 @@ export default function CreateGroup() {
         const name = p.name.trim();
         const target = p.target.trim();
         if (!name) {
-          if (target) e[`project-${p.key}`] = "Name this project";
+          if (target || p.deadline) e[`project-${p.key}`] = "Name this project";
           continue;
         }
         if (seen.has(name.toLowerCase())) {
@@ -355,6 +437,8 @@ export default function CreateGroup() {
         seen.add(name.toLowerCase());
         if (target && toNum(target) <= 0)
           e[`project-${p.key}`] = "Goal must be more than 0, or leave it blank";
+        else if (p.deadline && parseISODate(p.deadline) < startOfToday())
+          e[`project-${p.key}`] = "The deadline has already passed";
       }
     }
     if (step === 2 && !isProjectFund) {
@@ -517,6 +601,7 @@ export default function CreateGroup() {
           ? namedProjects.map((p) => ({
               name: p.name.trim(),
               targetAmount: toNum(p.target) > 0 ? toNum(p.target) : null,
+              deadline: p.deadline || null,
             }))
           : undefined,
         constitution,
@@ -528,6 +613,9 @@ export default function CreateGroup() {
       const res = await createGroup(payload);
       const newId = String(res.group._id);
       setNewGroupId(newId);
+      // Simulated/cash payments settle inline and come back already active;
+      // a real deposit comes back pending and the poll below takes over.
+      setFeeState(res.group.status === "pending-payment" ? "waiting" : "active");
       setStep(7);
     } catch (e: any) {
       Alert.alert("Could not create group", e?.message || "Please try again.");
@@ -543,7 +631,7 @@ export default function CreateGroup() {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-invite-screen">
         <ScreenHeader title="Invite members" onBack={() => setShowInvite(false)} />
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 24 }}>
                 Invite people to {groupName} by phone number. They&apos;ll get an SMS and see the invite in their app.
@@ -630,14 +718,44 @@ export default function CreateGroup() {
 
   if (step === 7) {
     const typeLabel = GROUP_TYPES.find((t) => t.value === groupType)?.label ?? "";
+    const settled = feeState === "active";
+    const network = networkKnown ? payerAccount.network : "Mobile money";
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-success">
         <View style={styles.successWrap}>
-          <View style={[styles.successCircle, { backgroundColor: colors.primary }]}>
-            <Check size={56} color="#fff" strokeWidth={3} />
+          <View
+            style={[
+              styles.successCircle,
+              { backgroundColor: settled ? colors.primary : colors.primarySoft },
+            ]}
+          >
+            {settled ? (
+              <Check size={56} color="#fff" strokeWidth={3} />
+            ) : (
+              <ActivityIndicator size="large" color={colors.primary} />
+            )}
           </View>
-          <Text style={[styles.successTitle, { color: colors.textMain }]}>Group created</Text>
+          <Text style={[styles.successTitle, { color: colors.textMain }]}>
+            {settled ? "Group created" : "Confirm the payment"}
+          </Text>
           <Text style={[styles.successSub, { color: colors.textMuted }]}>{groupName}</Text>
+
+          {!settled && (
+            <Text
+              style={{
+                color: colors.textMuted,
+                fontSize: 14,
+                lineHeight: 21,
+                textAlign: "center",
+                paddingHorizontal: 32,
+                marginTop: 12,
+              }}
+            >
+              {feeState === "timeout"
+                ? `We haven't received the K100.00 registration fee yet. ${groupName} stays closed until it arrives — open it from Groups to try the payment again.`
+                : `Enter your ${network} PIN on your phone to pay the K100.00 registration fee. ${groupName} opens as soon as it goes through.`}
+            </Text>
+          )}
 
           <View style={{ width: "100%", paddingHorizontal: 24, marginTop: 28 }}>
             <Card padding={18}>
@@ -658,7 +776,13 @@ export default function CreateGroup() {
               )}
               <RRow
                 label="Registration fee"
-                value={`K100.00 paid · ${networkKnown ? payerAccount.network : "Mobile money"}`}
+                value={
+                  settled
+                    ? `K100.00 paid · ${network}`
+                    : feeState === "timeout"
+                      ? `K100.00 not received · ${network}`
+                      : `K100.00 awaiting your PIN · ${network}`
+                }
                 colors={colors}
                 last
               />
@@ -666,19 +790,32 @@ export default function CreateGroup() {
           </View>
 
           <View style={{ flex: 1 }} />
+          {/* Nothing can be done inside a group whose fee has not landed — the
+              API refuses it — so the actions only appear once it is active. */}
           <View style={{ width: "100%", paddingHorizontal: 24 }}>
-            <Button
-              label="Invite members"
-              onPress={() => setShowInvite(true)}
-              testID="create-group-invite-btn"
-            />
-            <View style={{ height: 10 }} />
-            <Button
-              label="Go to group dashboard"
-              variant="ghost"
-              onPress={() => router.replace(`/group/${newGroupId}`)}
-              testID="create-group-open-btn"
-            />
+            {settled ? (
+              <>
+                <Button
+                  label="Invite members"
+                  onPress={() => setShowInvite(true)}
+                  testID="create-group-invite-btn"
+                />
+                <View style={{ height: 10 }} />
+                <Button
+                  label="Go to group dashboard"
+                  variant="ghost"
+                  onPress={() => router.replace(`/group/${newGroupId}`)}
+                  testID="create-group-open-btn"
+                />
+              </>
+            ) : (
+              <Button
+                label="Done"
+                variant="ghost"
+                onPress={() => router.replace("/(tabs)/groups")}
+                testID="create-group-close-btn"
+              />
+            )}
           </View>
         </View>
       </SafeAreaView>
@@ -717,7 +854,7 @@ export default function CreateGroup() {
       </View>
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             {/* ─── STEP 1 — Group Basics ──────────────────────────────────────── */}
@@ -753,9 +890,8 @@ export default function CreateGroup() {
                 {errors.groupType ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.groupType}</Text> : null}
                 {isProjectFund ? (
                   <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>
-                    Members give what they choose, whenever they choose, toward a project you
-                    name. There is no set amount, no deadline, no late penalty, no loans and no
-                    share-out. You&apos;ll add the first project next.
+                    Members can give whatever they choose, whenever they choose, either toward a
+                    specific project you name or toward the church&rsquo;s general savings.
                   </Text>
                 ) : groupType && !lendingAvailable ? (
                   <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>
@@ -795,9 +931,8 @@ export default function CreateGroup() {
             {/* ─── STEP 2a — Savings projects (project-fund types) ────────────── */}
             {step === 2 && isProjectFund && (
               <>
-                <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 20 }}>
-                  Name what the group is raising money for. Members pick one of these every
-                  time they give, so the money is always traceable to what it was given for.
+                <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21, marginBottom: 18 }}>
+                  Add at least one project this group is saving for.
                 </Text>
 
                 {projects.map((p, i) => {
@@ -856,11 +991,64 @@ export default function CreateGroup() {
                           testID={`project-target-${i}`}
                         />
                       </View>
+
+                      {/* Optional deadline — a date some projects genuinely
+                          need (a conference, a roof before the rains) and most
+                          do not. Tapping the date again lets it be cleared. */}
+                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
+                        <Pressable
+                          onPress={() => setDeadlinePickerFor(p.key)}
+                          style={[
+                            styles.deadlineBtn,
+                            {
+                              backgroundColor: colors.surface,
+                              borderColor: err ? colors.danger : colors.border,
+                            },
+                          ]}
+                          testID={`project-deadline-${i}`}
+                        >
+                          <Calendar size={16} color={p.deadline ? colors.primary : colors.textMuted} />
+                          <Text
+                            style={{
+                              color: p.deadline ? colors.textMain : colors.textMuted,
+                              fontSize: 15,
+                              marginLeft: 10,
+                              flex: 1,
+                            }}
+                            numberOfLines={1}
+                          >
+                            {p.deadline ? formatDeadline(p.deadline) : "Deadline (optional)"}
+                          </Text>
+                        </Pressable>
+                        {p.deadline ? (
+                          <Pressable
+                            onPress={() => updateProject(p.key, { deadline: "" })}
+                            hitSlop={10}
+                            style={{ paddingLeft: 12 }}
+                            testID={`clear-project-deadline-${i}`}
+                          >
+                            <X size={16} color={colors.textMuted} />
+                          </Pressable>
+                        ) : null}
+                      </View>
+
+                      {deadlinePickerFor === p.key && (
+                        <DateTimePicker
+                          value={p.deadline ? parseISODate(p.deadline) : startOfToday()}
+                          mode="date"
+                          minimumDate={startOfToday()}
+                          display={Platform.OS === "ios" ? "spinner" : "default"}
+                          onValueChange={(_e, date) => onDeadlinePicked(p.key, date)}
+                          onDismiss={() => setDeadlinePickerFor(null)}
+                        />
+                      )}
+
                       {err ? (
                         <Text style={[styles.errText, { color: colors.danger }]}>{err}</Text>
                       ) : (
                         <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 6 }]}>
-                          Leave the goal blank if you are simply collecting until it&apos;s enough.
+                          Leave the goal and deadline blank if you are simply collecting until
+                          it&apos;s enough.
                         </Text>
                       )}
                     </View>
@@ -1365,9 +1553,14 @@ export default function CreateGroup() {
                       <RRow
                         key={p.key}
                         label={p.name.trim()}
-                        value={
-                          toNum(p.target) > 0 ? `Goal ${formatZMW(toNum(p.target))}` : "No goal set"
-                        }
+                        value={[
+                          toNum(p.target) > 0
+                            ? `Goal ${formatZMW(toNum(p.target))}`
+                            : "No goal set",
+                          p.deadline ? `by ${formatDeadline(p.deadline)}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                         colors={colors}
                         last={i === namedProjects.length - 1}
                       />
@@ -1774,6 +1967,15 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderStyle: "dashed",
+  },
+  deadlineBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   avatarWrap: { alignSelf: "flex-start" },
   avatarImg: { width: 88, height: 88, borderRadius: 44 },
