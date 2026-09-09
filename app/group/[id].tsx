@@ -378,13 +378,21 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
   const canAddProject = isProjectFund && effectiveRole === "Chairperson";
 
   // A tab arriving in the URL can name one this group's type does not offer:
-  // "projects" belongs to a project fund, "loans" to everything else. Falling
-  // back here beats rendering a body with no matching tab in the bar.
+  // "projects" belongs to a project fund, "loans" and "contributions" to
+  // everything else. Falling back here beats rendering a body with no matching
+  // tab in the bar.
+  //
+  // A project fund has no Giving tab of its own: giving IS the projects, so the
+  // list of them and the button to give toward one belong on the same tab. A
+  // link still pointing at "contributions" lands there rather than nowhere.
   const tab: TabKey =
     (rawTab === "projects" && !isProjectFund) ||
-    (rawTab === "loans" && isProjectFund)
+    (rawTab === "loans" && isProjectFund) ||
+    (rawTab === "approvals" && !isAdmin)
       ? "members"
-      : rawTab;
+      : rawTab === "contributions" && isProjectFund
+        ? "projects"
+        : rawTab;
 
   const paidCount = cycleStatus.filter((c) => c.status === "paid").length;
   const overdueCount = cycleStatus.filter((c) => c.status === "overdue").length;
@@ -526,7 +534,6 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
             ? ([
                 { k: "members", label: "Members" },
                 { k: "projects", label: "Projects" },
-                { k: "contributions", label: "Giving" },
                 { k: "approvals", label: "Approvals" },
                 { k: "reports", label: "Reports" },
                 { k: "governance", label: "Governance" },
@@ -539,7 +546,13 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
                 { k: "reports", label: "Reports" },
                 { k: "governance", label: "Governance" },
               ] as { k: TabKey; label: string }[])
-          ).map((t) => {
+          )
+            // Voting is an admin duty — the API refuses a member's vote outright
+            // ("Only group admins can vote on approvals"), so a member opening
+            // this tab could only watch. Showing it offered a decision they were
+            // never able to make.
+            .filter((t) => t.k !== "approvals" || isAdmin)
+            .map((t) => {
             const active = tab === t.k;
             return (
               <Pressable
@@ -800,46 +813,6 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
               }
               testID="group-give-btn"
             />
-          </View>
-        )}
-
-        {tab === "contributions" && isProjectFund && (
-          <View style={{ paddingHorizontal: 20 }}>
-            <Button
-              label="Give toward a project"
-              onPress={() =>
-                router.push({ pathname: "/contribute", params: { groupId: id } })
-              }
-              testID="group-contribute-btn"
-            />
-            <View style={{ height: 16 }} />
-            <Card padding={16}>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                RECENT GIVING
-              </Text>
-              {groupTxn.filter((t) => t.type === "contribution").length === 0 ? (
-                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
-                  Nothing given yet.
-                </Text>
-              ) : (
-                groupTxn
-                  .filter((t) => t.type === "contribution")
-                  .slice(0, 10)
-                  .map((t) => (
-                    <View key={t.id} style={[styles.contribRow, { borderBottomColor: colors.border }]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>
-                          {t.note ?? "Contribution"}
-                        </Text>
-                        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{t.date}</Text>
-                      </View>
-                      <Text style={{ color: colors.textMain, fontWeight: "700" }}>
-                        {formatZMW(t.amount)}
-                      </Text>
-                    </View>
-                  ))
-              )}
-            </Card>
           </View>
         )}
 
