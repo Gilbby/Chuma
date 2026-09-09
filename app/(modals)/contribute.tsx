@@ -387,7 +387,7 @@ export default function Contribute() {
                 </View>
                 {isProjectFund ? (
                   <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 6 }}>
-                    Give whatever you choose — there is no set amount in {selectedGroup.name}.
+                    Give whatever you choose. There is no set amount in {selectedGroup.name}.
                   </Text>
                 ) : base > 0 ? (
                   <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 6 }}>

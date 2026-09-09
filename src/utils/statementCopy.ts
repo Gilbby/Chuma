@@ -65,7 +65,7 @@ const COPY: Record<StatementFlavour, StatementCopy> = {
     footnote:
       "Your savings balance counts contributions and share-outs only. Loans, repayments, penalties and fees are real money and show in your activity, but they do not change your stake. Tap any line for its receipt.",
     footnotePdf:
-      "This is an official Chuma statement. The balance shown is your savings stake in the group — contributions and share-outs only. Loans, repayments, penalties and fees are real money and are listed under activity, but they do not change your stake.",
+      "This is an official Chuma statement. The balance shown is your savings stake in the group: contributions and share-outs only. Loans, repayments, penalties and fees are real money and are listed under activity, but they do not change your stake.",
     fileStem: "Chuma-Statement",
   },
   "project-fund": {
@@ -87,7 +87,7 @@ const COPY: Record<StatementFlavour, StatementCopy> = {
       combined: "Payment",
     },
     footnote:
-      "This total is what you have given, not a balance you can draw on — a project fund is never shared out. Fees and penalties show in your activity, but they do not count as giving. Tap any line for its receipt.",
+      "This total is what you have given, not a balance you can draw on, because a project fund is never shared out. Fees and penalties show in your activity, but they do not count as giving. Tap any line for its receipt.",
     footnotePdf:
       "This is an official Chuma statement. The total shown is what this member has given toward the group's projects. A project fund is not repaid and is never shared out, so nothing here is a claim on the group. Fees are real money and are listed under activity, but they do not count as giving.",
     fileStem: "Chuma-Giving-Statement",

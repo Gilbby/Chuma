@@ -64,7 +64,7 @@ export function ShareOutRunRow({
             {`${run.memberCount} member${run.memberCount === 1 ? "" : "s"} · ${
               run.closed
                 ? formatRunDate(run.completedAt) || formatRunDate(run.startedAt)
-                : `${run.totals.paid} of ${run.totals.count} paid — in progress`
+                : `${run.totals.paid} of ${run.totals.count} paid, in progress`
             }`}
           </Text>
         </View>

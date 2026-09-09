@@ -186,7 +186,7 @@ export default function ShareOutRunScreen() {
                     {`${run.method === "manual" ? "Paid by the group" : "Mobile money"} · ${
                       run.closed
                         ? `Closed${dateLabel ? ` ${dateLabel}` : ""}`
-                        : `${run.totals.paid} of ${run.totals.count} paid — in progress`
+                        : `${run.totals.paid} of ${run.totals.count} paid, in progress`
                     }`}
                   </Text>
                 </View>

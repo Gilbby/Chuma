@@ -856,7 +856,7 @@ export default function ShareOutScreen() {
                   icon: HandCoins,
                   title: "Pay members yourselves",
                   blurb:
-                    "Cash, your own mobile money, a bank transfer — however the group agreed. Mark each member paid here as you go.",
+                    "Cash, your own mobile money, a bank transfer, however the group agreed. Mark each member paid here as you go.",
                 },
                 {
                   key: "mobile-money" as const,
@@ -915,7 +915,7 @@ export default function ShareOutScreen() {
                 testID="shareout-method-locked-note"
               >
                 Automatic payouts are paused, so the group pays members directly this
-                time. Nothing is deducted — members take their full share.
+                time. Nothing is deducted. Members take their full share.
               </Text>
             ) : (
               <View style={{ height: 14 }} />
@@ -937,7 +937,7 @@ export default function ShareOutScreen() {
             )}
             <Text style={{ color: colors.textBody, fontSize: 12, flex: 1, lineHeight: 17 }}>
               {payingManually
-                ? "The group pays members directly. Once approved, the treasurer pays each one and marks them paid here — every member gets their receipt as it happens."
+                ? "The group pays members directly. Once approved, the treasurer pays each one and marks them paid here. Every member gets their receipt as it happens."
                 : "Paid through Chuma. Once approved, every member's share goes to their mobile wallet automatically."}
             </Text>
           </View>
