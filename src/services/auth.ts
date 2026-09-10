@@ -2,6 +2,7 @@ import { api } from "./apiClient";
 import { setToken, clearToken } from "@/src/utils/authToken";
 import { setCurrentUser, clearCurrentUser } from "@/src/utils/currentUser";
 import { clearPendingOnboarding } from "@/src/utils/onboarding";
+import { clearGroupDraft } from "@/src/utils/groupDraft";
 
 export async function requestOtp(
   phone: string,
@@ -61,4 +62,7 @@ export async function logout() {
   await clearToken();
   await clearCurrentUser();
   await clearPendingOnboarding();
+  // An unfinished group carries its founder's group name and their officers'
+  // phone numbers — it doesn't stay on the phone for whoever signs in next.
+  await clearGroupDraft();
 }

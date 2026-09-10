@@ -21,7 +21,14 @@ import { Group, Member, isProjectFundType } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
 import { invitedAgo, inviteDisplayName, pendingInvites } from "@/src/utils/invites";
-import { Users, Plus, ChevronRight, Clock } from "lucide-react-native";
+import {
+  clearGroupDraft,
+  draftTitle,
+  loadGroupDraft,
+  savedAgo,
+  type CreateGroupDraft,
+} from "@/src/utils/groupDraft";
+import { Users, Plus, ChevronRight, Clock, FileText } from "lucide-react-native";
 
 export default function Groups() {
   const { colors } = useTheme();
@@ -32,6 +39,9 @@ export default function Groups() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // The half-finished group creation this device has saved, if any. Local to
+  // the phone — nothing has been sent to the API yet.
+  const [draft, setDraft] = useState<CreateGroupDraft | null>(null);
 
   // Founding a group moves money (the month-1 fee), so it needs KYC. Ask for it
   // here rather than at signup — the user now knows why they are being asked.
@@ -41,8 +51,31 @@ export default function Groups() {
       router.push("/kyc?return=create-group" as never);
       return;
     }
+    // The wizard always reopens on the saved draft, so someone who meant to
+    // found a different group needs to be asked rather than dropped back into
+    // the old one.
+    if (draft) {
+      Alert.alert(
+        "Unfinished group",
+        `You were part-way through setting up ${draftTitle(draft)}. Carry on with it, or start a new group instead?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Start new",
+            style: "destructive",
+            onPress: async () => {
+              await clearGroupDraft();
+              setDraft(null);
+              router.push("/(modals)/create-group");
+            },
+          },
+          { text: "Carry on", onPress: () => router.push("/(modals)/create-group") },
+        ]
+      );
+      return;
+    }
     router.push("/(modals)/create-group");
-  }, [router]);
+  }, [router, draft]);
 
   // Invites this user's groups are still waiting on. Derived from the groups
   // themselves on every load, so it cannot be dismissed or swiped away — it
@@ -61,6 +94,10 @@ export default function Groups() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
+    // Read outside the try: the draft lives on this phone, so it must still
+    // show (and still be resumable) when the API is unreachable.
+    const me = await getCurrentUser<{ _id?: string }>();
+    setDraft(await loadGroupDraft(me?._id ? String(me._id) : ""));
     try {
       // Invitations come from the groups themselves, not from notifications:
       // reading or clearing a notification must never make an invitation
@@ -160,6 +197,31 @@ export default function Groups() {
     [load]
   );
 
+  // Discarding throws away typed setup and nothing else — no group exists yet
+  // and no fee has been taken — but it is still unrecoverable, so confirm.
+  const confirmDiscardDraft = useCallback(() => {
+    if (!draft) return;
+    Alert.alert(
+      "Discard this draft?",
+      `The setup you entered for ${draftTitle(draft)} will be deleted. No group was created and nothing was paid, so there is nothing else to undo.`,
+      [
+        { text: "Keep it", style: "cancel" },
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: async () => {
+            await clearGroupDraft();
+            setDraft(null);
+          },
+        },
+      ]
+    );
+  }, [draft]);
+
+  const resumeDraft = useCallback(() => {
+    router.push("/(modals)/create-group");
+  }, [router]);
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
@@ -190,7 +252,19 @@ export default function Groups() {
           <SkeletonGroup count={4} height={120} />
         </View>
       ) : error ? (
-        <ErrorState onRetry={handleRetry} />
+        <>
+          {draft ? (
+            <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+              <DraftCard
+                draft={draft}
+                colors={colors}
+                onResume={resumeDraft}
+                onDiscard={confirmDiscardDraft}
+              />
+            </View>
+          ) : null}
+          <ErrorState onRetry={handleRetry} />
+        </>
       ) : (
       <ScrollView
         contentContainerStyle={styles.content}
@@ -242,6 +316,19 @@ export default function Groups() {
             ))}
           </>
         )}
+        {draft ? (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
+              UNFINISHED GROUP
+            </Text>
+            <DraftCard
+              draft={draft}
+              colors={colors}
+              onResume={resumeDraft}
+              onDiscard={confirmDiscardDraft}
+            />
+          </>
+        ) : null}
         {groups.map((g) => (
           <Pressable
             key={g.id}
@@ -343,6 +430,76 @@ export default function Groups() {
     </SafeAreaView>
   );
 }
+
+/**
+ * A group creation that was never finished.
+ *
+ * The wizard saves itself as it goes, so an app killed in the background (or a
+ * founder who stepped away at the loan-rules step) doesn't cost them the whole
+ * constitution. This is the only place that draft is visible, and the only
+ * place it can be thrown away — the wizard itself just picks it back up.
+ */
+const DraftCard = ({
+  draft,
+  colors,
+  onResume,
+  onDiscard,
+}: {
+  draft: CreateGroupDraft;
+  colors: ReturnType<typeof useTheme>["colors"];
+  onResume: () => void;
+  onDiscard: () => void;
+}) => {
+  const ago = savedAgo(draft.savedAt);
+  return (
+    <Pressable
+      onPress={onResume}
+      style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+      testID="group-draft-card"
+    >
+      <Card padding={14} style={{ marginBottom: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={[styles.inviteIcon, { backgroundColor: colors.warning + "1A" }]}>
+            <FileText size={18} color={colors.warning} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text
+              style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}
+              numberOfLines={1}
+            >
+              {draftTitle(draft)}
+            </Text>
+            <Text
+              style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}
+              numberOfLines={1}
+            >
+              Not created yet · step {draft.displayStep} of {draft.totalSteps}
+              {ago ? ` · saved ${ago}` : ""}
+            </Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+          <Button
+            label="Discard"
+            variant="outline"
+            size="sm"
+            fullWidth={false}
+            onPress={onDiscard}
+            testID="group-draft-discard"
+          />
+          <Button
+            label="Carry on"
+            variant="primary"
+            size="sm"
+            fullWidth={false}
+            onPress={onResume}
+            testID="group-draft-resume"
+          />
+        </View>
+      </Card>
+    </Pressable>
+  );
+};
 
 /**
  * The people this group invited who still haven't answered.

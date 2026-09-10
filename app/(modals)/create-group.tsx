@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -26,6 +27,13 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { createGroup, inviteMember, getGroupById } from "@/src/services/groups";
 import { defaultTiersForCycle, tierBandLabel } from "@/src/services/loans";
 import { getCurrentUser } from "@/src/utils/currentUser";
+import {
+  clearGroupDraft,
+  loadGroupDraft,
+  makeGroupDraft,
+  saveGroupDraft,
+  type CreateGroupDraftForm,
+} from "@/src/utils/groupDraft";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X, CreditCard, Contact, Plus, Calendar } from "lucide-react-native";
@@ -114,6 +122,11 @@ export default function CreateGroup() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // The wizard opens blank and is filled in from the saved draft (if there is
+  // one) on mount. Nothing is written back before that has happened, or the
+  // empty initial state would overwrite the very draft being restored.
+  const [hydrated, setHydrated] = useState(false);
+  const [userId, setUserId] = useState("");
   const scrollRef = useRef<ScrollView>(null);
 
   // Step 1 — Group Basics
@@ -121,6 +134,12 @@ export default function CreateGroup() {
   const [groupType, setGroupType] = useState<GroupType | "">("");
   const [groupDesc, setGroupDesc] = useState("");
   const [groupAvatar, setGroupAvatar] = useState<string | null>(null);
+  // Last group type's lending availability, so a type change can reset the
+  // lending switch (see the sync further down). Declared up here because
+  // restoring a draft has to seed it alongside the type it restores.
+  const [prevLendingAvailable, setPrevLendingAvailable] = useState(() =>
+    lendsToMembers(groupType)
+  );
 
   // Step 2 — Contribution Setup
   const [contribFreq, setContribFreq] = useState("Monthly");
@@ -258,10 +277,15 @@ export default function CreateGroup() {
   }, [step, newGroupId, feeState]);
 
   // Guards direct navigation (deep link) into a 6-step wizard that would only
-  // 403 at the payment step — the Groups + button already checks this first.
+  // 403 at the payment step — the Groups + button already checks this first —
+  // then puts back whatever was typed before the app was last closed.
   useEffect(() => {
     (async () => {
-      const user = await getCurrentUser<{ kyc?: { status?: string }; phone?: string }>();
+      const user = await getCurrentUser<{
+        _id?: string;
+        kyc?: { status?: string };
+        phone?: string;
+      }>();
       if (user?.kyc?.status !== "verified") {
         router.replace("/kyc?return=create-group" as never);
         return;
@@ -269,6 +293,70 @@ export default function CreateGroup() {
       // The fee is always charged to the registered number, so the payment step
       // shows that wallet instead of asking them to pick one.
       setPayerPhone(user?.phone ?? "");
+      const uid = String(user?._id ?? "");
+      setUserId(uid);
+
+      const draft = await loadGroupDraft(uid);
+      if (draft) {
+        const f = draft.form;
+        // The cycle-length effect above re-bases the loan tiers whenever the
+        // cycle changes. Restoring a non-default cycle would trip it and throw
+        // away the tiers being restored in the same breath, so put that effect
+        // back into its "first render" state and let it skip this one change.
+        didMountCycleRef.current = false;
+
+        setGroupName(f.groupName ?? "");
+        setGroupType(f.groupType ?? "");
+        setGroupDesc(f.groupDesc ?? "");
+        setGroupAvatar(f.groupAvatar ?? null);
+
+        setContribFreq(f.contribFreq ?? "Monthly");
+        setContribAmount(f.contribAmount ?? "");
+        setCycleDuration(f.cycleDuration ?? "6 months");
+        setDeadlineDay(f.deadlineDay ?? "1");
+        setDeadlineDow(f.deadlineDow ?? "Mon");
+        setLateContribEnabled(!!f.lateContribEnabled);
+        setLateContributionPenaltyRate(f.lateContributionPenaltyRate ?? "1");
+        setLateContribPenaltyType(f.lateContribPenaltyType ?? "percent");
+        setLateContribFlatAmount(f.lateContribFlatAmount ?? "20");
+
+        // Always leave at least one row: the project step has nothing to type
+        // into without one.
+        const rows = Array.isArray(f.projects) ? f.projects : [];
+        setProjects(rows.length ? rows : [{ key: "p0", name: "", target: "", deadline: "" }]);
+        // Carry on numbering past the highest restored key, so a row added
+        // after the restore can't collide with one that came back.
+        projectKeyRef.current =
+          rows.reduce((max, r) => Math.max(max, parseInt(String(r.key).slice(1)) || 0), 0) + 1;
+
+        setInternalLending(!!f.internalLending);
+        setLoanMultiplier(f.loanMultiplier ?? "2");
+        setLoanInterest(f.loanInterest ?? "5");
+        if (Array.isArray(f.repaymentTiers) && f.repaymentTiers.length) {
+          setRepaymentTiers(f.repaymentTiers);
+        }
+        setLoanFreeWindow(f.loanFreeWindow ?? 1);
+        setGracePeriod(f.gracePeriod ?? "0");
+        setLateRepayEnabled(!!f.lateRepayEnabled);
+        setLateRepaymentPenaltyRate(f.lateRepaymentPenaltyRate ?? "1");
+        setLateRepayPenaltyType(f.lateRepayPenaltyType ?? "percent");
+        setLateRepayFlatAmount(f.lateRepayFlatAmount ?? "100");
+
+        setTreasurerPhone(f.treasurerPhone ?? "");
+        setSecretaryPhone(f.secretaryPhone ?? "");
+        setApprovalThreshold(f.approvalThreshold ?? "majority");
+        if (f.permissions) setPermissions(f.permissions);
+        setTermsAccepted(!!f.termsAccepted);
+
+        // Keep the lending-availability sync in step with the restored type, so
+        // it doesn't read the change as "the founder just picked a new type"
+        // and reset internalLending on top of what was saved.
+        setPrevLendingAvailable(lendsToMembers(f.groupType ?? ""));
+        // Never restore into the payment/success steps: the fee has not been
+        // taken and the group does not exist yet.
+        setStep(Math.min(Math.max(draft.step || 1, 1), 6));
+      }
+      setHydrated(true);
     })();
   }, [router]);
 
@@ -509,7 +597,6 @@ export default function CreateGroup() {
   // savings-only type clears lending, switching back restores the default.
   // Adjusted during render rather than in an effect so the reset lands in the
   // same pass as the type change instead of causing a second one.
-  const [prevLendingAvailable, setPrevLendingAvailable] = useState(lendingAvailable);
   if (prevLendingAvailable !== lendingAvailable) {
     setPrevLendingAvailable(lendingAvailable);
     setInternalLending(lendingAvailable);
@@ -528,6 +615,114 @@ export default function CreateGroup() {
       })
     );
   };
+
+  // ─── Draft auto-save ────────────────────────────────────────────────────────
+  // Six steps of constitution is too much to retype because Android reclaimed
+  // the app while it sat in the background, so every edit is kept on the device
+  // and restored on the next open. The founder discards it from the Groups tab,
+  // and it is dropped for good the moment the group is actually created.
+
+  const draftForm: CreateGroupDraftForm = {
+    groupName,
+    groupType,
+    groupDesc,
+    groupAvatar,
+    contribFreq,
+    contribAmount,
+    cycleDuration,
+    deadlineDay,
+    deadlineDow,
+    lateContribEnabled,
+    lateContributionPenaltyRate,
+    lateContribPenaltyType,
+    lateContribFlatAmount,
+    projects,
+    internalLending,
+    loanMultiplier,
+    loanInterest,
+    repaymentTiers,
+    loanFreeWindow,
+    gracePeriod,
+    lateRepayEnabled,
+    lateRepaymentPenaltyRate,
+    lateRepayPenaltyType,
+    lateRepayFlatAmount,
+    treasurerPhone,
+    secretaryPhone,
+    approvalThreshold,
+    permissions,
+    termsAccepted,
+  };
+  // One dependency for the whole form: the writes are debounced anyway, so
+  // comparing the serialised snapshot beats 30 effect dependencies.
+  const draftJson = JSON.stringify(draftForm);
+
+  // An untouched step 1 is not a draft — don't put a card on the Groups tab for
+  // someone who opened the wizard and immediately backed out.
+  const draftWorthKeeping =
+    !!groupName.trim() || !!groupType || !!groupDesc.trim() || !!groupAvatar || step > 1;
+
+  // Set once the group exists: from there on it is a real group on the Groups
+  // tab, and a draft of it would only offer to create a second one.
+  const draftClosedRef = useRef(false);
+
+  // Latest snapshot, kept where the background handler can reach it without
+  // waiting for a re-render.
+  const draftStateRef = useRef({
+    form: draftForm,
+    step,
+    totalSteps,
+    displayStep,
+    userId,
+    enabled: false,
+  });
+  const draftEnabled = hydrated && step < 7 && !newGroupId && draftWorthKeeping;
+  useEffect(() => {
+    draftStateRef.current = {
+      form: draftForm,
+      step,
+      totalSteps,
+      displayStep,
+      userId,
+      enabled: draftEnabled,
+    };
+  });
+
+  const flushDraft = useCallback(() => {
+    const d = draftStateRef.current;
+    if (!d.enabled || draftClosedRef.current) return;
+    void saveGroupDraft(
+      makeGroupDraft({
+        userId: d.userId,
+        step: d.step,
+        totalSteps: d.totalSteps,
+        displayStep: d.displayStep,
+        form: d.form,
+      })
+    );
+  }, []);
+
+  // Write half a second after typing stops: not a disk write per keystroke, but
+  // nothing sits unsaved long enough to matter.
+  useEffect(() => {
+    if (!hydrated) return;
+    const t = setTimeout(flushDraft, 500);
+    return () => clearTimeout(t);
+  }, [draftJson, step, hydrated, flushDraft]);
+
+  // Backgrounding is the case this exists for — Android can kill the app from
+  // there without warning — so save immediately rather than wait out a debounce
+  // that is about to be cancelled with the screen.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") flushDraft();
+    });
+    return () => sub.remove();
+  }, [flushDraft]);
+
+  // Backing out of step 1 unmounts the wizard and cancels the debounce above,
+  // so write once more on the way out rather than lose the last edit.
+  useEffect(() => flushDraft, [flushDraft]);
 
   const handleNext = () => {
     if (!validate()) return;
@@ -616,6 +811,10 @@ export default function CreateGroup() {
       // Simulated/cash payments settle inline and come back already active;
       // a real deposit comes back pending and the poll below takes over.
       setFeeState(res.group.status === "pending-payment" ? "waiting" : "active");
+      // A real group now — even while the fee settles it is on the Groups tab,
+      // so the draft has nothing left to restore.
+      draftClosedRef.current = true;
+      await clearGroupDraft();
       setStep(7);
     } catch (e: any) {
       Alert.alert("Could not create group", e?.message || "Please try again.");
