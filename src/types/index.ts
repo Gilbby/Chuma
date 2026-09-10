@@ -123,6 +123,11 @@ export interface Group {
   loanInterestRate: number; // % per month
   loanMaxMultiplier: number; // x of savings
   members: Member[];
+  /** What the signed-in member has put into this group, and how many times.
+   *  Read off their own member row by the service layer, so it is 0 for
+   *  anyone who is not a member of the group. */
+  yourSavings?: number;
+  yourContributions?: number;
   /** Savings projects. Only project-fund types (church) have any — see
    *  isProjectFundType. Always set by the service layer; optional so older
    *  shapes still type. */

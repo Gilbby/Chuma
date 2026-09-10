@@ -53,6 +53,8 @@ function mapGroup(raw: any, currentUserId?: string): Group {
     formerMembers,
     memberCount: members.filter((m: any) => m.status === "active").length,
     yourRole: mine?.role ?? "Member",
+    yourSavings: mine?.savings ?? 0,
+    yourContributions: mine?.contributions ?? 0,
     // keep shareOutDate / nextContributionDate as ISO strings — Hermes date math
     // needs ISO; components format for display. Do NOT reformat here.
   };
@@ -157,6 +159,30 @@ export async function addGroupProject(
       targetAmount: project.targetAmount ?? null,
       deadline: project.deadline ?? null,
     },
+  });
+  return {
+    ...res.project,
+    id: String(res.project._id ?? res.project.id ?? ""),
+    targetAmount: res.project.targetAmount ?? null,
+    deadline: res.project.deadline ?? null,
+    collected: res.project.collected ?? 0,
+    status: res.project.status ?? "active",
+  };
+}
+
+/**
+ * Edit a savings project on a project-fund group (church). Chairperson only.
+ * Only the fields passed are changed; pass `null` for targetAmount / deadline
+ * to clear a goal or a deadline back to "not set".
+ */
+export async function updateGroupProject(
+  groupId: string,
+  projectId: string,
+  patch: { name?: string; targetAmount?: number | null; deadline?: string | null }
+): Promise<GroupProject> {
+  const res = await api<{ project: any }>(`/groups/${groupId}/projects/${projectId}`, {
+    method: "PATCH",
+    body: patch,
   });
   return {
     ...res.project,

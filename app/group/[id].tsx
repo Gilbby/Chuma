@@ -33,6 +33,7 @@ import {
   requestMemberRemoval,
   requestGroupDeletion,
   addGroupProject,
+  updateGroupProject,
 } from "@/src/services/groups";
 import type { Role } from "@/src/types";
 import { getApprovals } from "@/src/services/approvals";
@@ -47,7 +48,16 @@ import {
   pendingInvites,
 } from "@/src/utils/invites";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
-import { Member, Group, Approval, TxnItem, Loan, isProjectFundType } from "@/src/types";
+import {
+  Member,
+  Group,
+  GroupProject,
+  Approval,
+  TxnItem,
+  Loan,
+  isProjectFundType,
+} from "@/src/types";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
 import {
   Users,
@@ -75,6 +85,7 @@ import {
   History,
   Target,
   Trash2,
+  Pencil,
 } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
@@ -106,6 +117,31 @@ const formatProjectDeadline = (iso: string) =>
     year: "numeric",
   });
 
+// The form works in plain "YYYY-MM-DD" days, which is what the API is sent and
+// what it stores (UTC midnight) — so a day never shifts on the way through.
+const toISODay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+
+const parseISODay = (day: string) => {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+const formatISODay = (day: string) =>
+  parseISODay(day).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+const startOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
 const projectOverdue = (p: { deadline?: string | null; status?: string }) => {
   if (!p.deadline || p.status === "completed") return false;
   const today = new Date();
@@ -133,12 +169,17 @@ export default function GroupDetails() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   // true while a group deletion is being requested
   const [deletingGroup, setDeletingGroup] = useState(false);
-  // Add-a-project form (project-fund groups; Chairperson only)
-  const [projectFormOpen, setProjectFormOpen] = useState(false);
+  // Project form (project-fund groups; Chairperson only). One form serves both
+  // adding and editing: `projectFormFor` is null when closed, "new" when adding,
+  // and the project's id when editing that project.
+  const [projectFormFor, setProjectFormFor] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [projectTarget, setProjectTarget] = useState("");
+  // "YYYY-MM-DD", or "" for no deadline.
+  const [projectDeadline, setProjectDeadline] = useState("");
+  const [deadlinePickerOpen, setDeadlinePickerOpen] = useState(false);
   const [projectError, setProjectError] = useState("");
-  const [addingProject, setAddingProject] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
 
   const insets = useSafeAreaInsets();
 
@@ -375,7 +416,36 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
     [id, load, router]
   );
 
-  const onAddProject = useCallback(async () => {
+  const closeProjectForm = useCallback(() => {
+    setProjectFormFor(null);
+    setDeadlinePickerOpen(false);
+    setProjectError("");
+    setProjectName("");
+    setProjectTarget("");
+    setProjectDeadline("");
+  }, []);
+
+  const openAddProject = useCallback(() => {
+    setProjectFormFor("new");
+    setDeadlinePickerOpen(false);
+    setProjectError("");
+    setProjectName("");
+    setProjectTarget("");
+    setProjectDeadline("");
+  }, []);
+
+  // Editing starts from what the project already is, so an untouched field is
+  // saved back exactly as it was.
+  const openEditProject = useCallback((p: GroupProject) => {
+    setProjectFormFor(p.id);
+    setDeadlinePickerOpen(false);
+    setProjectError("");
+    setProjectName(p.name);
+    setProjectTarget(p.targetAmount ? String(p.targetAmount) : "");
+    setProjectDeadline(p.deadline ? String(p.deadline).slice(0, 10) : "");
+  }, []);
+
+  const onSaveProject = useCallback(async () => {
     const name = projectName.trim();
     if (!name) {
       setProjectError("Give the project a name");
@@ -386,20 +456,38 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
       setProjectError("Goal must be more than 0, or leave it blank");
       return;
     }
-    setAddingProject(true);
+    const editingId = projectFormFor && projectFormFor !== "new" ? projectFormFor : null;
+    const fields = {
+      name,
+      targetAmount: target > 0 ? target : null,
+      deadline: projectDeadline || null,
+    };
+    setSavingProject(true);
     setProjectError("");
     try {
-      await addGroupProject(id, { name, targetAmount: target > 0 ? target : null });
-      setProjectName("");
-      setProjectTarget("");
-      setProjectFormOpen(false);
+      if (editingId) await updateGroupProject(id, editingId, fields);
+      else await addGroupProject(id, fields);
+      closeProjectForm();
       await refreshGroup();
     } catch (e: any) {
-      setProjectError(e?.message || "Could not add the project. Please try again.");
+      setProjectError(
+        e?.message ||
+          (editingId
+            ? "Could not save the changes. Please try again."
+            : "Could not add the project. Please try again.")
+      );
     } finally {
-      setAddingProject(false);
+      setSavingProject(false);
     }
-  }, [id, projectName, projectTarget, refreshGroup]);
+  }, [
+    id,
+    projectFormFor,
+    projectName,
+    projectTarget,
+    projectDeadline,
+    closeProjectForm,
+    refreshGroup,
+  ]);
 
   const cycleStatus = useMemo(() =>
     (group?.members ?? []).filter((m: any) => m.status !== "pending").map((m, i) => {
@@ -464,9 +552,24 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
   const projects = group.projects ?? [];
   const activeProjects = projects.filter((p) => p.status === "active");
   const totalRaised = projects.reduce((sum, p) => sum + p.collected, 0);
-  // Opening a project decides what members' money can be given toward, so it
-  // is the Chairperson's call — the API enforces the same.
-  const canAddProject = isProjectFund && effectiveRole === "Chairperson";
+  // Opening a project — and renaming one, or moving its goal or deadline —
+  // decides what members' money can be given toward, so it is the
+  // Chairperson's call. The API enforces the same on both routes.
+  const canManageProjects = isProjectFund && effectiveRole === "Chairperson";
+
+  // Closing a church group ends what the congregation is giving toward, so it
+  // is the Chairperson alone who may start it — a Treasurer or Secretary does
+  // not see the danger zone at all. Every other group type keeps the older
+  // rule, where any admin may propose it and the rest vote.
+  const canDeleteGroup = isProjectFund ? effectiveRole === "Chairperson" : isAdmin;
+
+  // What each person has given to a church group is between them and the
+  // leadership — a congregation reads its neighbours' giving as a ranking, and
+  // it is not what the tab is for. Admins still see every figure, because
+  // reconciling the money is their job. Every other group type is a savings
+  // club where members pool and share out together, so who saved what stays
+  // open to all of them.
+  const canSeeMemberMoney = !isProjectFund || isAdmin;
 
   // A tab arriving in the URL can name one this group's type does not offer:
   // "projects" belongs to a project fund, "loans" and "contributions" to
@@ -509,10 +612,10 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
             >
               <Plus size={18} color="#fff" strokeWidth={2.4} />
             </Pressable>
-          ) : tab === "projects" && canAddProject ? (
+          ) : tab === "projects" && canManageProjects ? (
             <Pressable
               style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}
-              onPress={() => { setProjectFormOpen((v) => !v); setProjectError(""); }}
+              onPress={() => (projectFormFor === "new" ? closeProjectForm() : openAddProject())}
               testID="projects-add-btn"
             >
               <Plus size={18} color="#fff" strokeWidth={2.4} />
@@ -529,17 +632,31 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
         {/* Financial overview */}
         <View style={{ paddingHorizontal: 20 }}>
           <Card padding={20} style={{ backgroundColor: colors.primary, borderColor: colors.primary }}>
+            {/* Their own figure leads: "where do I stand in this group" is what
+                most people open it to find out. The group's total sits under it
+                as context, not as the headline. */}
             <Text style={styles.heroLabel}>
-              {isProjectFund ? "Total raised" : "Total group savings"}
+              {isProjectFund ? "You have given" : "Your savings"}
             </Text>
-            <Text style={styles.heroAmount}>{formatZMW(group.totalSavings)}</Text>
+            <Text style={styles.heroAmount}>{formatZMW(group.yourSavings ?? 0)}</Text>
+            <View style={styles.heroYouRow}>
+              <Text style={styles.heroYouLabel}>
+                {isProjectFund ? "Church total raised" : "Total group savings"}
+              </Text>
+              <Text style={styles.heroYouValue}>{formatZMW(group.totalSavings)}</Text>
+            </View>
             <View style={styles.heroRow}>
-              <HeroStat label="Wallet" value={formatZMW(group.walletBalance, { compact: true })} />
-              <View style={styles.divider} />
+              {/* A church group never lends and holds nothing back for a
+                  share-out, so a wallet figure would only repeat the total
+                  raised. It shows what it is raising for instead. */}
               {isProjectFund ? (
                 <HeroStat label="Projects" value={String(activeProjects.length)} />
               ) : (
-                <HeroStat label="Loans out" value={formatZMW(group.loanCirculation, { compact: true })} />
+                <>
+                  <HeroStat label="Wallet" value={formatZMW(group.walletBalance, { compact: true })} />
+                  <View style={styles.divider} />
+                  <HeroStat label="Loans out" value={formatZMW(group.loanCirculation, { compact: true })} />
+                </>
               )}
               <View style={styles.divider} />
               <HeroStat label="Members" value={String(group.memberCount)} />
@@ -685,6 +802,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                       member={m}
                       colors={colors}
                       removalPending={removalPending.has(String(m.id))}
+                      showMoney={canSeeMemberMoney}
                     />
                   </Pressable>
                   {i < Math.min(arr.length, 12) - 1 && (
@@ -766,7 +884,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 <Card padding={0}>
                   {formerMembers.map((m, i) => (
                     <View key={m.id ?? m.phone ?? String(i)}>
-                      <FormerMemberRow member={m} colors={colors} />
+                      <FormerMemberRow member={m} colors={colors} showMoney={canSeeMemberMoney} />
                       {i < formerMembers.length - 1 && (
                         <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />
                       )}
@@ -785,64 +903,35 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
 
         {tab === "projects" && (
           <View style={{ paddingHorizontal: 20 }}>
-            {projectFormOpen && canAddProject && (
-              <Card padding={16} style={{ marginBottom: 12 }}>
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-                  NEW PROJECT
-                </Text>
-                <TextInput
-                  style={[
-                    styles.projectInput,
-                    {
-                      color: colors.textMain,
-                      backgroundColor: colors.surfaceSecondary,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  value={projectName}
-                  onChangeText={(t) => { setProjectName(t.slice(0, 80)); setProjectError(""); }}
-                  placeholder="e.g. Church building"
-                  placeholderTextColor={colors.textMuted}
-                  testID="project-name-input"
-                />
-                <View style={{ height: 10 }} />
-                <TextInput
-                  style={[
-                    styles.projectInput,
-                    {
-                      color: colors.textMain,
-                      backgroundColor: colors.surfaceSecondary,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  value={projectTarget}
-                  onChangeText={(t) => { setProjectTarget(t.replace(/[^0-9.]/g, "")); setProjectError(""); }}
-                  keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
-                  placeholder="Goal in Kwacha (optional)"
-                  placeholderTextColor={colors.textMuted}
-                  testID="project-target-input"
-                />
-                {projectError ? (
-                  <Text style={{ color: colors.danger, fontSize: 12, marginTop: 8 }}>
-                    {projectError}
-                  </Text>
-                ) : null}
-                <View style={{ height: 12 }} />
-                <Button
-                  label="Add project"
-                  loading={addingProject}
-                  disabled={addingProject}
-                  onPress={onAddProject}
-                  testID="project-submit-btn"
-                />
-              </Card>
+            {/* One form, two jobs: it sits at the top of the tab when adding,
+                and the same fields open in place under the project being
+                edited. Both offer every field a project is created with. */}
+            {projectFormFor === "new" && canManageProjects && (
+              <ProjectForm
+                title="NEW PROJECT"
+                colors={colors}
+                name={projectName}
+                target={projectTarget}
+                deadline={projectDeadline}
+                error={projectError}
+                saving={savingProject}
+                pickerOpen={deadlinePickerOpen}
+                setPickerOpen={setDeadlinePickerOpen}
+                onChangeName={(t) => { setProjectName(t.slice(0, 80)); setProjectError(""); }}
+                onChangeTarget={(t) => { setProjectTarget(t.replace(/[^0-9.]/g, "")); setProjectError(""); }}
+                onChangeDeadline={(d) => { setProjectDeadline(d); setProjectError(""); }}
+                onSubmit={onSaveProject}
+                onCancel={closeProjectForm}
+                submitLabel="Add project"
+                style={{ marginBottom: 12 }}
+              />
             )}
 
             {projects.length === 0 ? (
               <Card padding={20}>
                 <Text style={{ color: colors.textMain, fontWeight: "700" }}>No projects yet</Text>
                 <Text style={{ color: colors.textMuted, marginTop: 6, fontSize: 13, lineHeight: 20 }}>
-                  {canAddProject
+                  {canManageProjects
                     ? "Add what the group is raising money for. Members pick a project every time they give."
                     : "The Chairperson hasn't opened a project yet. Members give toward a named project, so there is nothing to give to right now."}
                 </Text>
@@ -869,6 +958,24 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                       <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
                         {formatZMW(p.collected)}
                       </Text>
+                      {/* An archived project is history — the API refuses to
+                          edit one, so no pencil is offered for it. */}
+                      {canManageProjects && p.status !== "archived" && (
+                        <Pressable
+                          onPress={() =>
+                            projectFormFor === p.id ? closeProjectForm() : openEditProject(p)
+                          }
+                          hitSlop={10}
+                          style={{ paddingLeft: 12 }}
+                          testID={`project-edit-${p.id}`}
+                        >
+                          {projectFormFor === p.id ? (
+                            <X size={16} color={colors.textMuted} />
+                          ) : (
+                            <Pencil size={16} color={colors.primary} />
+                          )}
+                        </Pressable>
+                      )}
                     </View>
                     {p.targetAmount ? (
                       <View style={{ marginTop: 8 }}>
@@ -895,6 +1002,28 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                         {formatProjectDeadline(p.deadline)}
                       </Text>
                     ) : null}
+
+                    {projectFormFor === p.id && canManageProjects && (
+                      <ProjectForm
+                        title="EDIT PROJECT"
+                        colors={colors}
+                        name={projectName}
+                        target={projectTarget}
+                        deadline={projectDeadline}
+                        error={projectError}
+                        saving={savingProject}
+                        pickerOpen={deadlinePickerOpen}
+                        setPickerOpen={setDeadlinePickerOpen}
+                        onChangeName={(t) => { setProjectName(t.slice(0, 80)); setProjectError(""); }}
+                        onChangeTarget={(t) => { setProjectTarget(t.replace(/[^0-9.]/g, "")); setProjectError(""); }}
+                        onChangeDeadline={(d) => { setProjectDeadline(d); setProjectError(""); }}
+                        onSubmit={onSaveProject}
+                        onCancel={closeProjectForm}
+                        submitLabel="Save changes"
+                        bare
+                        style={{ marginTop: 12 }}
+                      />
+                    )}
                   </View>
                 ))}
                 <View style={[styles.rowBetween, { marginTop: 14 }]}>
@@ -906,6 +1035,22 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   </Text>
                 </View>
               </Card>
+            )}
+
+            {/* The header's + does the same thing, but a Chairperson looking at
+                a list of projects looks for the way to add one at the end of
+                that list. Members never see it — the API refuses them too. */}
+            {canManageProjects && projectFormFor !== "new" && (
+              <Pressable
+                onPress={openAddProject}
+                style={[styles.addProjectBtn, { borderColor: colors.primary }]}
+                testID="projects-add-inline-btn"
+              >
+                <Plus size={16} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>
+                  {projects.length === 0 ? "Add a project" : "Add another project"}
+                </Text>
+              </Pressable>
             )}
 
             <View style={{ height: 14 }} />
@@ -1265,10 +1410,11 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               </Card>
             </Pressable>
 
-            {/* Deleting the group. Admins only — the API refuses anyone else —
-                and it says plainly that the records outlive the group, because
-                that is the question anyone about to tap this is asking. */}
-            {isAdmin && (
+            {/* Deleting the group. Admins only — the Chairperson alone in a
+                church group, and the API refuses anyone else either way — and
+                it says plainly that the records outlive the group, because that
+                is the question anyone about to tap this is asking. */}
+            {canDeleteGroup && (
               <>
                 <Text
                   style={{
@@ -1397,32 +1543,38 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   </Pressable>
                 </View>
 
-                {/* Savings */}
-                <Card padding={16} style={{ marginTop: 20 }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
-                    SAVINGS IN THIS GROUP
-                  </Text>
-                  <View style={{ flexDirection: "row", marginTop: 12 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Total saved</Text>
-                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
-                        {formatZMW(selectedMember.savings)}
-                      </Text>
+                {/* The same rule as the members list: in a church group only the
+                    leadership sees what one person has given. */}
+                {canSeeMemberMoney && (
+                  <>
+                  {/* Savings */}
+                  <Card padding={16} style={{ marginTop: 20 }}>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
+                      SAVINGS IN THIS GROUP
+                    </Text>
+                    <View style={{ flexDirection: "row", marginTop: 12 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Total saved</Text>
+                        <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
+                          {formatZMW(selectedMember.savings)}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Contributions</Text>
+                        <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
+                          {selectedMember.contributions}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Active loan</Text>
+                        <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
+                          {selectedMember.loanActive ? formatZMW(selectedMember.loanActive) : "None"}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Contributions</Text>
-                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
-                        {selectedMember.contributions}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}>Active loan</Text>
-                      <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, marginTop: 4 }}>
-                        {selectedMember.loanActive ? formatZMW(selectedMember.loanActive) : "None"}
-                      </Text>
-                    </View>
-                  </View>
-                </Card>
+                  </Card>
+                  </>
+                )}
 
                 {/* Loan progress */}
                 {selectedMember.loanActive != null && selectedMember.loanActive > 0 && (
@@ -1444,42 +1596,48 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   </Card>
                 )}
 
-                {/* Recent activity */}
-                <Card padding={16} style={{ marginTop: 12 }}>
-                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
-                    RECENT ACTIVITY
-                  </Text>
-                  {(() => {
-                    const memberTxns = groupTxn.filter(
-                      (t) => String(t.memberId) === String(selectedMember.userId ?? selectedMember.id)
-                    );
-                    const display = memberTxns.length > 0 ? memberTxns.slice(0, 3) : groupTxn.slice(0, 3);
-                    if (display.length === 0) {
-                      return (
-                        <Text style={{ color: colors.textMuted, marginTop: 10, fontSize: 13 }}>
-                          No recent activity
-                        </Text>
+                {/* Their giving, transaction by transaction — held to the same
+                    rule as the totals above. */}
+                {canSeeMemberMoney && (
+                  <>
+                  {/* Recent activity */}
+                  <Card padding={16} style={{ marginTop: 12 }}>
+                    <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1 }}>
+                      RECENT ACTIVITY
+                    </Text>
+                    {(() => {
+                      const memberTxns = groupTxn.filter(
+                        (t) => String(t.memberId) === String(selectedMember.userId ?? selectedMember.id)
                       );
-                    }
-                    return display.map((t) => (
-                      <View
-                        key={t.id}
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          paddingVertical: 8,
-                          borderBottomWidth: 1,
-                          borderBottomColor: colors.border,
-                        }}
-                      >
-                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t.date}</Text>
-                        <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 13 }}>
-                          {formatZMW(t.amount)}
-                        </Text>
-                      </View>
-                    ));
-                  })()}
-                </Card>
+                      const display = memberTxns.length > 0 ? memberTxns.slice(0, 3) : groupTxn.slice(0, 3);
+                      if (display.length === 0) {
+                        return (
+                          <Text style={{ color: colors.textMuted, marginTop: 10, fontSize: 13 }}>
+                            No recent activity
+                          </Text>
+                        );
+                      }
+                      return display.map((t) => (
+                        <View
+                          key={t.id}
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            paddingVertical: 8,
+                            borderBottomWidth: 1,
+                            borderBottomColor: colors.border,
+                          }}
+                        >
+                          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t.date}</Text>
+                          <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 13 }}>
+                            {formatZMW(t.amount)}
+                          </Text>
+                        </View>
+                      ));
+                    })()}
+                  </Card>
+                  </>
+                )}
 
                 {/* Admin actions */}
                 {group.yourRole !== "Member" && (
@@ -1902,6 +2060,162 @@ const LegendDot = ({
   </View>
 );
 
+/**
+ * The fields a project is made of — name, goal and deadline — used both to add
+ * one and to edit one. The goal and the deadline are optional in the same way
+ * they are at group creation: blank means "no goal set" and "collect for as
+ * long as it takes", and clearing either one later says the same thing.
+ *
+ * `bare` drops the Card wrapper for the in-place edit form, which already sits
+ * inside the projects card.
+ */
+const ProjectForm = ({
+  title,
+  colors,
+  name,
+  target,
+  deadline,
+  error,
+  saving,
+  pickerOpen,
+  setPickerOpen,
+  onChangeName,
+  onChangeTarget,
+  onChangeDeadline,
+  onSubmit,
+  onCancel,
+  submitLabel,
+  bare,
+  style,
+}: {
+  title: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+  name: string;
+  target: string;
+  deadline: string;
+  error: string;
+  saving: boolean;
+  pickerOpen: boolean;
+  setPickerOpen: (open: boolean) => void;
+  onChangeName: (t: string) => void;
+  onChangeTarget: (t: string) => void;
+  onChangeDeadline: (day: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  submitLabel: string;
+  bare?: boolean;
+  style?: any;
+}) => {
+  const inputStyle = {
+    color: colors.textMain,
+    backgroundColor: colors.surfaceSecondary,
+    borderColor: error ? colors.danger : colors.border,
+  };
+
+  const body = (
+    <>
+      <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{title}</Text>
+      <TextInput
+        style={[styles.projectInput, inputStyle]}
+        value={name}
+        onChangeText={onChangeName}
+        placeholder="e.g. Church building"
+        placeholderTextColor={colors.textMuted}
+        testID="project-name-input"
+      />
+      <View style={{ height: 10 }} />
+      <TextInput
+        style={[styles.projectInput, inputStyle]}
+        value={target}
+        onChangeText={onChangeTarget}
+        keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
+        placeholder="Goal in Kwacha (optional)"
+        placeholderTextColor={colors.textMuted}
+        testID="project-target-input"
+      />
+      <View style={{ height: 10 }} />
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <Pressable
+          onPress={() => setPickerOpen(true)}
+          style={[styles.projectInput, styles.projectDeadlineBtn, inputStyle]}
+          testID="project-deadline-input"
+        >
+          <Calendar size={16} color={deadline ? colors.primary : colors.textMuted} />
+          <Text
+            style={{
+              color: deadline ? colors.textMain : colors.textMuted,
+              fontSize: 15,
+              marginLeft: 10,
+              flex: 1,
+            }}
+            numberOfLines={1}
+          >
+            {deadline ? formatISODay(deadline) : "Deadline (optional)"}
+          </Text>
+        </Pressable>
+        {deadline ? (
+          <Pressable
+            onPress={() => onChangeDeadline("")}
+            hitSlop={10}
+            style={{ paddingLeft: 12 }}
+            testID="project-deadline-clear"
+          >
+            <X size={16} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {pickerOpen && (
+        <DateTimePicker
+          value={deadline ? parseISODay(deadline) : startOfToday()}
+          mode="date"
+          minimumDate={startOfToday()}
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onValueChange={(_e: unknown, date: Date) => {
+            setPickerOpen(false);
+            if (date) onChangeDeadline(toISODay(date));
+          }}
+          onDismiss={() => setPickerOpen(false)}
+        />
+      )}
+
+      {error ? (
+        <Text style={{ color: colors.danger, fontSize: 12, marginTop: 8 }}>{error}</Text>
+      ) : (
+        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 18 }}>
+          Leave the goal and deadline blank if the group is simply collecting until
+          it&apos;s enough.
+        </Text>
+      )}
+
+      <View style={{ height: 12 }} />
+      <Button
+        label={submitLabel}
+        loading={saving}
+        disabled={saving}
+        onPress={onSubmit}
+        testID="project-submit-btn"
+      />
+      <Pressable
+        onPress={onCancel}
+        disabled={saving}
+        style={{ paddingVertical: 12, alignItems: "center" }}
+        testID="project-cancel-btn"
+      >
+        <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>Cancel</Text>
+      </Pressable>
+    </>
+  );
+
+  return bare ? (
+    <View style={style}>{body}</View>
+  ) : (
+    <Card padding={16} style={style}>
+      {body}
+    </Card>
+  );
+};
+
 const HeroStat = ({ label, value }: { label: string; value: string }) => (
   <View>
     <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "500", letterSpacing: 0.3 }}>
@@ -1939,11 +2253,14 @@ const MemberRow = ({
   member,
   colors,
   removalPending,
+  showMoney = true,
 }: {
   member: Member;
   colors: ReturnType<typeof useTheme>["colors"];
   /** A removal for this member is waiting on the other admins' votes. */
   removalPending?: boolean;
+  /** False hides what this person has put in — see canSeeMemberMoney. */
+  showMoney?: boolean;
 }) => {
   const roleVariant: "primary" | "warning" | "info" | "neutral" =
     member.role === "Chairperson"
@@ -1960,10 +2277,12 @@ const MemberRow = ({
         <Text style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }} numberOfLines={1}>
           {member.name}
         </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-          {formatZMW(member.savings, { compact: true })} saved
-          {removalPending ? " · removal pending" : ""}
-        </Text>
+        {showMoney ? (
+          <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+            {formatZMW(member.savings, { compact: true })} saved
+            {removalPending ? " · removal pending" : ""}
+          </Text>
+        ) : null}
       </View>
       <StatusBadge
         label={removalPending ? "Removal pending" : member.role}
@@ -1977,9 +2296,12 @@ const MemberRow = ({
 const FormerMemberRow = ({
   member,
   colors,
+  showMoney = true,
 }: {
   member: Member;
   colors: ReturnType<typeof useTheme>["colors"];
+  /** False hides what they put in — see canSeeMemberMoney. */
+  showMoney?: boolean;
 }) => {
   const left = formatDate(member.exitedAt);
   const saved = member.exitSavings ?? 0;
@@ -2005,11 +2327,13 @@ const FormerMemberRow = ({
             {member.phone}
           </Text>
         ) : null}
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-          {formatZMW(saved, { compact: true })} saved · {member.contributions ?? 0}{" "}
-          contribution{(member.contributions ?? 0) === 1 ? "" : "s"}
-          {cleared > 0 ? ` · ${formatZMW(cleared, { compact: true })} to loan` : ""}
-        </Text>
+        {showMoney ? (
+          <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+            {formatZMW(saved, { compact: true })} saved · {member.contributions ?? 0}{" "}
+            contribution{(member.contributions ?? 0) === 1 ? "" : "s"}
+            {cleared > 0 ? ` · ${formatZMW(cleared, { compact: true })} to loan` : ""}
+          </Text>
+        ) : null}
         {left ? (
           <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
             Left {left}
@@ -2125,6 +2449,21 @@ const LoanLine = ({
 const styles = StyleSheet.create({
   heroLabel: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "500", letterSpacing: 0.3 },
   heroAmount: { color: "#fff", fontSize: 30, fontWeight: "700", marginTop: 4, letterSpacing: -0.5 },
+  // The group's total, sitting under the member's own headline figure:
+  // pill-backed so the two never read as one running total.
+  heroYouRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    alignSelf: "flex-start",
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  heroYouLabel: { color: "rgba(255,255,255,0.85)", fontSize: 12, fontWeight: "600" },
+  heroYouValue: { color: "#fff", fontSize: 13, fontWeight: "800", marginLeft: 10 },
   heroRow: { flexDirection: "row", alignItems: "center", marginTop: 16 },
   divider: { width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.18)", marginHorizontal: 14 },
   row: { flexDirection: "row" },
@@ -2164,6 +2503,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 16,
     fontSize: 15,
+  },
+  projectDeadlineBtn: { flex: 1, flexDirection: "row", alignItems: "center" },
+  addProjectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    marginTop: 14,
   },
   contribRow: {
     flexDirection: "row",
