@@ -374,7 +374,7 @@ export async function exportStatementPdf(
     return;
   }
 
-  const copy = statementCopy(flavour);
+  const copy = statementCopy(flavour, statement.scope ?? "member");
   await savePdf(
     html,
     `${copy.fileStem}-${new Date(statement.period.from).toISOString().slice(0, 10)}`,
@@ -386,7 +386,13 @@ function statementHtml(
   s: ReturnType<typeof exportable>,
   flavour: StatementFlavour
 ): string {
-  const copy = statementCopy(flavour);
+  const forGroup = s.scope === "group";
+  const copy = statementCopy(flavour, forGroup ? "group" : "member");
+
+  // A group statement covers one group, so naming it on every row says
+  // nothing — the column the reader needs is WHO paid. A member statement
+  // spanning several groups is the opposite case, and keeps the group.
+  const whoColumn = forGroup ? "Member" : "Group";
 
   const activityRows = s.activity
     .map(
@@ -394,7 +400,7 @@ function statementHtml(
         <tr>
           <td>${fmtDate(a.date)}</td>
           <td>${esc(movementLabel(copy, a))}</td>
-          <td class="muted">${esc(a.groupName)}</td>
+          <td class="muted">${esc(forGroup ? a.memberName ?? "" : a.groupName)}</td>
           <td class="num ${a.direction === "out" ? "neg" : "pos"}">${a.direction === "out" ? "−" : "+"}${formatZMW(a.amount)}</td>
         </tr>`
     )
@@ -436,8 +442,11 @@ function statementHtml(
       <div class="label">${esc(copy.docLabel)}</div>
       <div class="period">${statementTitle(s)}</div>
       <div class="who">
-        ${esc(s.member.name)} · ${esc(s.member.phone)}<br />
-        ${s.group ? `${esc(s.group.name)} · ${esc(s.group.role)}` : "All groups"}<br />
+        ${
+          forGroup
+            ? `${esc(s.group?.name ?? "")}<br />Issued by ${esc(s.member.name)} · ${esc(s.group?.role ?? "")}`
+            : `${esc(s.member.name)} · ${esc(s.member.phone)}<br />${s.group ? `${esc(s.group.name)} · ${esc(s.group.role)}` : "All groups"}`
+        }<br />
         Statement no. ${esc(s.statementId)} · issued ${fmtDate(s.generatedAt)}
       </div>
     </div>
@@ -459,7 +468,7 @@ function statementHtml(
 
       <h2>${esc(copy.activityTitle)}</h2>
       <table>
-        <thead><tr><th>Date</th><th>Description</th><th>Group</th><th class="num">Amount</th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th><th>${whoColumn}</th><th class="num">Amount</th></tr></thead>
         <tbody>${activityRows || `<tr><td colspan="4" class="empty">No completed transactions in this period.</td></tr>`}</tbody>
       </table>
 
@@ -479,7 +488,8 @@ export async function exportStatementCsv(
   flavour: StatementFlavour = "savings"
 ) {
   const s = exportable(statement);
-  const copy = statementCopy(flavour);
+  const forGroup = s.scope === "group";
+  const copy = statementCopy(flavour, forGroup ? "group" : "member");
   const day = (d: string | Date) => new Date(d).toISOString().slice(0, 10);
 
   // The same four sections the app shows, in the same order and with the same
@@ -489,8 +499,9 @@ export async function exportStatementCsv(
   const table: (string | number)[][] = [
     [`Chuma ${copy.docLabel.toLowerCase()}`],
     ["Statement no.", s.statementId],
-    ["Member", s.member.name, s.member.phone],
-    ["Group", s.group ? s.group.name : "All groups"],
+    ...(forGroup
+      ? [["Group", s.group?.name ?? ""], ["Issued by", s.member.name, s.group?.role ?? ""]]
+      : [["Member", s.member.name, s.member.phone], ["Group", s.group ? s.group.name : "All groups"]]),
     ["Period", fmtDate(s.period.from), fmtDate(s.period.to)],
     ["Issued", fmtDate(s.generatedAt)],
     [],
@@ -504,12 +515,12 @@ export async function exportStatementCsv(
     [],
 
     [copy.activityTitle],
-    ["Date", "Description", "Group", "Amount"],
+    ["Date", "Description", forGroup ? "Member" : "Group", "Amount"],
     ...(s.activity.length > 0
       ? s.activity.map((a) => [
           day(a.date),
           movementLabel(copy, a),
-          a.groupName,
+          forGroup ? a.memberName ?? "" : a.groupName,
           a.direction === "out" ? -a.amount : a.amount,
         ])
       : [["No completed transactions in this period."]]),

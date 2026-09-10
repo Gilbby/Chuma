@@ -19,11 +19,15 @@ export type StatementTxnType =
   | "fee"
   | "withdrawal";
 
+export type StatementScope = "member" | "group";
+
 export interface StatementLine {
   id: string;
   date: string;
   type: StatementTxnType;
   groupName: string;
+  /** Who paid. Set only on a group statement, where the answer varies. */
+  memberName?: string | null;
   description: string;
   /** Project-fund groups only: the project this paid into, "General giving"
    *  when it named none, suffixed "+ other" when the payment also settled a
@@ -41,6 +45,8 @@ export interface StatementActivity {
   date: string;
   type: StatementTxnType;
   groupName: string;
+  /** See StatementLine.memberName. */
+  memberName?: string | null;
   description: string;
   /** See StatementLine.projectLabel. */
   projectLabel?: string | null;
@@ -94,7 +100,12 @@ export interface Statement {
   statementId: string;
   generatedAt: string;
   period: { from: string; to: string };
+  /** Who pulled the statement. On a group statement that is the officer who
+   *  issued it, not whose money it is. */
   member: { name: string; phone: string };
+  /** Whose money the figures are. Absent on an older API, which only ever
+   *  built the member view. */
+  scope?: StatementScope;
   group: { id: string; name: string; groupType?: GroupType; role: string } | null;
   openingBalance: number;
   closingBalance: number;
@@ -118,16 +129,26 @@ export interface Statement {
   activity: StatementActivity[];
 }
 
+/**
+ * Pull a statement.
+ *
+ * `scope: "group"` asks for the whole group's book rather than the caller's
+ * own account. The API only answers it for an officer of that group, so a
+ * groupId is required — and the screen only offers the switch to a role that
+ * actually holds it.
+ */
 export async function getStatement(opts: {
   from: Date;
   to: Date;
   groupId?: string | null;
+  scope?: StatementScope;
 }): Promise<Statement> {
   const params = new URLSearchParams({
     from: opts.from.toISOString(),
     to: opts.to.toISOString(),
   });
   if (opts.groupId) params.set("groupId", opts.groupId);
+  if (opts.scope === "group") params.set("scope", "group");
   const res = await api<{ statement: Statement }>(`/statement?${params}`);
   return res.statement;
 }

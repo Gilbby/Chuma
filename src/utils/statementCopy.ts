@@ -18,7 +18,7 @@
 // paper cannot do.
 
 import { GroupType, isProjectFundType } from "@/src/types";
-import type { StatementTxnType } from "@/src/services/statement";
+import type { StatementScope, StatementTxnType } from "@/src/services/statement";
 
 export type StatementFlavour = "savings" | "project-fund";
 
@@ -94,7 +94,58 @@ const COPY: Record<StatementFlavour, StatementCopy> = {
   },
 };
 
-export const statementCopy = (flavour: StatementFlavour): StatementCopy => COPY[flavour];
+/**
+ * The same statement, worded for the whole group instead of one member.
+ *
+ * An officer pulling the group's book is reading the pool, not a stake, so
+ * every label that says "you" has to stop saying it: "Contributions" becomes
+ * "Contributions received", "Total given" becomes "Total raised". Only the
+ * words move — the figures, the shape and the order stay the member
+ * statement's, deliberately, so a treasurer reconciling the group and a
+ * member checking their own line are reading the same document.
+ *
+ * Only the labels that actually read wrong are overridden; everything else
+ * falls through to the member copy above.
+ */
+const GROUP_OVERRIDES: Record<StatementFlavour, Partial<StatementCopy>> = {
+  savings: {
+    docLabel: "Group savings statement",
+    balanceLabel: "Group savings balance",
+    summaryTitle: "Group savings summary",
+    openingLabel: "Opening group balance",
+    inLabel: "Contributions received",
+    outLabel: "Share-outs paid",
+    closingLabel: "Closing group balance",
+    activityTitle: "All group activity",
+    footnote:
+      "This is the group's pooled savings: contributions in and share-outs out, across every member. Loans, repayments, penalties and fees are real money and show in the activity, but they do not change the pool. Tap any line for its receipt.",
+    footnotePdf:
+      "This is an official Chuma group statement. The balance shown is the group's pooled savings across every member: contributions and share-outs only. Loans, repayments, penalties and fees are real money and are listed under activity, but they do not change the pool.",
+    fileStem: "Chuma-Group-Statement",
+  },
+  "project-fund": {
+    docLabel: "Group giving statement",
+    balanceLabel: "Total raised",
+    summaryTitle: "Group giving summary",
+    openingLabel: "Raised before this period",
+    inLabel: "Given this period",
+    closingLabel: "Total raised",
+    activityTitle: "All group activity",
+    footnote:
+      "This is what the group has raised toward its projects, across every member. A project fund is never shared out, so nothing here is owed back. Fees and penalties show in the activity but do not count as giving. Tap any line for its receipt.",
+    footnotePdf:
+      "This is an official Chuma group statement. The total shown is what the group has raised toward its projects, across every member. A project fund is not repaid and is never shared out, so nothing here is a claim on the group. Fees are real money and are listed under activity, but they do not count as giving.",
+    fileStem: "Chuma-Group-Giving-Statement",
+  },
+};
+
+export const statementCopy = (
+  flavour: StatementFlavour,
+  scope: StatementScope = "member"
+): StatementCopy =>
+  scope === "group"
+    ? { ...COPY[flavour], ...GROUP_OVERRIDES[flavour] }
+    : COPY[flavour];
 
 /**
  * What one movement is called on this kind of statement.

@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   Modal,
+  Switch,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -19,11 +20,12 @@ import {
   getStatement,
   Statement,
   StatementActivity,
+  StatementScope,
 } from "@/src/services/statement";
 import { exportStatementPdf, exportStatementCsv } from "@/src/utils/exports";
 import { formatZMW } from "@/src/utils/currency";
 import { movementLabel, statementCopy, statementFlavourFor } from "@/src/utils/statementCopy";
-import { Group } from "@/src/types";
+import { Group, Role } from "@/src/types";
 import { Download, Calendar, ChevronDown, ChevronRight, Check } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
@@ -62,6 +64,17 @@ const PRESETS: { key: PresetKey; label: string }[] = [
   { key: "custom", label: "Custom" },
 ];
 
+/**
+ * The roles that may read the group's own book.
+ *
+ * A member statement is your money; a group statement is everyone's, which
+ * is an officer's job and nobody else's. The API enforces this — the toggle
+ * below only avoids offering a door that would be shut. In a group where you
+ * are just a member there is no toggle at all: a control that can only ever
+ * fail is worse than no control.
+ */
+const OFFICER_ROLES: Role[] = ["Chairperson", "Treasurer", "Secretary"];
+
 const fmtDay = (d: string | Date) =>
   new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 const fmtShort = (d: string | Date) =>
@@ -84,8 +97,22 @@ export default function StatementScreen() {
   const [preset, setPreset] = useState<PresetKey>("this-month");
   const [range, setRange] = useState(() => presetRange("this-month"));
   const [groupId, setGroupId] = useState<string | null>(params.groupId ?? null);
+  // What the toggle has been set to BY HAND, and for which group+role. The
+  // scope itself is derived from this below rather than stored: an officer's
+  // default is on, and a default that lives in state has to be re-synced
+  // every time the group changes, which is a render cascade waiting to
+  // happen. A stale choice (different key) simply stops applying.
+  const [scopeChoice, setScopeChoice] = useState<{
+    key: string;
+    scope: StatementScope;
+  } | null>(null);
 
   const [groups, setGroups] = useState<Group[]>([]);
+  // Your role in a group arrives with this list, and the toggle's default
+  // depends on it — so a statement scoped to a group waits for it rather than
+  // fetching the member view and immediately replacing it.
+  const [groupsLoaded, setGroupsLoaded] = useState(false);
+
   const [statement, setStatement] = useState<Statement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -101,25 +128,60 @@ export default function StatementScreen() {
     // its history with it.
     getGroups({ includeClosed: true })
       .then(setGroups)
-      .catch(() => setGroups([]));
+      .catch(() => setGroups([]))
+      // Even a failure settles the question — without the list nobody is an
+      // officer, so the statement is the member view and should load.
+      .finally(() => setGroupsLoaded(true));
   }, []);
 
+  const scopedGroup = groupId ? groups.find((g) => g.id === groupId) : undefined;
+  const groupLabel = groupId ? scopedGroup?.name ?? "Selected group" : "All groups";
+
+  // Your role in the group currently in view. The group book is always about
+  // ONE group, so "All groups" holds no role and offers no toggle.
+  const roleHere = scopedGroup?.yourRole;
+  const officerHere = !!roleHere && OFFICER_ROLES.includes(roleHere);
+
+  /**
+   * An officer opening a group they run wants the group's book — that is the
+   * job they opened it for — so the toggle starts on, and stays wherever they
+   * put it until the group, or their role in it, changes underneath them.
+   *
+   * The key carries the role as well as the group because the role arrives a
+   * moment after the group does; keying on both means a choice made under one
+   * role stops applying the instant the answer changes, and the default takes
+   * over again without anything having to re-sync it.
+   */
+  const defaultKey = `${groupId ?? ""}:${roleHere ?? ""}`;
+  const scope: StatementScope =
+    scopeChoice?.key === defaultKey
+      ? scopeChoice.scope
+      : officerHere
+        ? "group"
+        : "member";
+  const forGroup = scope === "group";
+  const setScope = (next: StatementScope) =>
+    setScopeChoice({ key: defaultKey, scope: next });
+
   const load = useCallback(async () => {
+    // Wait for the groups list: your role in the group decides which of the
+    // two statements to fetch, and asking before it lands would show the
+    // member view for a beat before replacing it.
+    if (!groupsLoaded) return;
     setLoading(true);
     setError(false);
     try {
-      setStatement(await getStatement({ from: range.from, to: range.to, groupId }));
+      setStatement(
+        await getStatement({ from: range.from, to: range.to, groupId, scope })
+      );
     } catch (e) {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [range, groupId]);
+  }, [range, groupId, scope, groupsLoaded]);
 
   useAsyncEffect(load);
-
-  const scopedGroup = groupId ? groups.find((g) => g.id === groupId) : undefined;
-  const groupLabel = groupId ? scopedGroup?.name ?? "Selected group" : "All groups";
 
   // Settled money only, matching the export. A statement answers "what do I
   // have and how did it get there" — a payment that might still fail belongs to
@@ -139,7 +201,7 @@ export default function StatementScreen() {
       ? [statement?.group?.groupType ?? scopedGroup?.groupType]
       : groups.map((g) => g.groupType)
   );
-  const copy = statementCopy(flavour);
+  const copy = statementCopy(flavour, scope);
   const periodLabel = `${fmtDay(range.from)} – ${fmtDay(range.to)}`;
 
   const choosePreset = (key: PresetKey) => {
@@ -177,7 +239,7 @@ export default function StatementScreen() {
       testID="statement-screen"
     >
       <ScreenHeader
-        title="Statement"
+        title={forGroup ? "Group statement" : "Statement"}
         subtitle={periodLabel}
         rightAction={
           <Pressable
@@ -201,7 +263,7 @@ export default function StatementScreen() {
         }
       />
 
-      {/* Scope: which group, which period */}
+      {/* Scope: whose money, which group, which period */}
       <View style={styles.scopeRow}>
         <Pressable
           onPress={() => setGroupPickerOpen(true)}
@@ -213,6 +275,37 @@ export default function StatementScreen() {
           </Text>
           <ChevronDown size={16} color={colors.textMuted} />
         </Pressable>
+
+        {/* Officers only, and only in the group they hold the role in. Off is
+            your own money; on is the book you keep for everyone. */}
+        {officerHere ? (
+          <View
+            style={[
+              styles.toggleRow,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+            testID="statement-scope-row"
+          >
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.toggleLabel, { color: colors.textMain }]}>
+                View as {roleHere}
+              </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                {forGroup
+                  ? "The whole group's money"
+                  : "Showing your own money"}
+              </Text>
+            </View>
+            <Switch
+              value={forGroup}
+              onValueChange={(on) => setScope(on ? "group" : "member")}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="#fff"
+              ios_backgroundColor={colors.border}
+              testID="statement-scope-toggle"
+            />
+          </View>
+        ) : null}
       </View>
 
       <ScrollView
@@ -267,9 +360,16 @@ export default function StatementScreen() {
               {formatZMW(statement.closingBalance)}
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
-              {statement.group ? statement.group.name : "Across all your groups"} · as at{" "}
-              {fmtDay(statement.period.to)}
+              {forGroup
+                ? `Everyone in ${statement.group?.name ?? "the group"}`
+                : statement.group?.name ?? "Across all your groups"}{" "}
+              · as at {fmtDay(statement.period.to)}
             </Text>
+            {forGroup && roleHere ? (
+              <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                Pulled by you as {roleHere}
+              </Text>
+            ) : null}
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -318,7 +418,9 @@ export default function StatementScreen() {
                   key={a.id}
                   item={a}
                   label={movementLabel(copy, a)}
-                  showGroup={!statement.group}
+                  // One group's book names the payer; a member's statement
+                  // across several groups names the group.
+                  meta={forGroup ? a.memberName ?? "" : statement.group ? "" : a.groupName}
                   colors={colors}
                   last={i === activity.length - 1}
                   onPress={() =>
@@ -375,31 +477,33 @@ export default function StatementScreen() {
         <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 24) }]}>
           <View style={[styles.grabber, { backgroundColor: colors.border }]} />
           <Text style={[styles.sheetTitle, { color: colors.textMain }]}>Statement for</Text>
-          <Card padding={0}>
-            <PickerRow
-              label="All groups"
-              selected={groupId === null}
-              onPress={() => {
-                setGroupId(null);
-                setGroupPickerOpen(false);
-              }}
-              colors={colors}
-              testID="statement-group-all"
-            />
-            {groups.map((g) => (
+          <ScrollView style={{ maxHeight: 320 }}>
+            <Card padding={0}>
               <PickerRow
-                key={g.id}
-                label={g.name}
-                selected={groupId === g.id}
+                label="All groups"
+                selected={groupId === null}
                 onPress={() => {
-                  setGroupId(g.id);
+                  setGroupId(null);
                   setGroupPickerOpen(false);
                 }}
                 colors={colors}
-                testID={`statement-group-${g.id}`}
+                testID="statement-group-all"
               />
-            ))}
-          </Card>
+              {groups.map((g) => (
+                <PickerRow
+                  key={g.id}
+                  label={g.name}
+                  selected={groupId === g.id}
+                  onPress={() => {
+                    setGroupId(g.id);
+                    setGroupPickerOpen(false);
+                  }}
+                  colors={colors}
+                  testID={`statement-group-${g.id}`}
+                />
+              ))}
+            </Card>
+          </ScrollView>
           <Button
             label="Cancel"
             variant="ghost"
@@ -477,11 +581,12 @@ const SectionTitle: React.FC<{ children: React.ReactNode; colors: Colors }> = ({
 const ActivityRow: React.FC<{
   item: StatementActivity;
   label: string;
-  showGroup: boolean;
+  /** Who paid, or which group — whichever the current view leaves open. */
+  meta: string;
   colors: Colors;
   last?: boolean;
   onPress: () => void;
-}> = ({ item, label, showGroup, colors, last, onPress }) => {
+}> = ({ item, label, meta, colors, last, onPress }) => {
   // Every line the statement lists has settled, so the amount always earns its
   // colour and there is no status to caveat it with.
   return (
@@ -503,7 +608,7 @@ const ActivityRow: React.FC<{
         </Text>
         <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
           {fmtShort(item.date)}
-          {showGroup && item.groupName ? ` · ${item.groupName}` : ""}
+          {meta ? ` · ${meta}` : ""}
         </Text>
       </View>
       <Text
@@ -589,6 +694,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   scopeText: { fontSize: 14, fontWeight: "600", flex: 1 },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  toggleLabel: { fontSize: 14, fontWeight: "600" },
   chipScroll: { flexGrow: 0, height: 44, marginBottom: 8 },
   chipRow: { paddingHorizontal: 20, alignItems: "center" },
   chip: {
