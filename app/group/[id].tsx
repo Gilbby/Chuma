@@ -612,14 +612,6 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
             >
               <Plus size={18} color="#fff" strokeWidth={2.4} />
             </Pressable>
-          ) : tab === "projects" && canManageProjects ? (
-            <Pressable
-              style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}
-              onPress={() => (projectFormFor === "new" ? closeProjectForm() : openAddProject())}
-              testID="projects-add-btn"
-            >
-              <Plus size={18} color="#fff" strokeWidth={2.4} />
-            </Pressable>
           ) : undefined
         }
       />
@@ -1037,9 +1029,10 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               </Card>
             )}
 
-            {/* The header's + does the same thing, but a Chairperson looking at
-                a list of projects looks for the way to add one at the end of
-                that list. Members never see it — the API refuses them too. */}
+            {/* The only way to open a project, and the Chairperson's alone —
+                it sits at the end of the list because that is where someone
+                reading the projects looks for the way to add one. The API
+                refuses everyone else too. */}
             {canManageProjects && projectFormFor !== "new" && (
               <Pressable
                 onPress={openAddProject}
