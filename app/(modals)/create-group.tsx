@@ -54,7 +54,7 @@ const STEP_TITLES = [
   "Payment",
 ];
 
-// Project-fund types have no contribution setup — step 2 is where they name
+// Project-fund types have no contribution setup - step 2 is where they name
 // what they are raising money for instead.
 const PROJECT_FUND_STEP_TITLES = [...STEP_TITLES];
 PROJECT_FUND_STEP_TITLES[1] = "What you're saving for";
@@ -128,7 +128,7 @@ export default function CreateGroup() {
   const [userId, setUserId] = useState("");
   const scrollRef = useRef<ScrollView>(null);
 
-  // Step 1 — Group Basics
+  // Step 1 - Group Basics
   const [groupName, setGroupName] = useState("");
   const [groupType, setGroupType] = useState<GroupType | "">("");
   const [groupDesc, setGroupDesc] = useState("");
@@ -140,7 +140,7 @@ export default function CreateGroup() {
     lendsToMembers(groupType)
   );
 
-  // Step 2 — Contribution Setup
+  // Step 2 - Contribution Setup
   const [contribFreq, setContribFreq] = useState("Monthly");
   const [contribAmount, setContribAmount] = useState("");
   const [cycleDuration, setCycleDuration] = useState("6 months");
@@ -149,10 +149,10 @@ export default function CreateGroup() {
   const [lateContribEnabled, setLateContribEnabled] = useState(false);
   const [lateContributionPenaltyRate, setLateContributionPenaltyRate] = useState("1");
 
-  // Step 2 (project-fund types) — the projects the group is raising money for.
+  // Step 2 (project-fund types) - the projects the group is raising money for.
   // One blank row to start: at least one project must be named before the group
   // can be created, because every contribution has to be given toward one.
-  // `deadline` is an ISO yyyy-mm-dd string, or "" for "no deadline" — most
+  // `deadline` is an ISO yyyy-mm-dd string, or "" for "no deadline" - most
   // church projects simply collect until it's enough, but some (a conference,
   // a roof before the rains) have a real date to hit.
   type ProjectRow = { key: string; name: string; target: string; deadline: string };
@@ -163,7 +163,7 @@ export default function CreateGroup() {
   // Which project row currently has the date picker open (its key), if any.
   const [deadlinePickerFor, setDeadlinePickerFor] = useState<string | null>(null);
 
-  // Step 3 — Loan Rules
+  // Step 3 - Loan Rules
   const [internalLending, setInternalLending] = useState(true);
   const [loanMultiplier, setLoanMultiplier] = useState("2");
   const [loanInterest, setLoanInterest] = useState("5");
@@ -173,7 +173,7 @@ export default function CreateGroup() {
     () => defaultTiersForCycle(6)
   );
   // Stop issuing new loans within this many months of share-out so every loan
-  // clears before the cycle closes (VSLA norm is 1–2 months).
+  // clears before the cycle closes (VSLA norm is 1-2 months).
   const [loanFreeWindow, setLoanFreeWindow] = useState(1);
   const [gracePeriod, setGracePeriod] = useState("0");
   const [lateRepayEnabled, setLateRepayEnabled] = useState(false);
@@ -184,7 +184,7 @@ export default function CreateGroup() {
   const [lateRepayPenaltyType, setLateRepayPenaltyType] = useState<"flat" | "percent">("percent");
   const [lateRepayFlatAmount, setLateRepayFlatAmount] = useState("100");
 
-  // Step 4 — Governance
+  // Step 4 - Governance
   const [treasurerPhone, setTreasurerPhone] = useState("");
   const [secretaryPhone, setSecretaryPhone] = useState("");
   const [approvalThreshold, setApprovalThreshold] = useState<GroupConstitution["approvalThreshold"]>("majority");
@@ -203,17 +203,17 @@ export default function CreateGroup() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState("");
 
-  // Step 5 — Review
+  // Step 5 - Review
   const [termsAccepted, setTermsAccepted] = useState(false);
 
-  // Step 6 — Payment
+  // Step 6 - Payment
   const [payerPhone, setPayerPhone] = useState("");
   const [paying, setPaying] = useState(false);
 
   // new group id after creation
   const [newGroupId, setNewGroupId] = useState("");
 
-  // The API creates the group the moment PawaPay *accepts* the fee request —
+  // The API creates the group the moment PawaPay *accepts* the fee request -
   // which is before the founder has entered their mobile-money PIN. Until the
   // deposit actually completes the group sits at status "pending-payment" and
   // refuses every action, so step 7 waits here rather than claiming success.
@@ -245,12 +245,12 @@ export default function CreateGroup() {
 
   // Poll the new group until its registration fee settles. The PawaPay callback
   // lands on the API a few seconds after the founder confirms the PIN, and the
-  // group flips from "pending-payment" to "active" there — GET /groups/:id is
+  // group flips from "pending-payment" to "active" there - GET /groups/:id is
   // one of the two routes a pending group still answers.
   useEffect(() => {
     if (step !== 7 || !newGroupId || feeState !== "waiting") return;
     const POLL_MS = 4000;
-    const POLL_LIMIT = 38; // ~2.5 minutes — longer than any PIN prompt lives
+    const POLL_LIMIT = 38; // ~2.5 minutes - longer than any PIN prompt lives
     let tries = 0;
     let cancelled = false;
 
@@ -264,7 +264,7 @@ export default function CreateGroup() {
           return;
         }
       } catch {
-        // A dropped request is not an answer — keep waiting for the next tick.
+        // A dropped request is not an answer - keep waiting for the next tick.
       }
       if (!cancelled && tries >= POLL_LIMIT) setFeeState("timeout");
     }, POLL_MS);
@@ -276,7 +276,7 @@ export default function CreateGroup() {
   }, [step, newGroupId, feeState]);
 
   // Guards direct navigation (deep link) into a 6-step wizard that would only
-  // 403 at the payment step — the Groups + button already checks this first —
+  // 403 at the payment step - the Groups + button already checks this first -
   // then puts back whatever was typed before the app was last closed.
   useEffect(() => {
     (async () => {
@@ -436,7 +436,7 @@ export default function CreateGroup() {
   };
 
   // `onValueChange` fires with the picked date and `onDismiss` when the dialog
-  // is cancelled — both unmount the picker so the next tap reopens it.
+  // is cancelled - both unmount the picker so the next tap reopens it.
   const onDeadlinePicked = (key: string, date: Date) => {
     setDeadlinePickerFor(null);
     updateProject(key, { deadline: toISODate(date) });
@@ -549,7 +549,7 @@ export default function CreateGroup() {
   }
 
   // Set a repayment band's max term, keeping the ladder valid: every term stays
-  // within 1…cycle, and larger loans never get a shorter term than smaller ones.
+  // within 1...cycle, and larger loans never get a shorter term than smaller ones.
   const setTierMonths = (index: number, months: number) => {
     const v = Math.max(1, Math.min(cycleMonths, months));
     setRepaymentTiers((prev) =>
@@ -603,7 +603,7 @@ export default function CreateGroup() {
   // comparing the serialised snapshot beats 30 effect dependencies.
   const draftJson = JSON.stringify(draftForm);
 
-  // An untouched step 1 is not a draft — don't put a card on the Groups tab for
+  // An untouched step 1 is not a draft - don't put a card on the Groups tab for
   // someone who opened the wizard and immediately backed out.
   const draftWorthKeeping =
     !!groupName.trim() || !!groupType || !!groupDesc.trim() || !!groupAvatar || step > 1;
@@ -656,8 +656,8 @@ export default function CreateGroup() {
     return () => clearTimeout(t);
   }, [draftJson, step, hydrated, flushDraft]);
 
-  // Backgrounding is the case this exists for — Android can kill the app from
-  // there without warning — so save immediately rather than wait out a debounce
+  // Backgrounding is the case this exists for - Android can kill the app from
+  // there without warning - so save immediately rather than wait out a debounce
   // that is about to be cancelled with the screen.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
@@ -757,7 +757,7 @@ export default function CreateGroup() {
       // Simulated/cash payments settle inline and come back already active;
       // a real deposit comes back pending and the poll below takes over.
       setFeeState(res.group.status === "pending-payment" ? "waiting" : "active");
-      // A real group now — even while the fee settles it is on the Groups tab,
+      // A real group now - even while the fee settles it is on the Groups tab,
       // so the draft has nothing left to restore.
       draftClosedRef.current = true;
       await clearGroupDraft();
@@ -803,7 +803,7 @@ export default function CreateGroup() {
                   style={[styles.actionBtn, { backgroundColor: colors.primary, opacity: inviting ? 0.6 : 1 }]}
                   testID="invite-phone-send"
                 >
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>{inviting ? "Sending…" : "Send"}</Text>
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>{inviting ? "Sending..." : "Send"}</Text>
                 </Pressable>
               </View>
               {inviteError ? <Text style={[styles.errText, { color: colors.danger }]}>{inviteError}</Text> : null}
@@ -859,7 +859,7 @@ export default function CreateGroup() {
     );
   }
 
-  // ─── Step 7 — Success ───────────────────────────────────────────────────────
+  // ─── Step 7 - Success ───────────────────────────────────────────────────────
 
   if (step === 7) {
     const typeLabel = GROUP_TYPES.find((t) => t.value === groupType)?.label ?? "";
@@ -897,7 +897,7 @@ export default function CreateGroup() {
               }}
             >
               {feeState === "timeout"
-                ? `We haven't received the K100.00 registration fee yet. ${groupName} stays closed until it arrives — open it from Groups to try the payment again.`
+                ? `We haven't received the K100.00 registration fee yet. ${groupName} stays closed until it arrives - open it from Groups to try the payment again.`
                 : `Enter your ${network} PIN on your phone to pay the K100.00 registration fee. ${groupName} opens as soon as it goes through.`}
             </Text>
           )}
@@ -935,8 +935,8 @@ export default function CreateGroup() {
           </View>
 
           <View style={{ flex: 1 }} />
-          {/* Nothing can be done inside a group whose fee has not landed — the
-              API refuses it — so the actions only appear once it is active. */}
+          {/* Nothing can be done inside a group whose fee has not landed - the
+              API refuses it - so the actions only appear once it is active. */}
           <View style={{ width: "100%", paddingHorizontal: 24 }}>
             {settled ? (
               <>
@@ -1002,7 +1002,7 @@ export default function CreateGroup() {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-            {/* ─── STEP 1 — Group Basics ──────────────────────────────────────── */}
+            {/* ─── STEP 1 - Group Basics ──────────────────────────────────────── */}
             {step === 1 && (
               <>
                 <FL text="Group name" colors={colors} />
@@ -1073,7 +1073,7 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* ─── STEP 2a — Savings projects (project-fund types) ────────────── */}
+            {/* ─── STEP 2a - Savings projects (project-fund types) ────────────── */}
             {step === 2 && isProjectFund && (
               <>
                 <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21, marginBottom: 18 }}>
@@ -1137,7 +1137,7 @@ export default function CreateGroup() {
                         />
                       </View>
 
-                      {/* Optional deadline — a date some projects genuinely
+                      {/* Optional deadline - a date some projects genuinely
                           need (a conference, a roof before the rains) and most
                           do not. Tapping the date again lets it be cleared. */}
                       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
@@ -1228,7 +1228,7 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* ─── STEP 2 — Contribution Setup ────────────────────────────────── */}
+            {/* ─── STEP 2 - Contribution Setup ────────────────────────────────── */}
             {step === 2 && !isProjectFund && (
               <>
                 <FL text="Contribution frequency" colors={colors} />
@@ -1383,7 +1383,7 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* ─── STEP 3 — Loan Rules ────────────────────────────────────────── */}
+            {/* ─── STEP 3 - Loan Rules ────────────────────────────────────────── */}
             {step === 3 && (
               <>
                 <TR label="Enable internal lending" value={internalLending} onToggle={setInternalLending} colors={colors} />
@@ -1582,7 +1582,7 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* ─── STEP 4 — Governance ────────────────────────────────────────── */}
+            {/* ─── STEP 4 - Governance ────────────────────────────────────────── */}
             {step === 4 && (
               <>
                 <View style={[styles.infoNote, { backgroundColor: colors.primarySoft, marginBottom: 20 }]}>
@@ -1662,7 +1662,7 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* ─── STEP 5 — Review & Confirm ──────────────────────────────────── */}
+            {/* ─── STEP 5 - Review & Confirm ──────────────────────────────────── */}
             {step === 5 && (
               <>
                 <RC title="Group" onEdit={() => goToStep(1)} colors={colors}>
@@ -1777,7 +1777,7 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* ─── STEP 6 — Payment ───────────────────────────────────────── */}
+            {/* ─── STEP 6 - Payment ───────────────────────────────────────── */}
             {step === 6 && (
               <>
                 {/* Fee summary */}
@@ -1817,7 +1817,7 @@ export default function CreateGroup() {
                   ))}
                 </Card>
 
-                {/* Paying from — auto-detected from the registered number */}
+                {/* Paying from - auto-detected from the registered number */}
                 <FL text="Paying from" colors={colors} />
                 <Card padding={16} style={{ marginTop: 8 }}>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -1849,7 +1849,7 @@ export default function CreateGroup() {
                 </Text>
 
                 <Button
-                  label={paying ? "Processing…" : "Pay K100 & Create Group"}
+                  label={paying ? "Processing..." : "Pay K100 & Create Group"}
                   disabled={paying || !networkKnown}
                   onPress={handlePayAndCreate}
                   testID="create-group-pay-btn"
@@ -1857,7 +1857,7 @@ export default function CreateGroup() {
               </>
             )}
 
-            {/* Continue button for steps 1–4 */}
+            {/* Continue button for steps 1-4 */}
             {step >= 1 && step <= 4 && (
               <>
                 <View style={{ flexGrow: 1, minHeight: 24 }} />
@@ -1878,7 +1878,7 @@ export default function CreateGroup() {
 
 // ─── Local sub-components ─────────────────────────────────────────────────────
 
-/** Field label — uppercase overline style */
+/** Field label - uppercase overline style */
 const FL = ({
   text,
   colors,
@@ -1945,7 +1945,7 @@ const RC = ({
   </Card>
 );
 
-/** Review row — label/value pair */
+/** Review row - label/value pair */
 const RRow = ({
   label,
   value,

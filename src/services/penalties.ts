@@ -170,13 +170,13 @@ export async function recordViolation(input: {
 }
 
 /**
- * Pay several penalties in ONE deposit — a single mobile-money prompt and a
+ * Pay several penalties in ONE deposit - a single mobile-money prompt and a
  * single transaction fee. All must belong to the same group.
  */
 export async function payPenalties(
   penaltyIds: string[],
   payerPhone?: string,
-  /** "Cash" records the payment for an admin to confirm — the only method
+  /** "Cash" records the payment for an admin to confirm - the only method
    *  accepted while the mobile money hold is on. */
   paymentMethod?: string
 ): Promise<{ message?: string; penalties?: any[]; transaction?: any; approval?: any }> {

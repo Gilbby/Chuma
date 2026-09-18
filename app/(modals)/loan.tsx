@@ -115,7 +115,7 @@ export default function Loan() {
 
   // Derived rather than stored: we are loading exactly while a group is picked
   // and `elig` does not yet belong to it. There is nothing to score without a
-  // group, so that case is not loading — the guard below catches it via `!grp`.
+  // group, so that case is not loading - the guard below catches it via `!grp`.
   const eligLoading = !!grp?.id && eligFor !== grp.id;
 
   const handleAmountChange = (text: string) => {
@@ -191,8 +191,8 @@ export default function Loan() {
 
   // The amount is only half of eligibility. POST /loans also refuses outright
   // when the member is blocked for a reason that has nothing to do with what
-  // they type — unpaid group fee, lending switched off, no real name, a loan
-  // already running — and the group has to hold the cash to lend. Judge all of
+  // they type - unpaid group fee, lending switched off, no real name, a loan
+  // already running - and the group has to hold the cash to lend. Judge all of
   // it here so the form stops on this screen, rather than letting someone fill
   // in every field and be turned away at the confirm button.
   const blockedReason = elig && !elig.canBorrow ? elig.blockedReason : null;
@@ -416,7 +416,7 @@ export default function Loan() {
                 </View>
               </Card>
 
-              {/* Duration — options capped by the group's size-based tier */}
+              {/* Duration - options capped by the group's size-based tier */}
               <Text style={[styles.label, { color: colors.textMuted, marginTop: 24 }]}>
                 Repayment duration
               </Text>
@@ -554,7 +554,7 @@ export default function Loan() {
 
               {/* Plain-language terms disclosure. Frames the loan correctly for
                   members and for app-store review: Chuma is not a lender and
-                  charges no interest — this is the group's own pooled member
+                  charges no interest - this is the group's own pooled member
                   savings, lent between members on terms the group set itself,
                   with the interest returning to the members at share-out. */}
               <Card padding={16} style={{ marginTop: 14 }}>
@@ -568,7 +568,7 @@ export default function Loan() {
                   This isn&apos;t a loan from Chuma or any outside lender. You&apos;re
                   borrowing from{" "}
                   <Text style={{ color: colors.textMain, fontWeight: "600" }}>{grp.name}</Text>
-                  &apos;s own pooled savings — money you and the other members have
+                  &apos;s own pooled savings - money you and the other members have
                   saved together. Your group set the {grp.loanInterestRate}% monthly
                   interest rate, and the interest you repay goes back into the group
                   fund and is shared among the members at share-out.

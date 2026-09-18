@@ -3,7 +3,7 @@
 // A savings group and a church group hold a member's money for opposite
 // reasons: one keeps a stake that comes back at share-out, the other takes a
 // gift that funds a project and is never repaid. The figures the API returns
-// are the same either way — it is the words around them that have to change,
+// are the same either way - it is the words around them that have to change,
 // or a church member reads "closing savings balance" as money they are owed.
 //
 // The screen, the PDF and the CSV all read from here so the copy a member sees
@@ -12,7 +12,7 @@
 //
 // Shape does NOT vary by flavour, and it does not vary by medium either. Every
 // statement is the totals card then the activity, on screen and in the export
-// alike — a phone statement is read standing up, and the printed copy has to be
+// alike - a phone statement is read standing up, and the printed copy has to be
 // recognisable as the same document. The per-line detail (reference, method,
 // running balance) lives on the receipt behind a tap, which is the one thing
 // paper cannot do.
@@ -29,7 +29,7 @@ export interface StatementCopy {
   balanceLabel: string;
   summaryTitle: string;
   openingLabel: string;
-  /** Money in — a contribution, or a gift. */
+  /** Money in - a contribution, or a gift. */
   inLabel: string;
   /** Money out. `null` where the type never pays anything back, which drops
    *  the row rather than showing a permanent zero. */
@@ -100,7 +100,7 @@ const COPY: Record<StatementFlavour, StatementCopy> = {
  * An officer pulling the group's book is reading the pool, not a stake, so
  * every label that says "you" has to stop saying it: "Contributions" becomes
  * "Contributions received", "Total given" becomes "Total raised". Only the
- * words move — the figures, the shape and the order stay the member
+ * words move - the figures, the shape and the order stay the member
  * statement's, deliberately, so a treasurer reconciling the group and a
  * member checking their own line are reading the same document.
  *
@@ -153,7 +153,7 @@ export const statementCopy = (
  * The project it paid into wins whenever the API supplies one: a church member
  * gave to a named thing, and "Church building" is the only label that answers
  * the question they opened the statement to ask. Below that sits the per-type
- * wording, and below that the description the API sent — which is already the
+ * wording, and below that the description the API sent - which is already the
  * right one for a savings group.
  *
  * Screen and exports both go through here, so the line a member taps and the
@@ -176,7 +176,7 @@ export const movementLabel = (
  *
  * A statement scoped to one group follows that group's type. Scoped to "All
  * groups" it can only use the giving wording when EVERY group gives toward
- * projects — mixing a church group in with a savings group leaves the savings
+ * projects - mixing a church group in with a savings group leaves the savings
  * wording, which is the one that still describes a share-out correctly.
  */
 export function statementFlavourFor(

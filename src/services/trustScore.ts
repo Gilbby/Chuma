@@ -1,8 +1,8 @@
-// Trust score (0–100) reflects member reliability. Computed
+// Trust score (0-100) reflects member reliability. Computed
 // from contribution consistency, loan standing, and
 // penalties. The current model uses available member data as
 // a proxy; when the backend tracks full on-time history,
-// feed it here — the score scale and bands stay the same.
+// feed it here - the score scale and bands stay the same.
 
 import type { Member } from "@/src/types";
 
@@ -26,7 +26,7 @@ export function getTrustScore(
   // Each penalty reduces the score
   score -= penaltyCount * 6;
 
-  // Clamp 0–100
+  // Clamp 0-100
   return Math.max(0, Math.min(Math.round(score), 100));
 }
 

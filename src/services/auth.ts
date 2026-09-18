@@ -63,7 +63,7 @@ export async function logout() {
   await clearCurrentUser();
   await clearPendingOnboarding();
   // An unfinished group carries its founder's group name and their officers'
-  // phone numbers — it doesn't stay on the phone for whoever signs in next.
+  // phone numbers - it doesn't stay on the phone for whoever signs in next.
   await clearGroupDraft();
 }
 
@@ -76,7 +76,7 @@ export interface DeleteBlocker {
 /**
  * Permanently delete the signed-in account (Play/Apple deletion requirement).
  * The backend refuses (409, code "has_obligations") while the user still holds
- * savings, owes a loan, or is a sole chairperson — the thrown ApiError then
+ * savings, owes a loan, or is a sole chairperson - the thrown ApiError then
  * carries `blockers` so the screen can list exactly what to settle. On success
  * the local session is cleared, exactly as on logout.
  */

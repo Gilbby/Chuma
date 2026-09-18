@@ -4,7 +4,7 @@ export const approvals: Approval[] = [
   {
     id: "a1",
     type: "loan",
-    title: "Loan request — Chisomo Banda",
+    title: "Loan request - Chisomo Banda",
     description: "Loan for restocking market inventory.",
     requestedBy: "Chisomo Banda",
     requestedById: "m-0",
@@ -20,7 +20,7 @@ export const approvals: Approval[] = [
   {
     id: "a2",
     type: "withdrawal",
-    title: "Emergency withdrawal — Natasha Phiri",
+    title: "Emergency withdrawal - Natasha Phiri",
     description: "Medical emergency withdrawal request.",
     requestedBy: "Natasha Phiri",
     requestedById: "m-1",
@@ -51,7 +51,7 @@ export const approvals: Approval[] = [
   {
     id: "a4",
     type: "loan",
-    title: "Loan request — Mwansa Tembo",
+    title: "Loan request - Mwansa Tembo",
     description: "School fees for child secondary education.",
     requestedBy: "Mwansa Tembo",
     requestedById: "m-3",

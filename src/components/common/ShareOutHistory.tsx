@@ -7,7 +7,7 @@
  * heading rather than in the run of report cards, where it read as one more
  * statistic. Every member sees it, not just the treasurer.
  *
- * Only the most recent few runs are listed here — the rest are one tap away on
+ * Only the most recent few runs are listed here - the rest are one tap away on
  * the full history screen. A run opens its own breakdown rather than unfolding
  * in place: unfolding works for a group of six and collapses at thirty, burying
  * every other run with nowhere to search.

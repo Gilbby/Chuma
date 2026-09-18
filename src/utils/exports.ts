@@ -31,7 +31,7 @@ const BODY_FONT =
  * Tell the user the export failed, and tell the developer WHY.
  *
  * These catches used to swallow the error object, which left "Export failed"
- * as the only evidence there was — the same message whether the print module
+ * as the only evidence there was - the same message whether the print module
  * choked, a folder grant went stale, or the statement arrived missing a field.
  * The alert stays deliberately plain; the cause goes to the log.
  */
@@ -70,7 +70,7 @@ export async function printOrShareHtml(html: string, dialogTitle: string) {
  * Print HTML to a PDF that the rest of the app is actually allowed to touch.
  *
  * expo-print writes its output to its own cache location, which sits OUTSIDE
- * the directories expo-file-system and expo-sharing will read — sharing that
+ * the directories expo-file-system and expo-sharing will read - sharing that
  * path straight off fails with "Not allowed to read file under given URL", and
  * so does copying from it, which is why the old copy-then-share fallback died
  * silently and handed the unreadable path to the share sheet anyway.
@@ -88,7 +88,7 @@ async function renderPdf(
   const base64 = printed.base64 ?? null;
 
   // No base64 (older print module) leaves the original path as the only
-  // option — it still works wherever print writes inside the sandbox.
+  // option - it still works wherever print writes inside the sandbox.
   if (!base64) return { uri: printed.uri, base64: null };
 
   const uri = `${FileSystem.cacheDirectory}${baseName}.pdf`;
@@ -113,14 +113,14 @@ async function androidDownloadDir(): Promise<string | null> {
 }
 
 /**
- * Generate a PDF from HTML and DOWNLOAD it to the device — as opposed to
+ * Generate a PDF from HTML and DOWNLOAD it to the device - as opposed to
  * printOrShareHtml, which opens the share sheet.
  *
  * Android: writes the file into a folder the user picks once via the Storage
  * Access Framework (e.g. Downloads), with a readable name. The grant is
  * remembered so later downloads save straight there without prompting.
  * iOS: has no folder picker, so the file goes to the share sheet whose
- * "Save to Files" is the platform's save flow — named properly, not a UUID.
+ * "Save to Files" is the platform's save flow - named properly, not a UUID.
  * Web: the browser print dialog is the only way to produce a file.
  */
 export async function savePdf(html: string, baseName: string, dialogTitle: string) {
@@ -130,7 +130,7 @@ export async function savePdf(html: string, baseName: string, dialogTitle: strin
       return;
     }
 
-    // Already re-homed into our own cache directory, with the bytes in hand —
+    // Already re-homed into our own cache directory, with the bytes in hand -
     // both of which the Android branch below needs.
     const { uri: shareUri, base64 } = await renderPdf(html, baseName);
 
@@ -179,7 +179,7 @@ export async function savePdf(html: string, baseName: string, dialogTitle: strin
 }
 
 /**
- * DOWNLOAD a CSV to the device — same flow as savePdf.
+ * DOWNLOAD a CSV to the device - same flow as savePdf.
  *
  * Android: writes it into the folder the user picked once via the Storage
  * Access Framework (remembered across downloads), with a readable name.
@@ -242,7 +242,7 @@ export async function saveCsv(csv: string, baseName: string, dialogTitle: string
   }
 }
 
-/** Quote a CSV field — commas, quotes and newlines all need escaping. */
+/** Quote a CSV field - commas, quotes and newlines all need escaping. */
 function csvCell(value: unknown): string {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
@@ -330,7 +330,7 @@ export async function exportTransactionsCsv(data: TxnItem[]) {
 // ─── Account statement ───────────────────────────────────────────────────────
 
 export function statementTitle(s: Statement) {
-  return `${fmtDate(s.period.from)} – ${fmtDate(s.period.to)}`;
+  return `${fmtDate(s.period.from)} - ${fmtDate(s.period.to)}`;
 }
 
 /**
@@ -344,7 +344,7 @@ export function statementTitle(s: Statement) {
  * Render), so the export degrades to an empty section instead of throwing.
  *
  * Pending and failed movements are dropped here rather than printed with a
- * status beside them. On screen a pending line is useful — it is the member's
+ * status beside them. On screen a pending line is useful - it is the member's
  * own view, it updates, and they can tap it. The export is a document handed to
  * someone else: a treasurer, a bank, a family member settling an estate. A row
  * that might still fail is a row that reader cannot act on, and printing it
@@ -369,7 +369,7 @@ export async function exportStatementPdf(
   } catch (e) {
     // Building the document is pure string work, so a throw here means the
     // payload was shaped in a way we did not anticipate. It used to reject
-    // unhandled — the user tapped Export and simply got nothing.
+    // unhandled - the user tapped Export and simply got nothing.
     exportFailed("exportStatementPdf/build", e, "Could not build the statement. Please try again.");
     return;
   }
@@ -390,7 +390,7 @@ function statementHtml(
   const copy = statementCopy(flavour, forGroup ? "group" : "member");
 
   // A group statement covers one group, so naming it on every row says
-  // nothing — the column the reader needs is WHO paid. A member statement
+  // nothing - the column the reader needs is WHO paid. A member statement
   // spanning several groups is the opposite case, and keeps the group.
   const whoColumn = forGroup ? "Member" : "Group";
 

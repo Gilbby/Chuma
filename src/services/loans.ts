@@ -1,7 +1,7 @@
 // Loan eligibility and interest math. Driven by the user's
 // savings in a group and that group's loan rules. When a
 // backend is connected, pass real member savings and group
-// rules to the same functions — no UI changes.
+// rules to the same functions - no UI changes.
 
 import { Loan, LoanRepaymentTier } from "@/src/types";
 import { api } from "./apiClient";
@@ -85,7 +85,7 @@ export function tierBandLabel(
 ): string {
   if (tier.maxAmount === null) return `Above ${formatAmount(prevMax ?? 0)}`;
   if (prevMax === null) return `Up to ${formatAmount(tier.maxAmount)}`;
-  return `${formatAmount(prevMax + 1)} – ${formatAmount(tier.maxAmount)}`;
+  return `${formatAmount(prevMax + 1)} - ${formatAmount(tier.maxAmount)}`;
 }
 
 // Max a member can borrow = their savings × group multiplier
@@ -193,7 +193,7 @@ export async function repayLoan(payload: {
   loanId: string;
   amount: number;
   payerPhone?: string;
-  /** "Cash" records the repayment for an admin to confirm — the only method
+  /** "Cash" records the repayment for an admin to confirm - the only method
    *  accepted while the mobile money hold is on. */
   paymentMethod?: string;
 }): Promise<{ loan?: any; transaction?: any; approval?: any; message?: string }> {

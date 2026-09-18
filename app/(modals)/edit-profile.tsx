@@ -50,7 +50,7 @@ export default function EditProfile() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nameError, setNameError] = useState("");
   // A KYC-verified name comes from the identity document (chairpersons), so
-  // the server rejects edits to it — mirror that here instead of failing on save.
+  // the server rejects edits to it - mirror that here instead of failing on save.
   const nameLocked = me?.kyc?.status === "verified";
   const [accountNameError, setAccountNameError] = useState("");
   const [accountNumberError, setAccountNumberError] = useState("");
@@ -177,7 +177,7 @@ export default function EditProfile() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Section 1 — Photo */}
+            {/* Section 1 - Photo */}
             <View style={styles.avatarSection}>
               <Pressable onPress={pickImage} testID="edit-profile-avatar-btn">
                 <View style={{ position: "relative" }}>
@@ -192,7 +192,7 @@ export default function EditProfile() {
               </Text>
             </View>
 
-            {/* Section 2 — Name */}
+            {/* Section 2 - Name */}
             <Text style={[styles.label, { color: colors.textMuted }]}>FULL NAME{nameLocked ? " (VERIFIED)" : ""}</Text>
             <TextInput
               style={[
@@ -220,7 +220,7 @@ export default function EditProfile() {
               </Text>
             ) : null}
 
-            {/* Phone — login identity, not editable */}
+            {/* Phone - login identity, not editable */}
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 20 }]}>
               PHONE NUMBER
             </Text>
@@ -242,7 +242,7 @@ export default function EditProfile() {
               Your login number can&apos;t be changed here.
             </Text>
 
-            {/* Section 3 — Preferred payment method */}
+            {/* Section 3 - Preferred payment method */}
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 20 }]}>
               PREFERRED PAYMENT METHOD
             </Text>

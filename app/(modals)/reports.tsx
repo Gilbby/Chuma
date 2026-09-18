@@ -82,7 +82,7 @@ export default function Reports() {
 
   // With no group there is nothing to report on. Masking here rather than
   // clearing in the effect keeps the effect off the synchronous setState path,
-  // and stops a previous group’s numbers showing while the next ones load.
+  // and stops a previous group's numbers showing while the next ones load.
   const trendData = primaryGroup?.id ? fetchedTrend : [];
   const report = primaryGroup?.id ? fetchedReport : null;
 
@@ -227,7 +227,7 @@ export default function Reports() {
 
         {/* The group's own record, ahead of the charts and outside them. The
             share-out screen clears itself for the next cycle the moment the last
-            member is paid, so this list is the permanent answer to who got what —
+            member is paid, so this list is the permanent answer to who got what -
             a roll call of people and amounts, not a statistic. */}
         {!projectFund && (
           <View style={{ marginTop: 22 }}>
@@ -235,7 +235,7 @@ export default function Reports() {
           </View>
         )}
 
-        {/* What the money is being raised for — the equivalent question in a
+        {/* What the money is being raised for - the equivalent question in a
             project-fund group, and the one members actually bring here. */}
         {projectFund && projectRows.length > 0 && (
           <Card padding={20} style={{ marginTop: 18 }}>
@@ -270,7 +270,7 @@ export default function Reports() {
           </View>
         </Card>
 
-        {/* Loan analytics — nothing to chart in a group that never lends. */}
+        {/* Loan analytics - nothing to chart in a group that never lends. */}
         {!projectFund && (
         <Card padding={20} style={{ marginTop: 14 }}>
           <Text style={[styles.cardTitle, { color: colors.textMain }]}>Loans issued</Text>

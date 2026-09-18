@@ -79,7 +79,7 @@ export default function DeleteAccount() {
         <Card padding={16} style={{ marginTop: 20 }}>
           <Text style={[styles.cardLabel, { color: colors.textMuted }]}>WHAT HAPPENS</Text>
           {[
-            "Your profile and login are removed — you'll be signed out on this device.",
+            "Your profile and login are removed - you'll be signed out on this device.",
             "Your identity (KYC) and payment details are deleted.",
             "Group records keep only your name for the group's own history and audit; they no longer link back to you.",
           ].map((line) => (

@@ -13,7 +13,7 @@ export const MIN_APPROVAL_THRESHOLD = 0.6;
  * credited then, not before.
  *
  * Group fees (creating a group, the monthly fee) still go through mobile money
- * — that is the app being paid, not members paying each other.
+ * - that is the app being paid, not members paying each other.
  *
  * The API enforces this independently (MOBILE_MONEY_HOLD there); this flag is
  * what the screens read to lock the choice and say why. Lift both together.
@@ -27,7 +27,7 @@ export const MOBILE_MONEY_HOLD_NOTE =
 /**
  * Legal / support links surfaced in the app and required by the app stores
  * (privacy policy is mandatory; terms and a data-deletion page are expected for
- * a fintech app). Point these at the real hosted pages before submitting —
+ * a fintech app). Point these at the real hosted pages before submitting -
  * placeholders here are wired into the Profile screen and the store listing.
  */
 export const LEGAL_URLS = {

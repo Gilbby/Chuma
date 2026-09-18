@@ -143,13 +143,13 @@ export default function Governance() {
   const c = group.constitution;
   const lends = c?.internalLendingEnabled !== false;
 
-  // Only members who have actually joined hold office — a pending invite carries
+  // Only members who have actually joined hold office - a pending invite carries
   // the role but not the seat until it is accepted.
   const admins = (group.members ?? []).filter(
     (m: Member) => m.status !== "pending" && ADMIN_ROLES.includes(m.role)
   );
 
-  // A project-fund group (church) has no schedule, no dues and no share-out —
+  // A project-fund group (church) has no schedule, no dues and no share-out -
   // what it has is the projects members give toward.
   const projectFund = isProjectFundType(group.groupType);
   const openProjects = (group.projects ?? []).filter((p) => p.status === "active");
@@ -251,7 +251,7 @@ export default function Governance() {
           ))}
         </Card>
 
-        {/* Loan rules — absent entirely for savings-only groups */}
+        {/* Loan rules - absent entirely for savings-only groups */}
         {lends ? (
           <>
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   footnote: { fontSize: 12, lineHeight: 18, marginTop: 22, textAlign: "center" },
 });
 
-/* PROPOSALS — hidden until there is a backend for them. The previous version
+/* PROPOSALS - hidden until there is a backend for them. The previous version
    listed hardcoded proposals, had no vote button despite promising a vote, and
    lost anything you created on unmount. Rule and threshold editing went with
    it: the API has no group-update endpoint, so an edit could only ever have

@@ -9,7 +9,7 @@ import * as SecureStore from "expo-secure-store";
 import { AssertNoExtras, StorageBase, StorageItemValue } from "./storage-base";
 
 export class Storage extends StorageBase {
-  // General KV — backed by AsyncStorage.
+  // General KV - backed by AsyncStorage.
   async getItem<Fallback extends StorageItemValue>(
     key: string,
     fallback: Fallback,
@@ -46,7 +46,7 @@ export class Storage extends StorageBase {
     }
   }
 
-  // Sensitive values — Keychain (iOS) / EncryptedSharedPreferences (Android).
+  // Sensitive values - Keychain (iOS) / EncryptedSharedPreferences (Android).
   async secureGet<Fallback extends StorageItemValue>(
     key: string,
     fallback: Fallback,

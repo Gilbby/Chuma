@@ -68,7 +68,7 @@ const PRESETS: { key: PresetKey; label: string }[] = [
  * The roles that may read the group's own book.
  *
  * A member statement is your money; a group statement is everyone's, which
- * is an officer's job and nobody else's. The API enforces this — the toggle
+ * is an officer's job and nobody else's. The API enforces this - the toggle
  * below only avoids offering a door that would be shut. In a group where you
  * are just a member there is no toggle at all: a control that can only ever
  * fail is worse than no control.
@@ -82,7 +82,7 @@ const fmtShort = (d: string | Date) =>
 const fmtMonth = (d: Date) =>
   d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 
-/** The trailing 24 calendar months, newest first — the custom-range choices. */
+/** The trailing 24 calendar months, newest first - the custom-range choices. */
 function recentMonths(count = 24): Date[] {
   const now = new Date();
   return Array.from({ length: count }, (_, i) => new Date(now.getFullYear(), now.getMonth() - i, 1));
@@ -109,7 +109,7 @@ export default function StatementScreen() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   // Your role in a group arrives with this list, and the toggle's default
-  // depends on it — so a statement scoped to a group waits for it rather than
+  // depends on it - so a statement scoped to a group waits for it rather than
   // fetching the member view and immediately replacing it.
   const [groupsLoaded, setGroupsLoaded] = useState(false);
 
@@ -124,12 +124,12 @@ export default function StatementScreen() {
 
   useEffect(() => {
     // A statement is the record of what happened, so a group that has since
-    // been deleted still belongs in the picker — closing a group never takes
+    // been deleted still belongs in the picker - closing a group never takes
     // its history with it.
     getGroups({ includeClosed: true })
       .then(setGroups)
       .catch(() => setGroups([]))
-      // Even a failure settles the question — without the list nobody is an
+      // Even a failure settles the question - without the list nobody is an
       // officer, so the statement is the member view and should load.
       .finally(() => setGroupsLoaded(true));
   }, []);
@@ -143,8 +143,8 @@ export default function StatementScreen() {
   const officerHere = !!roleHere && OFFICER_ROLES.includes(roleHere);
 
   /**
-   * An officer opening a group they run wants the group's book — that is the
-   * job they opened it for — so the toggle starts on, and stays wherever they
+   * An officer opening a group they run wants the group's book - that is the
+   * job they opened it for - so the toggle starts on, and stays wherever they
    * put it until the group, or their role in it, changes underneath them.
    *
    * The key carries the role as well as the group because the role arrives a
@@ -184,7 +184,7 @@ export default function StatementScreen() {
   useAsyncEffect(load);
 
   // Settled money only, matching the export. A statement answers "what do I
-  // have and how did it get there" — a payment that might still fail belongs to
+  // have and how did it get there" - a payment that might still fail belongs to
   // the question "did my payment go through", which the Transactions tab and
   // the payment's own receipt answer. Printing the two side by side invites the
   // pending one being counted as though it had landed.
@@ -193,7 +193,7 @@ export default function StatementScreen() {
     [statement]
   );
 
-  // A church group's money is given, not saved. Same figures, different words —
+  // A church group's money is given, not saved. Same figures, different words -
   // see statementCopy. Scoped to one group it follows that group; across all of
   // them only an all-project-fund member gets the giving wording.
   const flavour = statementFlavourFor(
@@ -202,7 +202,7 @@ export default function StatementScreen() {
       : groups.map((g) => g.groupType)
   );
   const copy = statementCopy(flavour, scope);
-  const periodLabel = `${fmtDay(range.from)} – ${fmtDay(range.to)}`;
+  const periodLabel = `${fmtDay(range.from)} - ${fmtDay(range.to)}`;
 
   const choosePreset = (key: PresetKey) => {
     if (key === "custom") {
@@ -401,8 +401,8 @@ export default function StatementScreen() {
           </Card>
 
           {/* Every movement in the period. On screen this IS the statement:
-              what it was, when, and which way the money went. Anything more —
-              reference, method, fees, the running balance behind a line — is a
+              what it was, when, and which way the money went. Anything more -
+              reference, method, fees, the running balance behind a line - is a
               tap away on the receipt, or in the export. */}
           <SectionTitle colors={colors}>{copy.activityTitle.toUpperCase()}</SectionTitle>
           <Card padding={0}>
@@ -513,7 +513,7 @@ export default function StatementScreen() {
         </View>
       </Modal>
 
-      {/* Custom period picker — pick a start month, then an end month */}
+      {/* Custom period picker - pick a start month, then an end month */}
       <Modal
         visible={periodPickerOpen}
         transparent
@@ -531,7 +531,7 @@ export default function StatementScreen() {
           </Text>
           <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 16 }}>
             {customStart
-              ? `From ${fmtMonth(customStart)} to…`
+              ? `From ${fmtMonth(customStart)} to...`
               : "Choose the month your statement should start"}
           </Text>
           <ScrollView style={{ maxHeight: 320 }}>
@@ -574,14 +574,14 @@ const SectionTitle: React.FC<{ children: React.ReactNode; colors: Colors }> = ({
 
 /**
  * One movement, the way a phone should show it: what it was, when, and a
- * colour that says which way the money went — green in, red out. Everything a
+ * colour that says which way the money went - green in, red out. Everything a
  * receipt carries (reference, method, fees, network charge) is a tap away
  * rather than crammed into a row read standing up on a bus.
  */
 const ActivityRow: React.FC<{
   item: StatementActivity;
   label: string;
-  /** Who paid, or which group — whichever the current view leaves open. */
+  /** Who paid, or which group - whichever the current view leaves open. */
   meta: string;
   colors: Colors;
   last?: boolean;

@@ -2,7 +2,7 @@
  * One past share-out as a summary line: what it paid, to how many, and when.
  *
  * Shared by the short list on the reports tab and the full list screen so the
- * two never drift — a member who taps a run from either place has already read
+ * two never drift - a member who taps a run from either place has already read
  * the same row, and lands on the same breakdown.
  */
 import React from "react";

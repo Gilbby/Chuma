@@ -82,7 +82,7 @@ export async function api<T = any>(path: string, opts: Options = {}): Promise<T>
     const err = new Error(data?.error || `Request failed (${res.status})`) as ApiError;
     err.status = res.status;
     err.code = data?.code;
-    err.data = data; // full body — carries structured fields like `blockers`
+    err.data = data; // full body - carries structured fields like `blockers`
     throw err;
   }
 

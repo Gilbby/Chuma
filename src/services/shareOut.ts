@@ -164,7 +164,7 @@ export interface ShareOutTotals {
 /**
  * The receipt of a distribution that has finished. Enough to say a share-out
  * happened and point at the report, deliberately not enough to be mistaken for
- * a live one — a settled run belongs in the history, not on the share-out screen.
+ * a live one - a settled run belongs in the history, not on the share-out screen.
  */
 export interface ShareOutCompleted {
   shareOutId: string;
@@ -191,7 +191,7 @@ export interface ShareOutPayouts {
   payouts: ShareOutPayout[];
   /** How the run in progress pays. null when there is no run in progress. */
   method: "manual" | "mobile-money" | null;
-  /** pawaPay disbursement is down — the next run has to be paid manually. */
+  /** pawaPay disbursement is down - the next run has to be paid manually. */
   mobileMoneyHold: boolean;
   totals: ShareOutTotals | null;
   /** Set only when the last run is over and the screen is clear for the next. */

@@ -37,7 +37,7 @@ export function getGraceInfo(group: Group): {
   daysIntoGrace: number;
   daysLeft: number;
 } {
-  // Not a lapsed fee — a group that has not started. Reported separately so
+  // Not a lapsed fee - a group that has not started. Reported separately so
   // screens can say "waiting for payment" instead of "your fee is overdue".
   if (isAwaitingFirstPayment(group)) {
     return { status: "pending-payment", daysIntoGrace: 0, daysLeft: 0 };

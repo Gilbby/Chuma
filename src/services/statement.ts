@@ -1,4 +1,4 @@
-// Member account statement — the bank-statement view of one member's money.
+// Member account statement - the bank-statement view of one member's money.
 //
 // The running balance tracks SAVINGS only (contributions in, share-out out),
 // so `closingBalance` reconciles with the savings figure shown everywhere else
@@ -61,7 +61,7 @@ export interface StatementActivity {
  * One line of the cash breakdown: what a slice of the period's money was FOR.
  *
  * Built by the backend from each transaction's own meta, so a single combined
- * payment shows up as its legs — savings, loan repayment, penalties — rather
+ * payment shows up as its legs - savings, loan repayment, penalties - rather
  * than as one lump the member cannot account for. The rows on each side always
  * sum to that side's total.
  */
@@ -75,8 +75,8 @@ export interface StatementPurpose {
 /**
  * One project a member gave toward in the period.
  *
- * Only project-fund groups produce these — a savings contribution buys a stake,
- * not a project — so an empty array is the normal case and is what the client
+ * Only project-fund groups produce these - a savings contribution buys a stake,
+ * not a project - so an empty array is the normal case and is what the client
  * keys the whole section off. `amount` is what THIS member gave; `collected`
  * and `targetAmount` are the group's progress, shown beside it for context.
  *
@@ -134,7 +134,7 @@ export interface Statement {
  *
  * `scope: "group"` asks for the whole group's book rather than the caller's
  * own account. The API only answers it for an officer of that group, so a
- * groupId is required — and the screen only offers the switch to a role that
+ * groupId is required - and the screen only offers the switch to a role that
  * actually holds it.
  */
 export async function getStatement(opts: {

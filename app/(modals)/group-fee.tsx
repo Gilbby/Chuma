@@ -102,7 +102,7 @@ export default function GroupFeeScreen() {
     );
   }
 
-  // Success screen — replaces the payment form after paying
+  // Success screen - replaces the payment form after paying
   if (paid && receipt) {
     const [y, m, d] = receipt.paidThrough.split("-").map(Number);
     const paidUntilLabel = new Date(y, m - 1, d).toLocaleDateString("en-GB", {
@@ -269,7 +269,7 @@ export default function GroupFeeScreen() {
     try {
       const res = await payGroupFee(group.id, me?.phone);
       const r = res?.receipt ?? {};
-      // While the payment is processing, paidThrough hasn't advanced yet —
+      // While the payment is processing, paidThrough hasn't advanced yet -
       // the settlement service extends it once PawaPay confirms.
       const pending = !r.paidThrough;
       const paidThrough =
@@ -315,12 +315,12 @@ export default function GroupFeeScreen() {
           <Text style={[styles.amount, { color: colors.textMain }]}>{formatZMW(amountOwed)}</Text>
           <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 4 }}>
             {awaitingFirstPayment
-              ? "Registration fee — month 1"
+              ? "Registration fee - month 1"
               : `${monthsOwed} month${monthsOwed === 1 ? "" : "s"} × ${formatZMW(group.monthlyFee ?? 100)}`}
           </Text>
         </Card>
 
-        {/* Breakdown — only when more than one month is owed */}
+        {/* Breakdown - only when more than one month is owed */}
         {monthsOwed > 1 && (
           <Card padding={16} style={{ marginTop: 14 }}>
             <Text style={[styles.overline, { color: colors.textMuted, marginBottom: 4 }]}>MONTHS OWED</Text>
@@ -347,7 +347,7 @@ export default function GroupFeeScreen() {
           </Card>
         )}
 
-        {/* Paying from — auto-detected registered wallet */}
+        {/* Paying from - auto-detected registered wallet */}
         <Text style={[styles.overline, { color: colors.textMuted, marginTop: 20, marginBottom: 8 }]}>
           PAYING FROM
         </Text>
@@ -391,7 +391,7 @@ export default function GroupFeeScreen() {
           </Text>
         ) : null}
         <Button
-          label={paying ? "Processing…" : `Pay ${formatZMW(amountOwed)}`}
+          label={paying ? "Processing..." : `Pay ${formatZMW(amountOwed)}`}
           onPress={handlePay}
           disabled={paying}
           loading={paying}

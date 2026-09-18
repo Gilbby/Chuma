@@ -13,7 +13,7 @@ function mapNotice(raw: any): Notice {
 /**
  * An invite the user can still act on. Notifications written before
  * "invite_accepted" existed have type "invite" even when they are really the
- * inviter's own "X accepted" confirmation — those carry no `invitedBy`, so they
+ * inviter's own "X accepted" confirmation - those carry no `invitedBy`, so they
  * are excluded here rather than rendered with dead Accept/Decline buttons.
  */
 export function isActionableInvite(n: Notice): boolean {

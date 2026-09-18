@@ -11,13 +11,13 @@ export interface Member {
   contributions: number;
   loanActive?: number;
   // "pending" = invited but hasn't accepted yet. They are NOT part of the group
-  // until they accept — don't count them, don't show them as members.
+  // until they accept - don't count them, don't show them as members.
   status?: "pending" | "active" | "removed";
   invitedByName?: string;
   invitedAt?: string;
   lastInviteSentAt?: string;
   // Frozen at removal. A former member's row is kept as the group's record of
-  // them — savings goes to 0 when the refund lands, these do not.
+  // them - savings goes to 0 when the refund lands, these do not.
   exitedAt?: string;
   exitSavings?: number;
   exitRefund?: number;
@@ -34,7 +34,7 @@ export type GroupType =
 /**
  * Types that collect toward NAMED PROJECTS instead of running a contribution
  * cycle. A church group takes whatever members choose to give, whenever they
- * give it, and spends it on the project it was given for — so it has no fixed
+ * give it, and spends it on the project it was given for - so it has no fixed
  * amount, no frequency, no deadline, no late penalty, no loans and no
  * share-out. What it has instead is `Group.projects`.
  * Mirrors PROJECT_FUND_TYPES in the API's logic.service.js.
@@ -44,7 +44,7 @@ export const PROJECT_FUND_TYPES: GroupType[] = ["church-group"];
 export const isProjectFundType = (t?: GroupType | "" | null): boolean =>
   !!t && PROJECT_FUND_TYPES.includes(t);
 
-/** A thing the group is raising money for — "Church building", "Mission trip". */
+/** A thing the group is raising money for - "Church building", "Mission trip". */
 export interface GroupProject {
   id: string;
   name: string;
@@ -73,10 +73,10 @@ export interface GroupConstitution {
   gracePeriodDays: number;
   loanMultiplier: number;
   loanInterestRate: number;
-  loanRepaymentMonths: number; // legacy single cap — kept as a fallback
+  loanRepaymentMonths: number; // legacy single cap - kept as a fallback
   loanRepaymentTiers?: LoanRepaymentTier[];
   // No new loans may be issued within this many months of share-out, so every
-  // loan is due before the cycle closes. VSLA norm is 1–2 months.
+  // loan is due before the cycle closes. VSLA norm is 1-2 months.
   loanFreeWindowMonths?: number;
   internalLendingEnabled: boolean;
   approvalThreshold: "2-of-3" | "majority" | "all";
@@ -93,7 +93,7 @@ export interface GroupGovernance {
 
 export interface FeeStatus {
   // "pending-payment" is a brand-new group whose registration fee has not
-  // settled yet — not overdue, just not started. `locked` is true for it too.
+  // settled yet - not overdue, just not started. `locked` is true for it too.
   status: "paid" | "grace" | "locked" | "pending-payment";
   daysIntoGrace: number;
   daysLeft: number;
@@ -128,7 +128,7 @@ export interface Group {
    *  anyone who is not a member of the group. */
   yourSavings?: number;
   yourContributions?: number;
-  /** Savings projects. Only project-fund types (church) have any — see
+  /** Savings projects. Only project-fund types (church) have any - see
    *  isProjectFundType. Always set by the service layer; optional so older
    *  shapes still type. */
   projects?: GroupProject[];
@@ -186,7 +186,7 @@ export interface Loan {
   history: { date: string; amount: number; type: "disbursement" | "repayment" }[];
 }
 
-/** One admin's decision on an approval — the row of its history trail. */
+/** One admin's decision on an approval - the row of its history trail. */
 export interface ApprovalVote {
   /** Who voted. Absent on older votes recorded before the id was stored. */
   adminId?: string;
@@ -206,7 +206,7 @@ export interface Approval {
     | "group-deletion"
     | "share-out"
     // An admin acknowledging that cash physically reached them. Needs one
-    // admin, not a quorum — see the API's cashReceipt service.
+    // admin, not a quorum - see the API's cashReceipt service.
     | "cash-receipt";
   title: string;
   description: string;
@@ -218,7 +218,7 @@ export interface Approval {
   votesFor: number;
   votesAgainst: number;
   totalVoters: number;
-  /** share-out only: how this run pays. Voters are approving the method too —
+  /** share-out only: how this run pays. Voters are approving the method too -
    *  "manual" means the group pays each member itself (notes, the treasurer's
    *  own mobile money, a bank transfer) and confirms each one in the app. */
   payoutMethod?: "manual" | "mobile-money";
@@ -227,14 +227,14 @@ export interface Approval {
   // distributed). An approved-but-not-executed action can be run again.
   status: "pending" | "approved" | "rejected" | "executed";
   /** cash-receipt only: whose duty this receipt is. The treasurer, who keeps
-   *  the cash box — and the chairperson only when the group has no treasurer.
+   *  the cash box - and the chairperson only when the group has no treasurer.
    *  Any admin may still confirm it; this is who it was addressed to. Absent on
    *  receipts raised before the role was recorded. */
   confirmerRole?: "Treasurer" | "Chairperson";
-  /** Who a member-removal is about — they never vote on their own removal. */
+  /** Who a member-removal is about - they never vote on their own removal. */
   targetUserId?: string;
   targetName?: string;
-  /** Who decided, and when — shown on resolved approvals in the history. */
+  /** Who decided, and when - shown on resolved approvals in the history. */
   votes?: ApprovalVote[];
   /** When it stopped being pending. Absent while still pending. */
   resolvedAt?: string;

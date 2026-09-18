@@ -15,7 +15,7 @@ function mapGroup(raw: any, currentUserId?: string): Group {
   const members = rows.filter((m: any) => m.status !== "removed");
 
   // A former member can be invited back, and the API adds a fresh row rather
-  // than reviving the old one — so someone who has rejoined has BOTH a removed
+  // than reviving the old one - so someone who has rejoined has BOTH a removed
   // row and a live one. They are in the group now, so their old row is dropped
   // from `formerMembers`: nobody should read as active and departed at once.
   const backInTheGroup = new Set(
@@ -55,7 +55,7 @@ function mapGroup(raw: any, currentUserId?: string): Group {
     yourRole: mine?.role ?? "Member",
     yourSavings: mine?.savings ?? 0,
     yourContributions: mine?.contributions ?? 0,
-    // keep shareOutDate / nextContributionDate as ISO strings — Hermes date math
+    // keep shareOutDate / nextContributionDate as ISO strings - Hermes date math
     // needs ISO; components format for display. Do NOT reformat here.
   };
 }
@@ -66,7 +66,7 @@ function mapGroup(raw: any, currentUserId?: string): Group {
  * Groups still waiting on their registration fee are left out by default: the
  * API refuses every action inside one (423), so offering it in a contribute /
  * loan / report picker only leads to an error. Pass `includePending` on screens
- * whose job is to show the founder that the payment is still outstanding — the
+ * whose job is to show the founder that the payment is still outstanding - the
  * Groups tab.
  */
 export async function getGroups(
@@ -87,12 +87,12 @@ export async function getGroups(
 /**
  * Delete a group. Nothing is erased: the API closes the group, and every
  * transaction, receipt, penalty and statement line under it is kept and stays
- * readable — a member can still pull a statement for a group that ended a year
+ * readable - a member can still pull a statement for a group that ended a year
  * ago. What goes is the group itself: it leaves everyone's list and nothing new
  * can be written into it.
  *
  * Whether it happens now depends on who else is there. `deleted: true` means it
- * is done — there was no other admin to ask. `deleted: false` means it is a
+ * is done - there was no other admin to ask. `deleted: false` means it is a
  * proposal the group's other admins vote on, exactly like a member removal.
  *
  * The API refuses while the group still holds savings or has open loans (400):
@@ -144,7 +144,7 @@ export async function createGroup(payload: any): Promise<{ group: any; transacti
 }
 
 /**
- * Add a savings project to a project-fund group (church). Chairperson only —
+ * Add a savings project to a project-fund group (church). Chairperson only -
  * the API refuses anyone else, and refuses group types that do not use
  * projects at all.
  */
@@ -264,7 +264,7 @@ export interface GroupInvite {
 /**
  * Invitations waiting on this user, read from the groups themselves rather than
  * from notifications. An invite therefore survives its notification being read
- * or cleared — it leaves this list only once accepted or declined.
+ * or cleared - it leaves this list only once accepted or declined.
  */
 export async function getMyInvites(): Promise<GroupInvite[]> {
   const res = await api<{ invites: GroupInvite[] }>("/groups/invites");

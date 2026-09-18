@@ -7,7 +7,7 @@ import { api } from "./apiClient";
  *
  * The member gets a single PawaPay prompt (mobile money) or hands the treasurer
  * one lump of cash, and is charged a single transaction fee. The backend prices
- * the grand total once and splits it across every obligation on settlement — see
+ * the grand total once and splits it across every obligation on settlement - see
  * the "combined" branch of settlement.service.js in chuma-api.
  */
 export type CheckoutPayload = {
@@ -23,7 +23,7 @@ export type CheckoutPayload = {
   /** Project-fund groups (church) only: which project the savings pay into.
    *  Required by the API whenever the savings leg is above zero. */
   projectId?: string;
-  /** "MTN MoMo" | "Airtel Money" | "Zamtel Kwacha" | "Cash" | … */
+  /** "MTN MoMo" | "Airtel Money" | "Zamtel Kwacha" | "Cash" | ... */
   paymentMethod: string;
   payerPhone?: string;
 };

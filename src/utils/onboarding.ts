@@ -34,7 +34,7 @@ export async function clearPendingOnboarding(): Promise<boolean> {
 export async function resumeRoute(): Promise<string> {
   const pending = await storage.getItem<string | null>(STEP_KEY, null);
   if (pending) return pending;
-  // No marker — an account created by a build that predates this, or storage
+  // No marker - an account created by a build that predates this, or storage
   // that lost it. The cached profile still says whether the name step ran.
   // Sent back to the tabs afterwards, never on to PIN setup: this user may
   // already have a PIN, and re-setting one outside the OTP window is refused

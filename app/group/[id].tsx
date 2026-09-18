@@ -118,7 +118,7 @@ const formatProjectDeadline = (iso: string) =>
   });
 
 // The form works in plain "YYYY-MM-DD" days, which is what the API is sent and
-// what it stores (UTC midnight) — so a day never shifts on the way through.
+// what it stores (UTC midnight) - so a day never shifts on the way through.
 const toISODay = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate()
@@ -254,7 +254,7 @@ export default function GroupDetails() {
   const pendingMembers = useMemo(() => pendingInvites(group), [group]);
 
   // People who have left. Their row is kept so the group keeps its record of
-  // what they saved and contributed — removal ends a membership, it does not
+  // what they saved and contributed - removal ends a membership, it does not
   // erase a history.
   const formerMembers = useMemo(
     () => group?.formerMembers ?? [],
@@ -320,7 +320,7 @@ export default function GroupDetails() {
   );
 
   /**
-   * Propose a removal. This never removes anyone on its own — it opens a vote
+   * Propose a removal. This never removes anyone on its own - it opens a vote
    * for the group's other admins, and the member's savings are refunded to
    * their wallet if it carries. Say both things plainly before asking.
    */
@@ -365,7 +365,7 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
    * Delete the group. Two things have to be said before anyone taps yes, and
    * both are said here rather than in a toast afterwards:
    *
-   *   1. Records survive. Closing a group never takes its history with it —
+   *   1. Records survive. Closing a group never takes its history with it -
    *      contributions, receipts, penalties and statements all stay readable,
    *      which is the whole reason this is a close and not a delete.
    *   2. It may not happen now. With other admins in the group this is a
@@ -394,7 +394,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   router.replace("/(tabs)/groups");
                   Alert.alert(
                     "Group deleted",
-                    `${groupName} is closed. Its records stay in the app — open Transactions or a statement to see them.`
+                    `${groupName} is closed. Its records stay in the app - open Transactions or a statement to see them.`
                   );
                   return;
                 }
@@ -526,13 +526,13 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
     ? (group.monthlyFee ?? group.registrationFee ?? 0)
     : (group.feeStatus?.amountOwed ?? getAmountOwed(group));
   // Privileges inside a group follow the user's role IN THIS GROUP, not their
-  // app-wide menu role — a global Chairperson is only a Member here if that's
+  // app-wide menu role - a global Chairperson is only a Member here if that's
   // how they joined this group.
   const effectiveRole = group.yourRole;
   const canPayFee =
     effectiveRole === "Chairperson" ||
     effectiveRole === "Treasurer";
-  // Resending or withdrawing an invite is an admin action — same set the API
+  // Resending or withdrawing an invite is an admin action - same set the API
   // enforces on /invite (requireGroupAdmin).
   const isAdmin = effectiveRole !== "Member";
   // Deleting is the group's most destructive act, so the app says up front
@@ -543,28 +543,28 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
   ).length;
   const soloAdmin = adminCount <= 1;
   // A deletion the other admins are still voting on. The group works normally
-  // meanwhile — the vote can fail — but nobody should propose it twice.
+  // meanwhile - the vote can fail - but nobody should propose it twice.
   const deletionPending = group.status === "deletion-pending";
 
   // Church-style group: gives toward named projects. No cycle, no dues, no
-  // loans, no penalties and no share-out — so none of that is shown here.
+  // loans, no penalties and no share-out - so none of that is shown here.
   const isProjectFund = isProjectFundType(group.groupType);
   const projects = group.projects ?? [];
   const activeProjects = projects.filter((p) => p.status === "active");
   const totalRaised = projects.reduce((sum, p) => sum + p.collected, 0);
-  // Opening a project — and renaming one, or moving its goal or deadline —
+  // Opening a project - and renaming one, or moving its goal or deadline -
   // decides what members' money can be given toward, so it is the
   // Chairperson's call. The API enforces the same on both routes.
   const canManageProjects = isProjectFund && effectiveRole === "Chairperson";
 
   // Closing a church group ends what the congregation is giving toward, so it
-  // is the Chairperson alone who may start it — a Treasurer or Secretary does
+  // is the Chairperson alone who may start it - a Treasurer or Secretary does
   // not see the danger zone at all. Every other group type keeps the older
   // rule, where any admin may propose it and the rest vote.
   const canDeleteGroup = isProjectFund ? effectiveRole === "Chairperson" : isAdmin;
 
   // What each person has given to a church group is between them and the
-  // leadership — a congregation reads its neighbours' giving as a ranking, and
+  // leadership - a congregation reads its neighbours' giving as a ranking, and
   // it is not what the tab is for. Admins still see every figure, because
   // reconciling the money is their job. Every other group type is a savings
   // club where members pool and share out together, so who saved what stays
@@ -704,7 +704,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
           )}
         </View>
 
-        {/* Cycle progress — a project-fund group has no cycle; progress is per
+        {/* Cycle progress - a project-fund group has no cycle; progress is per
             project, on the Projects tab. */}
         {!isProjectFund && (
         <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
@@ -747,7 +747,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 { k: "governance", label: "Governance" },
               ] as { k: TabKey; label: string }[])
           )
-            // Voting is an admin duty — the API refuses a member's vote outright
+            // Voting is an admin duty - the API refuses a member's vote outright
             // ("Only group admins can vote on approvals"), so a member opening
             // this tab could only watch. Showing it offered a decision they were
             // never able to make.
@@ -810,7 +810,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
 
             {/* Invited, not yet joined. Kept out of the members list above so the
                 group's headcount and savings never count someone who hasn't
-                accepted — and so an admin can chase or withdraw the invite.
+                accepted - and so an admin can chase or withdraw the invite.
                 Admins only: an unanswered invite is theirs to chase, and an
                 ordinary member has nothing to do about it. */}
             {isAdmin && pendingMembers.length > 0 && (
@@ -855,7 +855,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
 
             {/* Left the group. Kept on the record deliberately: their savings,
                 contributions and every transaction they made stay in the
-                group's books after they go. Read-only — nothing here removes
+                group's books after they go. Read-only - nothing here removes
                 or edits what they did. */}
             {formerMembers.length > 0 && (
               <View style={{ marginTop: 20 }}>
@@ -950,7 +950,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                       <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
                         {formatZMW(p.collected)}
                       </Text>
-                      {/* An archived project is history — the API refuses to
+                      {/* An archived project is history - the API refuses to
                           edit one, so no pencil is offered for it. */}
                       {canManageProjects && p.status !== "archived" && (
                         <Pressable
@@ -1029,7 +1029,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               </Card>
             )}
 
-            {/* The only way to open a project, and the Chairperson's alone —
+            {/* The only way to open a project, and the Chairperson's alone -
                 it sits at the end of the list because that is where someone
                 reading the projects looks for the way to add one. The API
                 refuses everyone else too. */}
@@ -1340,7 +1340,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 </View>
               </Card>
             </Pressable>
-            {/* A project-fund group never shares out — there is no pot to
+            {/* A project-fund group never shares out - there is no pot to
                 split and no forecast to make. */}
             {!isProjectFund && (
             <>
@@ -1403,8 +1403,8 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               </Card>
             </Pressable>
 
-            {/* Deleting the group. Admins only — the Chairperson alone in a
-                church group, and the API refuses anyone else either way — and
+            {/* Deleting the group. Admins only - the Chairperson alone in a
+                church group, and the API refuses anyone else either way - and
                 it says plainly that the records outlive the group, because that
                 is the question anyone about to tap this is asking. */}
             {canDeleteGroup && (
@@ -1439,12 +1439,12 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   </View>
                   <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 19, marginTop: 12 }}>
                     Records are kept. Contributions, receipts, penalties and statements all
-                    stay in the app and can still be opened from Transactions — deleting the
+                    stay in the app and can still be opened from Transactions - deleting the
                     group only closes it, it never erases what happened in it.
                   </Text>
                   {(group.totalSavings ?? 0) > 0 || (group.loanCirculation ?? 0) > 0 ? (
                     <Text style={{ color: colors.warning, fontSize: 12, lineHeight: 19, marginTop: 10 }}>
-                      The group still holds money. Share out and settle any open loans first —
+                      The group still holds money. Share out and settle any open loans first -
                       it cannot be deleted while savings or loans are still in it.
                     </Text>
                   ) : null}
@@ -1589,7 +1589,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   </Card>
                 )}
 
-                {/* Their giving, transaction by transaction — held to the same
+                {/* Their giving, transaction by transaction - held to the same
                     rule as the totals above. */}
                 {canSeeMemberMoney && (
                   <>
@@ -1861,7 +1861,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 ) as any;
                 if (existing) {
                   if (existing.status === "pending") {
-                    // Already invited and still waiting — the useful action here
+                    // Already invited and still waiting - the useful action here
                     // is to send the invitation again, not to refuse outright.
                     Alert.alert(
                       "Already invited",
@@ -1917,7 +1917,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
         <View style={StyleSheet.absoluteFill}>
           <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.65)" }]}>
-            {/* Back icon — top left, respects status bar */}
+            {/* Back icon - top left, respects status bar */}
             <Pressable
               onPress={() => router.back()}
               testID="group-locked-back-btn"
@@ -1973,7 +1973,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 {awaitingFirstPayment
                   ? canPayFee
                     ? `${group.name} opens once its ${formatZMW(amountOwed)} registration fee is received. Nothing can be added or contributed until then.`
-                    : "This group has not started yet — its registration fee is still being confirmed. Please check back soon."
+                    : "This group has not started yet - its registration fee is still being confirmed. Please check back soon."
                   : canPayFee
                     ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
                     : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}
@@ -1993,7 +1993,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               )}
               {/* The other way out. A group created by mistake, or one whose
                   fee is never going to be paid, is otherwise a locked screen
-                  the founder can do nothing with — and this overlay is the
+                  the founder can do nothing with - and this overlay is the
                   only screen they can reach inside it. */}
               {isAdmin && (
                 <Pressable
@@ -2054,7 +2054,7 @@ const LegendDot = ({
 );
 
 /**
- * The fields a project is made of — name, goal and deadline — used both to add
+ * The fields a project is made of - name, goal and deadline - used both to add
  * one and to edit one. The goal and the deadline are optional in the same way
  * they are at group creation: blank means "no goal set" and "collect for as
  * long as it takes", and clearing either one later says the same thing.
@@ -2252,7 +2252,7 @@ const MemberRow = ({
   colors: ReturnType<typeof useTheme>["colors"];
   /** A removal for this member is waiting on the other admins' votes. */
   removalPending?: boolean;
-  /** False hides what this person has put in — see canSeeMemberMoney. */
+  /** False hides what this person has put in - see canSeeMemberMoney. */
   showMoney?: boolean;
 }) => {
   const roleVariant: "primary" | "warning" | "info" | "neutral" =
@@ -2293,7 +2293,7 @@ const FormerMemberRow = ({
 }: {
   member: Member;
   colors: ReturnType<typeof useTheme>["colors"];
-  /** False hides what they put in — see canSeeMemberMoney. */
+  /** False hides what they put in - see canSeeMemberMoney. */
   showMoney?: boolean;
 }) => {
   const left = formatDate(member.exitedAt);
@@ -2310,7 +2310,7 @@ const FormerMemberRow = ({
           {member.name}
         </Text>
         {/* The number they were on the books under. Kept visible so the group
-            can still identify and reach someone after they've gone — names
+            can still identify and reach someone after they've gone - names
             repeat in a village, numbers don't. */}
         {member.phone ? (
           <Text
@@ -2357,7 +2357,7 @@ const PendingInviteRow = ({
   const displayName = inviteDisplayName(member);
   return (
     // No avatar here, unlike a member row: an invitee often has no account yet,
-    // so the circle is initials of a phone number — and the row needs the width
+    // so the circle is initials of a phone number - and the row needs the width
     // for the badge and the two actions.
     <View style={[styles.memberRow, { opacity: busy ? 0.5 : 1 }]}>
       <View style={{ flex: 1 }}>

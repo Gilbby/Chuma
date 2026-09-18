@@ -1,5 +1,5 @@
 // Reporting/analytics data. Backed by the API; swap freely
-// when a richer reports backend is available — no UI changes.
+// when a richer reports backend is available - no UI changes.
 
 import { api } from "./apiClient";
 

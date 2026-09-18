@@ -1,5 +1,5 @@
 // All stats are derived from Group + Loan data. When a backend is connected,
-// pass real groups and loans to these same functions — no UI changes required.
+// pass real groups and loans to these same functions - no UI changes required.
 
 import type { Group, Loan } from "@/src/types";
 

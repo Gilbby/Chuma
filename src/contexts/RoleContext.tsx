@@ -45,7 +45,7 @@ export const TESTER_PHONE = "260975988642";
 
 const ROLES: Role[] = ["Chairperson", "Treasurer", "Secretary", "Member"];
 
-/** Most senior first — a user's app-wide role is the best one they hold anywhere. */
+/** Most senior first - a user's app-wide role is the best one they hold anywhere. */
 const SENIORITY: Role[] = ["Chairperson", "Treasurer", "Secretary", "Member"];
 
 const RULES: Record<Role, Permission[]> = {
@@ -106,7 +106,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Logged out (welcome / OTP screens) — no call, so no 401 redirect loop.
+      // Logged out (welcome / OTP screens) - no call, so no 401 redirect loop.
       const token = await getToken();
       if (!token) {
         setRoleState("Member");
@@ -116,7 +116,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const groups = await getGroups();
       setRoleState(highestRole(groups.map((g) => g.yourRole).filter(isRole)));
     } catch {
-      // Offline or a failed fetch must not escalate privileges — stay a Member.
+      // Offline or a failed fetch must not escalate privileges - stay a Member.
       setRoleState("Member");
     } finally {
       setLoading(false);
@@ -142,7 +142,7 @@ export const RoleProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => sub.remove();
   }, [refresh]);
 
-  // Manual override, testers only — persisted so it survives a reload.
+  // Manual override, testers only - persisted so it survives a reload.
   const setRole = useCallback(
     (r: Role) => {
       if (!isTester) return;

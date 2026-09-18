@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/src/services/apiClient";
 
 // Server-computed fee breakdown for a payout (share-out or loan disbursement).
-// The client NEVER computes these — it only displays what /pricing/preview
+// The client NEVER computes these - it only displays what /pricing/preview
 // returns. When fees would exceed the amount, the server responds { tooSmall }.
 export type PayoutPreview =
   | {
@@ -28,7 +28,7 @@ export type ContributionPreview = {
 /**
  * Debounced POST /pricing/preview. Fires on amount changes (default 400ms
  * debounce) so we don't send a request per keystroke, and never throws into
- * render — failures surface as `error`, keeping the screen alive.
+ * render - failures surface as `error`, keeping the screen alive.
  */
 export function usePricingPreview<T = PayoutPreview>(
   kind: "contribution" | "payout",

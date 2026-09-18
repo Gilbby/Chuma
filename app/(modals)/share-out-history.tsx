@@ -3,7 +3,7 @@
  *
  * The reports tab lists only the last few. A group four cycles in has a record
  * older than that, and "what did I get in 2023" is exactly the question this
- * screen exists to answer — so the full list gets its own scroll, with the
+ * screen exists to answer - so the full list gets its own scroll, with the
  * running total of everything the group has ever paid out at the top.
  */
 import React, { useCallback, useState } from "react";

@@ -32,10 +32,10 @@ function mapApproval(raw: any): Approval {
     timestamp: raw.createdAt ?? raw.date ?? "",
     status: raw.status,
     // cash-receipt only, and only on receipts raised since the API started
-    // recording it — the screen falls back to neutral wording without it.
+    // recording it - the screen falls back to neutral wording without it.
     confirmerRole: raw.confirmerRole,
     votes: votes.map((v: any) => ({
-      // Carried through so a screen can ask "did I vote on this?" — the name
+      // Carried through so a screen can ask "did I vote on this?" - the name
       // alone cannot answer that in a group with two Marys.
       adminId: v.adminId ? String(v.adminId) : undefined,
       adminName: v.adminName || "An admin",
@@ -48,7 +48,7 @@ function mapApproval(raw: any): Approval {
 }
 
 /**
- * "pending" is the work queue (the default — most screens want only that);
+ * "pending" is the work queue (the default - most screens want only that);
  * "resolved" is the history (approved, rejected, executed); "all" is both.
  */
 export type ApprovalScope = "pending" | "resolved" | "all";
@@ -68,7 +68,7 @@ export async function getApprovals(opts?: {
 }
 
 /**
- * Re-run an approved action that could not complete when the vote carried —
+ * Re-run an approved action that could not complete when the vote carried -
  * a refund the group wallet couldn't cover yet, say. The votes stand.
  */
 export async function runApproval(

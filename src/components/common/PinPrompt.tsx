@@ -23,7 +23,7 @@ type Props = {
   onCancel: () => void;
   /**
    * The account has no PIN to check against (they skipped that step). The
-   * caller decides what that means — locking someone out of their own screen
+   * caller decides what that means - locking someone out of their own screen
    * over a PIN they were never asked to set would be worse than letting them
    * through.
    */

@@ -46,7 +46,7 @@ export default function Otp() {
     setError("");
     try {
       const res = await verifyOtp(phone, codeStr, mode);
-      // Signup asks for a display name, then a PIN — that is the whole of it.
+      // Signup asks for a display name, then a PIN - that is the whole of it.
       // KYC is never part of signing up; it is asked for once, at Create group,
       // because founding a group charges the K100 fee and makes you Chairperson.
       const dest =

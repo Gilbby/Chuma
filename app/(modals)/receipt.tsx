@@ -57,7 +57,7 @@ export default function ReceiptScreen() {
   // stable number instead of a new one each time params change.
   const [fallbackTxnId] = useState(() => `CHM-${Date.now().toString().slice(-8)}`);
 
-  // Build the receipt entirely from params — callers pass all needed data.
+  // Build the receipt entirely from params - callers pass all needed data.
   const data = useMemo(() => {
     const txnId = params.txnId
       ? params.txnId

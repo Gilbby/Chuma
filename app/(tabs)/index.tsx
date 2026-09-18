@@ -142,7 +142,7 @@ export default function Home() {
     await setBalanceHiddenPref(false);
   };
 
-  // Hiding needs no proof — anyone may cover the number. Revealing does: the
+  // Hiding needs no proof - anyone may cover the number. Revealing does: the
   // fingerprint/face they enabled, falling back to their Chuma PIN if they
   // never enabled it, cancel it, or it fails.
   const toggleBalance = async () => {
@@ -188,7 +188,7 @@ export default function Home() {
   const upcomingRepayment = nextRepaymentLoan?.installmentAmount ?? 0;
   const upcomingRepaymentDate = nextRepaymentLoan?.nextDueDate
     ? formatDueDate(nextRepaymentLoan.nextDueDate)
-    : "—";
+    : "-";
 
   const upcomingContribution = groups
     .filter((g) => g.nextContributionDate)
@@ -272,8 +272,8 @@ export default function Home() {
     can("approve.shareout");
 
   // The share-out screen resolves the group from groupId and shows nothing
-  // without one. Prefer the group whose share-out is soonest — that is the one
-  // anyone opening this is thinking about — and fall back to their first group.
+  // without one. Prefer the group whose share-out is soonest - that is the one
+  // anyone opening this is thinking about - and fall back to their first group.
   const shareOutGroupId = nextPayout?.groupId ?? groups[0]?.id;
   const shareOutRoute = shareOutGroupId
     ? `/share-out?groupId=${shareOutGroupId}`
@@ -299,11 +299,11 @@ export default function Home() {
     : "/groups";
 
   // Repay now lives on the unified payment screen (loans show among the dues),
-  // reached from Payments — so the freed slot surfaces the account statement.
+  // reached from Payments - so the freed slot surfaces the account statement.
   const statementsAction: QuickAction = { label: "Statements", icon: FileText, route: "/statement" };
 
   // Approvers get Approve; everyone else (Members) gets Share-out in its
-  // place — or, where every group they are in gives toward projects and so
+  // place - or, where every group they are in gives toward projects and so
   // never shares out, Projects instead.
   const roleAction: QuickAction = canApprove
     ? { label: "Approve", icon: CheckSquare, route: "/approvals", badge: pendingApprovals }
@@ -312,8 +312,8 @@ export default function Home() {
       : { label: "Share-out", icon: Gift, route: shareOutRoute };
 
   const quickActions: QuickAction[] = [
-    // A project fund holds no savings stake — the money is given toward a
-    // project, not put aside — so the tile names the act, not the pot.
+    // A project fund holds no savings stake - the money is given toward a
+    // project, not put aside - so the tile names the act, not the pot.
     {
       label: projectFundOnly ? "Contribution" : "Saving",
       icon: PiggyBank,
@@ -465,7 +465,7 @@ export default function Home() {
         >
           <OverviewCard
             label="Contribution due"
-            value={upcomingContribution ? formatZMW(upcomingContribution.nextContributionAmount ?? upcomingContribution.contributionAmount) : "—"}
+            value={upcomingContribution ? formatZMW(upcomingContribution.nextContributionAmount ?? upcomingContribution.contributionAmount) : "-"}
             sub={
               daysUntilDue === null
                 ? "Nothing due"
@@ -488,7 +488,7 @@ export default function Home() {
           />
           <OverviewCard
             label="Next repayment"
-            value={myLoanCount > 0 ? formatZMW(upcomingRepayment) : "—"}
+            value={myLoanCount > 0 ? formatZMW(upcomingRepayment) : "-"}
             sub={myLoanCount > 0 ? upcomingRepaymentDate : "Nothing due"}
             tint={colors.info}
             mode={mode}
@@ -642,7 +642,7 @@ export default function Home() {
         subtitle="Confirm it's you to show your balance."
         onSuccess={revealBalance}
         onCancel={() => setPinOpen(false)}
-        // Never set a PIN, so there is nothing to check — show the balance
+        // Never set a PIN, so there is nothing to check - show the balance
         // rather than locking them out of their own figure.
         onNoPin={revealBalance}
         testID="home-balance-pin"

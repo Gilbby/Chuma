@@ -1,6 +1,6 @@
 /**
  * Date formatting for display. The API returns ISO strings and services keep
- * them that way (Hermes date math needs ISO) — format only at the render edge.
+ * them that way (Hermes date math needs ISO) - format only at the render edge.
  */
 
 /** "5 Oct 2026". Returns "" for a missing or unparseable value. */

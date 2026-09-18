@@ -10,7 +10,7 @@ export default function TabsLayout() {
   const { refresh } = useRole();
 
   // The provider mounts above the auth stack, so it derived the role before
-  // sign-in. Entering the tabs is the first moment a token exists — re-derive.
+  // sign-in. Entering the tabs is the first moment a token exists - re-derive.
   useEffect(() => {
     refresh();
   }, [refresh]);

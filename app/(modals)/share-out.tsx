@@ -76,7 +76,7 @@ function PayoutStatus({ p, colors }: { p: ShareOutPayout; colors: any }) {
 
   if (p.status === "completed") {
     // Their whole share went to their own loan, so there was never anything to
-    // hand over — say that rather than claiming we paid them nothing.
+    // hand over - say that rather than claiming we paid them nothing.
     if (p.amount <= 0 && p.appliedToLoan > 0)
       return line(Check, colors.textMuted, "Cleared against their loan");
     if (p.viaMobileMoney) return line(Check, colors.success, "Sent to mobile wallet");
@@ -89,7 +89,7 @@ function PayoutStatus({ p, colors }: { p: ShareOutPayout; colors: any }) {
     );
   }
 
-  if (p.viaMobileMoney) return line(Clock, colors.textMuted, "Sending to wallet…");
+  if (p.viaMobileMoney) return line(Clock, colors.textMuted, "Sending to wallet...");
   return line(Clock, colors.warning, "Not paid yet");
 }
 
@@ -111,7 +111,7 @@ export default function ShareOutScreen() {
   const [justApproved, setJustApproved] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   // Whether MY approve vote is on this cycle's share-out, read back from the
-  // server so it survives a reload — not just something this session did.
+  // server so it survives a reload - not just something this session did.
   const [approvedShareOutMyself, setApprovedShareOutMyself] = useState(false);
   // The newest share-out approval whatever its status. The pending fetch above
   // loses it the moment the vote carries; this is what still remembers the
@@ -120,14 +120,14 @@ export default function ShareOutScreen() {
 
   // The distribution the group is CURRENTLY paying out: one row per member
   // saying whether they have their money yet. It empties when the last member
-  // is settled — a finished share-out is history, and history lives in Reports.
+  // is settled - a finished share-out is history, and history lives in Reports.
   const [payouts, setPayouts] = useState<ShareOutPayout[]>([]);
   const [payoutTotals, setPayoutTotals] = useState<ShareOutPayouts["totals"]>(null);
   const [confirmingId, setConfirmingId] = useState("");
   const [confirmError, setConfirmError] = useState("");
 
   // The last distribution, once it is over. Kept only to say it happened and
-  // point at the report — the screen itself is back to the next cycle.
+  // point at the report - the screen itself is back to the next cycle.
   const [lastCompleted, setLastCompleted] = useState<ShareOutCompleted | null>(null);
   // Every cycle the group has ever closed, as a count and a running total. The
   // receipt line is about the group's record, not about one run.
@@ -136,7 +136,7 @@ export default function ShareOutScreen() {
   // paid should land as an ending, not as the list silently emptying.
   const [justFinished, setJustFinished] = useState(false);
 
-  // How the group pays this time. The constant is only the opening guess — the
+  // How the group pays this time. The constant is only the opening guess - the
   // server is the authority on whether pawaPay can disburse today, so the
   // picker unlocks the moment the hold lifts without shipping a new build.
   const [mobileMoneyHold, setMobileMoneyHold] = useState(MOBILE_MONEY_ON_HOLD);
@@ -153,7 +153,7 @@ export default function ShareOutScreen() {
         getApprovals({ groupId: activeGroupId }),
         // The pending list above empties the moment the vote carries, so the
         // record of who approved this distribution only survives in the
-        // resolved history. Handing out money depends on it — see myApproval.
+        // resolved history. Handing out money depends on it - see myApproval.
         getApprovals({ groupId: activeGroupId, status: "all" }).catch(() => []),
         // A group that has never distributed has no payouts; that is not an
         // error and must not blank the rest of the screen.
@@ -252,7 +252,7 @@ export default function ShareOutScreen() {
 
   // A run that still owes somebody is mid-flight. It matters because the
   // approval that authorised it stops being pending the moment it carries, and
-  // GET /approvals returns pending only — so on the next load there is nothing
+  // GET /approvals returns pending only - so on the next load there is nothing
   // left saying this group already voted, and the screen would offer to start
   // the share-out it is in the middle of paying out.
   const distributionInProgress =
@@ -261,7 +261,7 @@ export default function ShareOutScreen() {
   // Every lock on this screen hangs off the caller's REAL role in THIS group,
   // never the demo role switcher, or buttons appear for people the server will
   // refuse. services/groups already derives it from the active membership with
-  // the id shapes normalised — re-deriving it here let a pending invite row, or
+  // the id shapes normalised - re-deriving it here let a pending invite row, or
   // a populated userId, hand someone the wrong buttons.
   const myRole = group?.yourRole;
   // The treasurer pays members and marks them off. The chairperson stands in
@@ -311,8 +311,8 @@ export default function ShareOutScreen() {
         payout: null as ShareOutPayout | null,
       }));
 
-  // Confirming is not undoable — it settles the member's stake, closes their
-  // part of the cycle and sends them their receipt — so it asks first. It asks
+  // Confirming is not undoable - it settles the member's stake, closes their
+  // part of the cycle and sends them their receipt - so it asks first. It asks
   // HOW as well as whether: the group may have paid in notes or sent mobile
   // money from its own phone, and the ledger should say which.
   const handleMarkPaid = (p: ShareOutPayout) => {
@@ -396,7 +396,7 @@ export default function ShareOutScreen() {
   ).length;
   // A share-out needs EVERY active admin, not the group's usual threshold:
   // this is the one decision that empties the pool and closes everyone's
-  // savings. Mirrors getRequiredApprovals("all", …) on the server.
+  // savings. Mirrors getRequiredApprovals("all", ...) on the server.
   const requiredApprovals = getRequiredApprovals("all", adminCount);
 
   // While a run is in progress its approval has already resolved, so fall back
@@ -423,11 +423,11 @@ export default function ShareOutScreen() {
       let approvalId = approval?.id;
 
       if (!approvalId) {
-        // no pending approval yet — propose one, then re-fetch to get its id
+        // no pending approval yet - propose one, then re-fetch to get its id
         try {
           await proposeShareOut(activeGroupId, chosenMethod);
         } catch (e: any) {
-          // "Share-out already pending" is fine — it means one exists; fall through to re-fetch
+          // "Share-out already pending" is fine - it means one exists; fall through to re-fetch
           if (!String(e?.message || "").toLowerCase().includes("already pending")) throw e;
         }
         const list = await getApprovals({ groupId: activeGroupId });
@@ -450,7 +450,7 @@ export default function ShareOutScreen() {
       if (updated) {
         setShareOutApproval(updated);
       } else if (priorVotesFor + 1 >= priorRequired) {
-        // Backend GET /approvals returns pending only — a missing result right
+        // Backend GET /approvals returns pending only - a missing result right
         // after our deciding vote means it was approved and executed.
         setJustApproved(true);
         setShareOutApproval(
@@ -483,7 +483,7 @@ export default function ShareOutScreen() {
   }
 
   // The last member was just marked paid. The cycle is done, and this screen
-  // has nothing left to run — so it says so and hands off to the record,
+  // has nothing left to run - so it says so and hands off to the record,
   // rather than dropping the treasurer back into a projection of the next one.
   if (justFinished && lastCompleted) {
     return (
@@ -593,7 +593,7 @@ export default function ShareOutScreen() {
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <ActivityIndicator color={colors.primary} />
                 <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                  Calculating what you&apos;ll receive…
+                  Calculating what you&apos;ll receive...
                 </Text>
               </View>
             ) : payoutError ? (
@@ -616,7 +616,7 @@ export default function ShareOutScreen() {
                 <NetRow label="Owed" value={formatZMW(payout.owed)} colors={colors} />
                 {payingManually ? (
                   // Cash has no transfer or platform fee to deduct, so the
-                  // member takes the whole share — say that instead of listing
+                  // member takes the whole share - say that instead of listing
                   // three zeroes.
                   <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 10, lineHeight: 17 }}>
                     Paid in cash by your treasurer. No fees are deducted, so you
@@ -635,7 +635,7 @@ export default function ShareOutScreen() {
         )}
 
         {/* The cycles the group has already been through. Not this screen's
-            business any more — but saying nothing would read as them never
+            business any more - but saying nothing would read as them never
             happening, so they get one line and a way in.
 
             Framed as the group's record rather than as the last run: a group
@@ -648,7 +648,7 @@ export default function ShareOutScreen() {
             onPress={() =>
               router.push(
                 // The record itself, not the reports screen that also carries a
-                // preview of it — the same list the group's Reports tab opens.
+                // preview of it - the same list the group's Reports tab opens.
                 // One run behind them and even that list is a detour, so go
                 // straight to the only thing on it.
                 (historyRuns === 1
@@ -722,7 +722,7 @@ export default function ShareOutScreen() {
             {confirmError}
           </Text>
         ) : null}
-        {/* Normally unreachable — every admin has to approve before a single
+        {/* Normally unreachable - every admin has to approve before a single
             payout exists. It catches the treasurer appointed AFTER the vote
             carried, who would otherwise be handing out money on a plan they
             never signed. Say why the buttons are missing, or it reads as the
@@ -868,7 +868,7 @@ export default function ShareOutScreen() {
               ]).map((opt) => {
                 const selected = chosenMethod === opt.key;
                 // Mobile money cannot pay anyone while the hold is on, so it is
-                // offered but locked, with the reason underneath — hiding it
+                // offered but locked, with the reason underneath - hiding it
                 // would just look like the feature does not exist.
                 const locked = opt.key === "mobile-money" && mobileMoneyHold;
                 const Icon = locked ? Lock : opt.icon;
@@ -1016,7 +1016,7 @@ export default function ShareOutScreen() {
             <Button
               label={
                 voting
-                  ? "Recording…"
+                  ? "Recording..."
                   : hasVoted
                     ? "Approval recorded"
                     : shareOutApproval

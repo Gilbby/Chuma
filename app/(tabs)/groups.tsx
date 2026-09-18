@@ -40,11 +40,11 @@ export default function Groups() {
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // The half-finished group creation this device has saved, if any. Local to
-  // the phone — nothing has been sent to the API yet.
+  // the phone - nothing has been sent to the API yet.
   const [draft, setDraft] = useState<CreateGroupDraft | null>(null);
 
   // Founding a group moves money (the month-1 fee), so it needs KYC. Ask for it
-  // here rather than at signup — the user now knows why they are being asked.
+  // here rather than at signup - the user now knows why they are being asked.
   const openCreateGroup = useCallback(async () => {
     const user = await getCurrentUser<{ kyc?: { status?: string } }>();
     if (user?.kyc?.status !== "verified") {
@@ -78,7 +78,7 @@ export default function Groups() {
   }, [router, draft]);
 
   // Invites this user's groups are still waiting on. Derived from the groups
-  // themselves on every load, so it cannot be dismissed or swiped away — it
+  // themselves on every load, so it cannot be dismissed or swiped away - it
   // clears only when the invitee accepts or declines, or an admin withdraws it.
   // Counted only where the user is an admin: chasing an unanswered invite is
   // an admin job, so an ordinary member is never shown the backlog.
@@ -102,7 +102,7 @@ export default function Groups() {
       // Invitations come from the groups themselves, not from notifications:
       // reading or clearing a notification must never make an invitation
       // disappear. Only accepting or declining removes one.
-      // Include groups whose registration fee has not landed — this is the one
+      // Include groups whose registration fee has not landed - this is the one
       // screen where the founder can see that and go finish the payment.
       const [g, inv] = await Promise.all([
         getGroups({ includePending: true }),
@@ -149,7 +149,7 @@ export default function Groups() {
             : `You joined ${inv.groupName}.`
         );
       } catch (e: any) {
-        // The invite was withdrawn while it sat on screen — refresh so the dead
+        // The invite was withdrawn while it sat on screen - refresh so the dead
         // card goes away instead of failing again on the next tap.
         if (e?.status === 404 || e?.status === 403) {
           await load();
@@ -167,7 +167,7 @@ export default function Groups() {
     [load]
   );
 
-  // Declining is final — the invitee needs a fresh invite to get back in — so
+  // Declining is final - the invitee needs a fresh invite to get back in - so
   // confirm before rejecting it.
   const confirmDecline = useCallback(
     (inv: GroupInvite) => {
@@ -197,8 +197,8 @@ export default function Groups() {
     [load]
   );
 
-  // Discarding throws away typed setup and nothing else — no group exists yet
-  // and no fee has been taken — but it is still unrecoverable, so confirm.
+  // Discarding throws away typed setup and nothing else - no group exists yet
+  // and no fee has been taken - but it is still unrecoverable, so confirm.
   const confirmDiscardDraft = useCallback(() => {
     if (!draft) return;
     Alert.alert(
@@ -353,7 +353,7 @@ export default function Groups() {
                         {g.name}
                       </Text>
                       {/* A group whose registration fee has not landed cannot
-                          be used at all — say so here rather than let the card
+                          be used at all - say so here rather than let the card
                           read like any other group. */}
                       <Text
                         style={[
@@ -363,7 +363,7 @@ export default function Groups() {
                         numberOfLines={1}
                       >
                         {g.status === "pending-payment"
-                          ? "Awaiting registration fee — tap to finish"
+                          ? "Awaiting registration fee - tap to finish"
                           : isProjectFundType(g.groupType)
                             ? projectSubtitle(g)
                             : `${g.contributionFrequency} · ${formatZMW(g.contributionAmount)}`}
@@ -389,7 +389,7 @@ export default function Groups() {
                 )}
               </View>
 
-              {/* A project-fund group has no cycle to be partway through —
+              {/* A project-fund group has no cycle to be partway through -
                   its progress lives on each project, inside the group. */}
               {!isProjectFundType(g.groupType) && (
                 <View style={{ marginTop: 14 }}>
@@ -437,7 +437,7 @@ export default function Groups() {
  * The wizard saves itself as it goes, so an app killed in the background (or a
  * founder who stepped away at the loan-rules step) doesn't cost them the whole
  * constitution. This is the only place that draft is visible, and the only
- * place it can be thrown away — the wizard itself just picks it back up.
+ * place it can be thrown away - the wizard itself just picks it back up.
  */
 const DraftCard = ({
   draft,
@@ -506,7 +506,7 @@ const DraftCard = ({
  *
  * Rebuilt from the group on every load and deliberately given no dismiss
  * control: an unanswered invitation stays on the overview until someone acts on
- * it — the invitee accepts or declines, or an admin withdraws it from the
+ * it - the invitee accepts or declines, or an admin withdraws it from the
  * group's members tab (tap the card to get there).
  */
 const PendingInvitesNote = ({

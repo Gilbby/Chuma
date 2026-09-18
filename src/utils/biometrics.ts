@@ -7,7 +7,7 @@ const ENABLED_KEY = "chuma.biometric.enabled";
 /**
  * Whether this phone can actually do biometrics *right now*: the sensor exists
  * and the user has enrolled a fingerprint/face. Hardware without an enrolment
- * can't authenticate, so both checks matter — otherwise we'd offer a switch
+ * can't authenticate, so both checks matter - otherwise we'd offer a switch
  * that always fails. Web has no sensor, so it is always false and the PIN
  * stands alone.
  */
@@ -24,7 +24,7 @@ export async function isBiometricAvailable(): Promise<boolean> {
   }
 }
 
-/** "Fingerprint" / "Face ID" / "Biometric" — for labels, so the copy matches the phone. */
+/** "Fingerprint" / "Face ID" / "Biometric" - for labels, so the copy matches the phone. */
 export async function biometricLabel(): Promise<string> {
   try {
     const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
@@ -69,7 +69,7 @@ export async function setBiometricEnabled(enabled: boolean): Promise<boolean> {
 const BALANCE_HIDDEN_KEY = "chuma.balance.hidden";
 
 /**
- * Balance visibility survives restarts: left showing, it comes back showing —
+ * Balance visibility survives restarts: left showing, it comes back showing -
  * hiding it is a deliberate act, so it is the hidden state we remember.
  */
 export async function isBalanceHidden(): Promise<boolean> {

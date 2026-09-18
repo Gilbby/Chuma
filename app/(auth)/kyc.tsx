@@ -41,7 +41,7 @@ export default function Kyc() {
   const { return: returnTo } = useLocalSearchParams<{ return?: string }>();
   const fromCreateGroup = returnTo === "create-group";
   const afterKyc = fromCreateGroup ? "/(modals)/create-group" : "/(tabs)";
-  // Skipping must never drop them into a screen that needs verification —
+  // Skipping must never drop them into a screen that needs verification -
   // a skipped create-group goes back to the Groups list instead.
   const skipTo = fromCreateGroup ? "/(tabs)/groups" : afterKyc;
   // KYC is never a hard gate now: it can always be postponed.
@@ -63,7 +63,7 @@ export default function Kyc() {
         last = await getKycStatus(sessionId);
         if (TERMINAL.includes(last.status) || last.status === "in_review") return last;
       } catch {
-        // A transient network error shouldn't abort the flow — try again.
+        // A transient network error shouldn't abort the flow - try again.
       }
       await new Promise((r) => setTimeout(r, 2500));
     }
@@ -109,7 +109,7 @@ export default function Kyc() {
       setSessionId(session.sessionId);
       setPhase("verifying");
       // Whether they return via the deep link or just close the browser, we
-      // still check the decision — the webhook may already have landed.
+      // still check the decision - the webhook may already have landed.
       await openKycFlow(session.url);
       setPhase("checking");
       const result = await pollStatus(session.sessionId);
@@ -133,7 +133,7 @@ export default function Kyc() {
       setError("Your verification session ended before it finished. Please start again.");
       return;
     }
-    // declined / pending / in_review — submitted but not yet approved. We hold on
+    // declined / pending / in_review - submitted but not yet approved. We hold on
     // the review screen rather than dead-ending: Zambian NRCs the automated engine
     // can't read are approved manually, so a "declined" here becomes a review hold
     // that clears once we approve the account. Genuine bad captures can re-submit
@@ -266,7 +266,7 @@ export default function Kyc() {
           <View style={styles.busyRow}>
             <ActivityIndicator color={colors.primary} />
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-              {phase === "checking" ? "Confirming your verification…" : "Opening secure verification…"}
+              {phase === "checking" ? "Confirming your verification..." : "Opening secure verification..."}
             </Text>
           </View>
         ) : error ? (

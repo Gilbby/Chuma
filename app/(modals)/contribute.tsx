@@ -49,7 +49,7 @@ import {
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
 // What giving that names no project is called. It is not something a member
-// picks — leaving the project picker alone is what produces it. The API labels
+// picks - leaving the project picker alone is what produces it. The API labels
 // these the same way on the statement (see statement.service.js), so the
 // receipt and the statement call the one thing by the one name.
 const GENERAL_GIVING_LABEL = "General giving";
@@ -76,7 +76,7 @@ export default function Contribute() {
 
   // Project-fund groups (church): money is given TOWARD something, so the
   // payment names the project it belongs to. Nothing is owed and nothing is
-  // scheduled — the member types whatever they are giving.
+  // scheduled - the member types whatever they are giving.
   const [projectId, setProjectId] = useState<string | null>(null);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
 
@@ -97,7 +97,7 @@ export default function Contribute() {
   const [amount, setAmount] = useState("");
   const [payerPhone, setPayerPhone] = useState("");
   // Cash is the only way member money moves while mobile money is on hold, so
-  // the toggle starts on and cannot be turned off — see MOBILE_MONEY_ON_HOLD.
+  // the toggle starts on and cannot be turned off - see MOBILE_MONEY_ON_HOLD.
   const [payCash, setPayCash] = useState(MOBILE_MONEY_ON_HOLD);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -184,7 +184,7 @@ export default function Contribute() {
     (p) => p.status === "active"
   );
   // Derived, not stored: a selection left over from the group they switched
-  // away from matches nothing here. Nothing is picked for them either — an
+  // away from matches nothing here. Nothing is picked for them either - an
   // untouched picker is not a missing answer, it is untagged giving, which
   // the statement carries as "General giving".
   const selectedProject = openProjects.find((p) => p.id === projectId) ?? null;
@@ -222,7 +222,7 @@ export default function Contribute() {
     const next = base + preservedTopup;
     setAmount(next > 0 ? String(next) : "");
     prevBaseRef.current = base;
-    // Deliberately keyed on `base` only — typing changes `amount` without base.
+    // Deliberately keyed on `base` only - typing changes `amount` without base.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base]);
 
@@ -266,7 +266,7 @@ export default function Contribute() {
           : "";
 
   // The savings leg the API is sent. A project-fund gift is the whole amount as
-  // a contribution — there is no cycle due for it to be a "top-up" above.
+  // a contribution - there is no cycle due for it to be a "top-up" above.
   const savingsLeg = isProjectFund
     ? { contribution: num, topup: 0 }
     : { contribution: savingsAmount, topup };
@@ -277,7 +277,7 @@ export default function Contribute() {
       .filter((r) => r.amount > 0);
 
   // Review → Confirm. Cash is collected at face value (no gross-up), so there
-  // is no fee preview to fetch — mirror how the treasurer-confirmed cash path
+  // is no fee preview to fetch - mirror how the treasurer-confirmed cash path
   // priced nothing. Mobile money fetches the real server breakdown first.
   const goToConfirm = async () => {
     if (num <= 0 || belowBase || invalidLoan) {
@@ -399,7 +399,7 @@ export default function Contribute() {
                   <Text style={[styles.errText, { color: colors.danger }]}>{displayError}</Text>
                 ) : null}
 
-                {/* Giving toward — project-fund groups pick a project instead
+                {/* Giving toward - project-fund groups pick a project instead
                     of settling a list of dues. */}
                 {isProjectFund && (
                   <>
@@ -496,7 +496,7 @@ export default function Contribute() {
                       />
                     )}
 
-                    {/* Loan repayments — tap to adjust installment / full / custom */}
+                    {/* Loan repayments - tap to adjust installment / full / custom */}
                     {loans.map((l) => {
                       const expanded = expandedLoanId === l.id;
                       const mode = loanModes[l.id]?.mode ?? "installment";
@@ -581,7 +581,7 @@ export default function Contribute() {
                       );
                     })}
 
-                    {/* Penalties — every pending one is included */}
+                    {/* Penalties - every pending one is included */}
                     {penalties.map((p) => (
                       <ObligationRow
                         key={p.id}
@@ -645,7 +645,7 @@ export default function Contribute() {
                         key={g.id}
                         onPress={() => {
                           setSelectedGroup(g);
-                          // Obligations belong to a group — a switch invalidates
+                          // Obligations belong to a group - a switch invalidates
                           // them; reset and let them reload + reprice the base.
                           setLoans([]);
                           setPenalties([]);
@@ -693,7 +693,7 @@ export default function Contribute() {
                   </Text>
                 )}
 
-                {/* Cash toggle — applies to the whole payment. Locked on while
+                {/* Cash toggle - applies to the whole payment. Locked on while
                     mobile money is held: there is no other way to pay. */}
                 <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
@@ -716,7 +716,7 @@ export default function Contribute() {
                   />
                 </View>
 
-                {/* Cycle progress — a project-fund group has no cycle to be
+                {/* Cycle progress - a project-fund group has no cycle to be
                     partway through; its progress is per project, shown above. */}
                 {!isProjectFund && (
                 <View style={{ marginTop: 20 }}>

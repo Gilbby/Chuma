@@ -47,7 +47,7 @@ export default function Profile() {
   const router = useRouter();
   const { role, setRole, description, isTester } = useRole();
   // Off until the phone says it has an enrolled fingerprint/face and the user
-  // has actually turned it on — a switch we can't honour shouldn't read as on.
+  // has actually turned it on - a switch we can't honour shouldn't read as on.
   const [bio, setBio] = React.useState(false);
   const [bioAvailable, setBioAvailable] = React.useState(false);
   const [trustOpen, setTrustOpen] = useState(false);
@@ -124,7 +124,7 @@ export default function Profile() {
 
   const memberSince = (() => {
     const d = new Date(me?.joinedDate ?? "");
-    if (isNaN(d.getTime())) return "—";
+    if (isNaN(d.getTime())) return "-";
     return d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
   })();
 
@@ -158,8 +158,8 @@ export default function Profile() {
               <View style={styles.profileRow}>
                 <Image source={{ uri: me?.avatar }} style={styles.avatar} />
                 <View style={{ flex: 1, marginLeft: 14 }}>
-                  <Text style={[styles.name, { color: colors.textMain }]}>{me?.name ?? "—"}</Text>
-                  <Text style={[styles.phone, { color: colors.textMuted }]}>{me?.phone ?? "—"}</Text>
+                  <Text style={[styles.name, { color: colors.textMain }]}>{me?.name ?? "-"}</Text>
+                  <Text style={[styles.phone, { color: colors.textMuted }]}>{me?.phone ?? "-"}</Text>
                   <View style={{ marginTop: 8, flexDirection: "row" }}>
                     <StatusBadge label={role} variant="primary" testID="profile-role-badge" />
                   </View>
@@ -438,9 +438,9 @@ export default function Profile() {
               </Text>
               <Card padding={14}>
                 {[
-                  { dot: colors.success, range: "80–100", label: "Excellent" },
-                  { dot: colors.primary, range: "60–79", label: "Good" },
-                  { dot: colors.warning, range: "40–59", label: "Fair" },
+                  { dot: colors.success, range: "80-100", label: "Excellent" },
+                  { dot: colors.primary, range: "60-79", label: "Good" },
+                  { dot: colors.warning, range: "40-59", label: "Fair" },
                   { dot: colors.danger, range: "Below 40", label: "Needs improvement" },
                 ].map((band, i, arr) => (
                   <View

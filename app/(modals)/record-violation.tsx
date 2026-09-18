@@ -156,7 +156,7 @@ export default function RecordViolation() {
               paddingHorizontal: 40,
             }}
           >
-            A {formatZMW(issued.amount)} penalty for “{issued.reason}” has been issued to{" "}
+            A {formatZMW(issued.amount)} penalty for &quot;{issued.reason}&quot; has been issued to{" "}
             {memberName}. They&apos;ve been notified and can pay it from their penalties list.
           </Text>
           <View style={{ flex: 1 }} />

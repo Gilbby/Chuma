@@ -59,7 +59,7 @@ export default function Approvals() {
   const [refreshing, setRefreshing] = useState(false);
   const [voting, setVoting] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null);
-  // Needed to spot an approval about the viewer themselves — nobody votes on
+  // Needed to spot an approval about the viewer themselves - nobody votes on
   // their own removal, so the buttons must not be there to tap.
   const [myUserId, setMyUserId] = useState<string | null>(null);
 
@@ -96,13 +96,13 @@ export default function Approvals() {
   }, [load]);
 
   const pendingCount = items.filter((i) => i.status === "pending").length;
-  // History is everything a vote has already settled — approved, rejected, or
+  // History is everything a vote has already settled - approved, rejected, or
   // carried out.
   const data = items.filter((i) =>
     filter === "pending" ? i.status === "pending" : i.status !== "pending"
   );
 
-  // An approved action whose execution was blocked at the time — a refund the
+  // An approved action whose execution was blocked at the time - a refund the
   // wallet couldn't cover yet. The votes stand; this just runs it again.
   const onRun = async (id: string) => {
     setRunning(id);
@@ -194,8 +194,8 @@ export default function Approvals() {
             a.type === "member-removal" &&
             !!myUserId &&
             String(a.targetUserId) === myUserId;
-          // A receipt is not a group decision — one admin says whether the cash
-          // reached them — so it drops the vote tally and asks the question in
+          // A receipt is not a group decision - one admin says whether the cash
+          // reached them - so it drops the vote tally and asks the question in
           // the words of the thing: did you get the money?
           const isReceipt = a.type === "cash-receipt";
           const progress = a.totalVoters === 0 ? 0 : a.votesFor / a.totalVoters;

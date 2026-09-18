@@ -41,7 +41,7 @@ export default function Pin() {
             setLoading(true);
             try {
               await savePin(next);
-              // Onboarding is done — biometric is optional, so a restart from
+              // Onboarding is done - biometric is optional, so a restart from
               // here belongs in the tabs, not back on this screen.
               await clearPendingOnboarding();
               router.replace("/biometric");

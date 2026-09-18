@@ -33,10 +33,10 @@ export default function Splash() {
       // into the app instead of forcing sign-in again. An expired/invalid
       // token is handled by apiClient's 401 interceptor (clears it + bounces
       // to /welcome), so we intentionally don't block on a network check here
-      // — that keeps the app usable on spotty connectivity.
+      // - that keeps the app usable on spotty connectivity.
       const token = await getToken();
-      // A token is not a finished account — it is issued at OTP, before the
-      // name and PIN steps — so resumeRoute() decides where a restored session
+      // A token is not a finished account - it is issued at OTP, before the
+      // name and PIN steps - so resumeRoute() decides where a restored session
       // actually belongs.
       router.replace((token ? await resumeRoute() : "/welcome") as never);
     }, 1900);

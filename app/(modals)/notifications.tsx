@@ -102,8 +102,8 @@ export default function Notifications() {
   }, [load]);
 
   // In-app grace reminder derived from live fee status. The
-  // backend will additionally PUSH this daily (day 1–5
-  // countdown) to chairperson + treasurer via SMS/push — see
+  // backend will additionally PUSH this daily (day 1-5
+  // countdown) to chairperson + treasurer via SMS/push - see
   // Phase 8 AfricasTalking. This in-app version shows the
   // current state whenever the user opens notifications.
   const feeNotices: Notice[] = [];
@@ -177,7 +177,7 @@ export default function Notifications() {
   };
 
   // Declining rejects the invite server-side (the pending member row is
-  // dropped), not just the notification — otherwise the invitation would come
+  // dropped), not just the notification - otherwise the invitation would come
   // straight back on the Groups tab, which reads invites from the groups.
   const handleDeclineInvite = (n: Notice) => {
     Alert.alert(
@@ -345,7 +345,7 @@ const NotifCard = ({
   const isCashReceipt =
     n.type === "contribution" && !!n.transactionId && n.title.includes("confirm receipt");
   // Admin action card: a loan-disbursement / share-out payout failed at the
-  // provider — only admin copies carry a transactionId to act on.
+  // provider - only admin copies carry a transactionId to act on.
   const isFailedPayout =
     !!n.transactionId &&
     /^(Loan disbursement|Share-out payout) failed$/.test(n.title) &&

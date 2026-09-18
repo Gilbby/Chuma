@@ -4,7 +4,7 @@
  * The history list used to unfold a run in place, which works for a group of
  * six and falls apart at thirty: the rows push every other run off the screen,
  * there is nowhere to search, and scrolling back to the list means scrolling
- * past everyone. A run gets its own screen instead — its own scroll, its own
+ * past everyone. A run gets its own screen instead - its own scroll, its own
  * search box, and a back button that returns to the list where it was.
  */
 import React, { useCallback, useMemo, useState } from "react";
@@ -66,7 +66,7 @@ function PayoutOutcome({
   if (p.status === "failed") return line(AlertTriangle, colors.danger, "Payout failed");
   if (p.status === "pending") return line(Clock, colors.warning, "Not paid yet");
   // Their whole share went to their own loan, so there was never anything to
-  // hand over — say that rather than claiming we paid them nothing.
+  // hand over - say that rather than claiming we paid them nothing.
   if (p.amount <= 0 && p.appliedToLoan > 0)
     return line(Check, colors.textMuted, "Cleared against their loan");
   return line(

@@ -1,4 +1,4 @@
-// Abstract base for the storage wrapper — shared types + helpers.
+// Abstract base for the storage wrapper - shared types + helpers.
 // Concrete implementations live in index.ts (native) and index.web.ts (web).
 
 export type StorageItemKey = string;

@@ -24,7 +24,7 @@ import type { GroupConstitution, GroupType, LoanRepaymentTier } from "@/src/type
 const DRAFT_KEY = "chuma.draft.create-group";
 
 // Bump when a field changes shape. An older draft is discarded rather than
-// half-restored — a wizard hydrated with fields it no longer understands is
+// half-restored - a wizard hydrated with fields it no longer understands is
 // worse than a blank one.
 const DRAFT_VERSION = 2;
 
@@ -43,7 +43,7 @@ export interface DraftPermissions {
   shareOutApprovals: boolean;
 }
 
-/** Everything the wizard would lose if the app died — mirrors its state. */
+/** Everything the wizard would lose if the app died - mirrors its state. */
 export interface CreateGroupDraftForm {
   groupName: string;
   groupType: GroupType | "";
@@ -87,9 +87,9 @@ export interface CreateGroupDraft {
   userId: string;
   /** ISO timestamp of the last edit. */
   savedAt: string;
-  /** Wizard step they were on (1–6). */
+  /** Wizard step they were on (1-6). */
   step: number;
-  /** Steps in their flow — savings-only types skip loan rules, so this varies. */
+  /** Steps in their flow - savings-only types skip loan rules, so this varies. */
   totalSteps: number;
   /** Step number as the wizard labels it, e.g. "Step 3 of 5". */
   displayStep: number;
@@ -124,7 +124,7 @@ export async function loadGroupDraft(userId?: string | null): Promise<CreateGrou
     await clearGroupDraft();
     return null;
   }
-  // Someone else's unfinished group — leave their account out of this one and
+  // Someone else's unfinished group - leave their account out of this one and
   // drop it: this device is now signed in as a different person.
   if (userId && draft.userId && draft.userId !== userId) {
     await clearGroupDraft();
