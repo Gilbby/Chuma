@@ -2,6 +2,7 @@ import React, { useState, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, Switch, Modal, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
@@ -12,7 +13,6 @@ import {
   Sun,
   KeyRound,
   Fingerprint,
-  Bell,
   ShieldCheck,
   HelpCircle,
   LogOut,
@@ -24,7 +24,10 @@ import {
   TrendingUp,
   TrendingDown,
   FileText,
+  Scale,
+  Trash2,
 } from "lucide-react-native";
+import { LEGAL_URLS } from "@/src/constants";
 import { getGroups } from "@/src/services/groups";
 import { getPenalties } from "@/src/services/penalties";
 import { logout } from "@/src/services/auth";
@@ -47,7 +50,6 @@ export default function Profile() {
   // has actually turned it on — a switch we can't honour shouldn't read as on.
   const [bio, setBio] = React.useState(false);
   const [bioAvailable, setBioAvailable] = React.useState(false);
-  const [notif, setNotif] = React.useState(true);
   const [trustOpen, setTrustOpen] = useState(false);
 
   const [me, setMe] = useState<any>(null);
@@ -214,8 +216,10 @@ export default function Profile() {
           />
           <Row
             icon={<ShieldCheck size={20} color={colors.primary} />}
-            label="Privacy & security"
+            label="Privacy policy"
             colors={colors}
+            onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.privacy)}
+            testID="profile-privacy-row"
           />
         </Section>
 
@@ -237,20 +241,6 @@ export default function Profile() {
                 trackColor={{ false: colors.border, true: colors.primaryAccent }}
                 thumbColor="#fff"
                 testID="profile-darkmode-switch"
-              />
-            }
-          />
-          <Row
-            icon={<Bell size={20} color={colors.primary} />}
-            label="Notifications"
-            colors={colors}
-            right={
-              <Switch
-                value={notif}
-                onValueChange={setNotif}
-                trackColor={{ false: colors.border, true: colors.primaryAccent }}
-                thumbColor="#fff"
-                testID="profile-notif-switch"
               />
             }
           />
@@ -331,6 +321,30 @@ export default function Profile() {
             colors={colors}
             onPress={() => router.push("/help")}
             testID="profile-help-row"
+          />
+        </Section>
+
+        <Section title="Legal" colors={colors}>
+          <Row
+            icon={<Scale size={20} color={colors.primary} />}
+            label="Terms of service"
+            colors={colors}
+            onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.terms)}
+            testID="profile-terms-row"
+          />
+          <Row
+            icon={<ShieldCheck size={20} color={colors.primary} />}
+            label="Privacy policy"
+            colors={colors}
+            onPress={() => WebBrowser.openBrowserAsync(LEGAL_URLS.privacy)}
+            testID="profile-privacy-legal-row"
+          />
+          <Row
+            icon={<Trash2 size={20} color={colors.danger} />}
+            label="Delete account"
+            colors={colors}
+            onPress={() => router.push("/delete-account")}
+            testID="profile-delete-account-row"
           />
         </Section>
 

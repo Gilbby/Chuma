@@ -66,3 +66,22 @@ export async function logout() {
   // phone numbers — it doesn't stay on the phone for whoever signs in next.
   await clearGroupDraft();
 }
+
+export interface DeleteBlocker {
+  type: "loan" | "savings" | "chair";
+  groupName: string;
+  message: string;
+}
+
+/**
+ * Permanently delete the signed-in account (Play/Apple deletion requirement).
+ * The backend refuses (409, code "has_obligations") while the user still holds
+ * savings, owes a loan, or is a sole chairperson — the thrown ApiError then
+ * carries `blockers` so the screen can list exactly what to settle. On success
+ * the local session is cleared, exactly as on logout.
+ */
+export async function deleteAccount(): Promise<void> {
+  // On 409 the ApiError carries `data.blockers`; let it propagate to the screen.
+  await api("/auth/account", { method: "DELETE" });
+  await logout();
+}

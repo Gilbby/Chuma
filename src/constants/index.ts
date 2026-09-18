@@ -23,3 +23,18 @@ export const MOBILE_MONEY_ON_HOLD = true;
 /** One line, used wherever a payment screen has to explain the lock. */
 export const MOBILE_MONEY_HOLD_NOTE =
   "Mobile money is paused for now. Payments are cash, confirmed by an admin.";
+
+/**
+ * Legal / support links surfaced in the app and required by the app stores
+ * (privacy policy is mandatory; terms and a data-deletion page are expected for
+ * a fintech app). Point these at the real hosted pages before submitting —
+ * placeholders here are wired into the Profile screen and the store listing.
+ */
+export const LEGAL_URLS = {
+  privacy: "https://chuma-api.onrender.com/privacy",
+  terms: "https://chuma-api.onrender.com/terms",
+  dataDeletion: "https://chuma-api.onrender.com/delete-account",
+};
+
+/** Monitored support inbox shown in Help and required in the store listings. */
+export const SUPPORT_EMAIL = "contact@bristalite.com";

@@ -10,7 +10,7 @@ type Options = {
   auth?: boolean;
 };
 
-export type ApiError = Error & { status?: number; code?: string };
+export type ApiError = Error & { status?: number; code?: string; data?: any };
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -82,6 +82,7 @@ export async function api<T = any>(path: string, opts: Options = {}): Promise<T>
     const err = new Error(data?.error || `Request failed (${res.status})`) as ApiError;
     err.status = res.status;
     err.code = data?.code;
+    err.data = data; // full body — carries structured fields like `blockers`
     throw err;
   }
 

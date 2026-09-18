@@ -552,12 +552,34 @@ export default function Loan() {
                 </View>
               ) : null}
 
-              <View style={{ marginTop: 14, flexDirection: "row", alignItems: "flex-start" }}>
-                <Info size={16} color={colors.textMuted} style={{ marginTop: 2 }} />
-                <Text style={{ flex: 1, color: colors.textMuted, fontSize: 12, marginLeft: 8, lineHeight: 18 }}>
-                  Repayments are due monthly. Missed installments may trigger penalties as per group rules.
+              {/* Plain-language terms disclosure. Frames the loan correctly for
+                  members and for app-store review: Chuma is not a lender and
+                  charges no interest — this is the group's own pooled member
+                  savings, lent between members on terms the group set itself,
+                  with the interest returning to the members at share-out. */}
+              <Card padding={16} style={{ marginTop: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <Info size={18} color={colors.primary} />
+                  <Text style={{ color: colors.textMain, fontSize: 14, fontWeight: "700" }}>
+                    How this loan works
+                  </Text>
+                </View>
+                <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
+                  This isn&apos;t a loan from Chuma or any outside lender. You&apos;re
+                  borrowing from{" "}
+                  <Text style={{ color: colors.textMain, fontWeight: "600" }}>{grp.name}</Text>
+                  &apos;s own pooled savings — money you and the other members have
+                  saved together. Your group set the {grp.loanInterestRate}% monthly
+                  interest rate, and the interest you repay goes back into the group
+                  fund and is shared among the members at share-out.
                 </Text>
-              </View>
+                <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20, marginTop: 10 }}>
+                  You&apos;ll repay {formatZMW(breakdown.totalRepay)} in total over{" "}
+                  {effectiveDuration.label} ({formatZMW(breakdown.monthlyInstallment)} per
+                  month). Repayments are due monthly, and missed installments may trigger
+                  penalties under your group&apos;s rules.
+                </Text>
+              </Card>
 
               <View style={{ flex: 1, minHeight: 24 }} />
               <Button label="Continue" onPress={() => setStep("confirm")} testID="loan-continue-btn" />

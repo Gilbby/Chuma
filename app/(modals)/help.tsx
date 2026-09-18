@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react-native";
+import { SUPPORT_EMAIL } from "@/src/constants";
 
 const FAQS = [
   {
@@ -89,8 +90,8 @@ export default function Help() {
           <ContactRow
             icon={<Mail size={20} color={colors.primary} />}
             label="Email us"
-            sublabel="support@chuma.app"
-            onPress={() => Linking.openURL("mailto:support@chuma.app")}
+            sublabel={SUPPORT_EMAIL}
+            onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}`)}
             colors={colors}
             testID="help-email-btn"
           />

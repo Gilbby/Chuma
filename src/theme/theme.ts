@@ -14,6 +14,7 @@ export const lightColors = {
   success: "#059669",
   warning: "#F59E0B",
   danger: "#EF4444",
+  dangerSoft: "#FEE2E2",
   info: "#0EA5E9",
   overlay: "rgba(6, 78, 59, 0.55)",
 };
@@ -34,6 +35,7 @@ export const darkColors = {
   success: "#10B981",
   warning: "#FBBF24",
   danger: "#F87171",
+  dangerSoft: "#2A1215",
   info: "#38BDF8",
   overlay: "rgba(0, 0, 0, 0.7)",
 };
