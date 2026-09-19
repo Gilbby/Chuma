@@ -3,6 +3,7 @@ import { setToken, clearToken } from "@/src/utils/authToken";
 import { setCurrentUser, clearCurrentUser } from "@/src/utils/currentUser";
 import { clearPendingOnboarding } from "@/src/utils/onboarding";
 import { clearGroupDraft } from "@/src/utils/groupDraft";
+import { clearLocalAuthPrefs } from "@/src/utils/biometrics";
 
 export async function requestOtp(
   phone: string,
@@ -65,6 +66,10 @@ export async function logout() {
   // An unfinished group carries its founder's group name and their officers'
   // phone numbers - it doesn't stay on the phone for whoever signs in next.
   await clearGroupDraft();
+  // Biometric-enabled + hidden-balance are device-local, not per-account, so
+  // wipe them too - otherwise the next account on this phone inherits them (a
+  // fingerprint prompt for a reveal the new user never set up).
+  await clearLocalAuthPrefs();
 }
 
 export interface DeleteBlocker {

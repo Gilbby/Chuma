@@ -6,6 +6,7 @@ import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { KYC_ENABLED } from "@/src/constants";
 import { Notice, Group } from "@/src/types";
 import { getNotifications, markAllNotificationsRead, markNotificationRead, isActionableInvite } from "@/src/services/notifications";
 import { confirmCashContribution, retryPayout } from "@/src/services/transactions";
@@ -23,7 +24,17 @@ import {
   Users,
   AlertTriangle,
   ShieldCheck,
+  Fingerprint,
 } from "lucide-react-native";
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  biometricLabel,
+  promptBiometric,
+  setBiometricEnabled,
+  isBiometricNudgeDismissed,
+  setBiometricNudgeDismissed,
+} from "@/src/utils/biometrics";
 
 const ICONS = {
   loan: Banknote,
@@ -35,6 +46,7 @@ const ICONS = {
   invite_accepted: Users,
   penalty: AlertTriangle,
   kyc: ShieldCheck,
+  biometric: Fingerprint,
 };
 
 function isToday(dateStr: string): boolean {
@@ -60,6 +72,7 @@ const TINTS: Record<Notice["type"], "primary" | "info" | "success" | "warning" |
   invite_accepted: "success",
   penalty: "warning",
   kyc: "warning",
+  biometric: "primary",
 };
 
 export default function Notifications() {
@@ -70,6 +83,10 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dismissed, setDismissed] = useState<string[]>([]);
+  // Local "turn on biometrics" notice - shown when the phone supports it, it's
+  // off, and the user hasn't dismissed it. Not a server notification.
+  const [bioShow, setBioShow] = useState(false);
+  const [bioLabel, setBioLabel] = useState("fingerprint");
 
   const { role } = useRole();
   const isAdmin = role === "Chairperson" || role === "Treasurer";
@@ -80,6 +97,17 @@ export default function Notifications() {
       const [n, g] = await Promise.all([getNotifications(), getGroups()]);
       setItems(n);
       setGroups(g);
+      const [available, enabled, dis] = await Promise.all([
+        isBiometricAvailable(),
+        isBiometricEnabled(),
+        isBiometricNudgeDismissed(),
+      ]);
+      if (available && !enabled && !dis) {
+        setBioLabel(await biometricLabel());
+        setBioShow(true);
+      } else {
+        setBioShow(false);
+      }
     } catch (e) {
       // leave lists empty on error; screen still renders
     } finally {
@@ -127,7 +155,21 @@ export default function Notifications() {
     });
   }
 
+  const bioNotices: Notice[] = bioShow
+    ? [
+        {
+          id: "n-biometric",
+          type: "biometric",
+          title: `Turn on ${bioLabel} sign-in`,
+          body: "Reveal your balance and confirm actions without typing your PIN. You can change this anytime in Profile.",
+          date: "Today",
+          read: false,
+        },
+      ]
+    : [];
+
   const activeItems = [
+    ...bioNotices.filter((n) => !dismissed.includes(n.id)),
     ...feeNotices.filter((n) => !dismissed.includes(n.id)),
     ...items.filter((n) => !dismissed.includes(n.id)),
   ];
@@ -145,6 +187,17 @@ export default function Notifications() {
   const markAllRead = async () => {
     await markAllNotificationsRead();
     setItems((p) => p.map((n) => ({ ...n, read: true })));
+  };
+
+  const enableBiometric = async () => {
+    if (await promptBiometric("Enable biometric sign-in")) {
+      await setBiometricEnabled(true);
+      setBioShow(false);
+    }
+  };
+  const dismissBiometric = async () => {
+    await setBiometricNudgeDismissed(true);
+    setBioShow(false);
   };
 
   const clearInvite = async (n: Notice) => {
@@ -275,6 +328,8 @@ export default function Notifications() {
                   }});
                 } : undefined}
                 onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
+                onEnableBiometric={enableBiometric}
+                onDismissBiometric={dismissBiometric}
                 tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
               />
             ))}
@@ -304,6 +359,8 @@ export default function Notifications() {
                   }});
                 } : undefined}
                 onPayFee={n.id.startsWith("n-fee-") ? () => router.push(`/group-fee?groupId=${n.groupId}`) : undefined}
+                onEnableBiometric={enableBiometric}
+                onDismissBiometric={dismissBiometric}
                 tintOverride={n.id.startsWith("n-fee-") ? (feeUrgency[n.groupId!] >= 3 ? colors.warning : colors.danger) : undefined}
               />
             ))}
@@ -325,6 +382,8 @@ const NotifCard = ({
   onCashConfirm,
   onCashDecline,
   onRetryPayout,
+  onEnableBiometric,
+  onDismissBiometric,
   tintOverride,
 }: {
   n: Notice;
@@ -337,6 +396,8 @@ const NotifCard = ({
   onCashConfirm?: () => void;
   onCashDecline?: () => void;
   onRetryPayout?: () => void;
+  onEnableBiometric?: () => void;
+  onDismissBiometric?: () => void;
   tintOverride?: string;
 }) => {
   const router = useRouter();
@@ -447,7 +508,7 @@ const NotifCard = ({
               />
             </View>
           )}
-          {n.type === "kyc" && !n.read && (
+          {KYC_ENABLED && n.type === "kyc" && !n.read && (
             <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
               <Button
                 label="Verify now"
@@ -455,6 +516,25 @@ const NotifCard = ({
                 fullWidth={false}
                 onPress={() => router.push("/kyc?return=tabs" as never)}
                 testID={`kyc-verify-${n.id}`}
+              />
+            </View>
+          )}
+          {n.type === "biometric" && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <Button
+                label="Turn on"
+                size="sm"
+                fullWidth={false}
+                onPress={onEnableBiometric}
+                testID={`bio-enable-${n.id}`}
+              />
+              <Button
+                label="Dismiss"
+                variant="outline"
+                size="sm"
+                fullWidth={false}
+                onPress={onDismissBiometric}
+                testID={`bio-dismiss-${n.id}`}
               />
             </View>
           )}

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { KYC_ENABLED, GROUP_FEES_ENABLED } from "@/src/constants";
 import { Card } from "@/src/components/ui/Card";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
@@ -43,13 +44,16 @@ export default function Groups() {
   // the phone - nothing has been sent to the API yet.
   const [draft, setDraft] = useState<CreateGroupDraft | null>(null);
 
-  // Founding a group moves money (the month-1 fee), so it needs KYC. Ask for it
-  // here rather than at signup - the user now knows why they are being asked.
+  // Founding a group needs no identity check in the tracker build (KYC off).
+  // When KYC is re-enabled for the org-account build, this asks for it here -
+  // at Create group - rather than at signup, so the user knows why.
   const openCreateGroup = useCallback(async () => {
-    const user = await getCurrentUser<{ kyc?: { status?: string } }>();
-    if (user?.kyc?.status !== "verified") {
-      router.push("/kyc?return=create-group" as never);
-      return;
+    if (KYC_ENABLED) {
+      const user = await getCurrentUser<{ kyc?: { status?: string } }>();
+      if (user?.kyc?.status !== "verified") {
+        router.push("/kyc?return=create-group" as never);
+        return;
+      }
     }
     // The wizard always reopens on the saved draft, so someone who meant to
     // found a different group needs to be asked rather than dropped back into
@@ -358,11 +362,11 @@ export default function Groups() {
                       <Text
                         style={[
                           styles.groupSub,
-                          { color: g.status === "pending-payment" ? colors.warning : colors.textMuted },
+                          { color: GROUP_FEES_ENABLED && g.status === "pending-payment" ? colors.warning : colors.textMuted },
                         ]}
                         numberOfLines={1}
                       >
-                        {g.status === "pending-payment"
+                        {GROUP_FEES_ENABLED && g.status === "pending-payment"
                           ? "Awaiting registration fee - tap to finish"
                           : isProjectFundType(g.groupType)
                             ? projectSubtitle(g)

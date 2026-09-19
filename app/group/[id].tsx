@@ -48,6 +48,7 @@ import {
   pendingInvites,
 } from "@/src/utils/invites";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
+import { GROUP_FEES_ENABLED } from "@/src/constants";
 import {
   Member,
   Group,
@@ -328,11 +329,17 @@ export default function GroupDetails() {
     (member: Member) => {
       const savings = member.savings || 0;
       const owed = member.loanActive || 0;
+      // Church (project-fund) contributions are never refunded on exit.
+      const churchFund = isProjectFundType(group?.groupType);
       Alert.alert(
         "Propose removal",
         `Remove ${member.name} from ${group?.name ?? "this group"}?
 
-The group's other admins vote on this. ${member.name} does not. If it carries, their ${formatZMW(savings)} in savings is refunded to their mobile wallet${owed > 0 ? ` after ${formatZMW(owed)} clears their outstanding loan` : ""}.`,
+The group's other admins vote on this. ${member.name} does not. ${
+          churchFund
+            ? `Their ${formatZMW(savings)} contribution stays in the group fund - nothing is refunded.`
+            : `If it carries, their ${formatZMW(savings)} in savings is refunded to their mobile wallet${owed > 0 ? ` after ${formatZMW(owed)} clears their outstanding loan` : ""}.`
+        }`,
         [
           { text: "Cancel", style: "cancel" },
           {
@@ -346,7 +353,7 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
                 await load();
                 Alert.alert(
                   "Removal proposed",
-                  `${res.requiredApprovals} of ${res.eligibleVoters} other admin${res.eligibleVoters === 1 ? "" : "s"} must approve. ${formatZMW(res.refund)} would be refunded to ${member.name}.`
+                  `${res.requiredApprovals} of ${res.eligibleVoters} other admin${res.eligibleVoters === 1 ? "" : "s"} must approve.${churchFund ? "" : ` ${formatZMW(res.refund)} would be refunded to ${member.name}.`}`
                 );
               } catch (e: any) {
                 Alert.alert("Could not propose removal", e?.message || "Please try again.");
@@ -358,7 +365,7 @@ The group's other admins vote on this. ${member.name} does not. If it carries, t
         ]
       );
     },
-    [group?.name, id, load]
+    [group?.name, group?.groupType, id, load]
   );
 
   /**
@@ -516,11 +523,14 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
     );
   }
 
-  const locked = group.feeStatus?.locked ?? isGroupLocked(group);
+  // Fees off: never locked, whatever a stale/older backend reports in feeStatus.
+  const locked = GROUP_FEES_ENABLED
+    ? (group.feeStatus?.locked ?? isGroupLocked(group))
+    : false;
   // A group still waiting on its registration fee owes exactly month 1. The
   // server's monthsOwed reads 0 there (feePaidThrough was stamped at creation),
   // so the amount has to come from the fee itself or the overlay offers "K0".
-  const awaitingFirstPayment = group.status === "pending-payment";
+  const awaitingFirstPayment = GROUP_FEES_ENABLED && group.status === "pending-payment";
   const monthsOwed = awaitingFirstPayment ? 1 : (group.feeStatus?.monthsOwed ?? getMonthsOwed(group));
   const amountOwed = awaitingFirstPayment
     ? (group.monthlyFee ?? group.registrationFee ?? 0)

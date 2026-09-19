@@ -20,11 +20,8 @@ import { useTheme } from "@/src/theme/ThemeContext";
 import { getLoans, repayLoan } from "@/src/services/loans";
 import { Loan } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
-import {
-  MOBILE_MONEY_ON_HOLD,
-  MOBILE_MONEY_HOLD_NOTE,
-} from "@/src/constants";
-import { Check, Clock, Lock } from "lucide-react-native";
+import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
+import { Check, Clock } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
 export default function Repay() {
@@ -303,19 +300,15 @@ export default function Repay() {
         {MOBILE_MONEY_ON_HOLD ? (
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
               padding: 12,
               borderRadius: 12,
               marginBottom: 12,
               backgroundColor: colors.surfaceSecondary,
             }}
           >
-            <Lock size={14} color={colors.textMuted} />
-            <Text style={{ flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
-              {MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer. It comes
-              off your loan once they confirm it.
+            <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
+              Cash repayment - hand the cash to your treasurer. It comes off your
+              loan once they confirm it.
             </Text>
           </View>
         ) : null}

@@ -267,7 +267,8 @@ export interface Notice {
     | "invite"
     | "invite_accepted"
     | "penalty"
-    | "kyc";
+    | "kyc"
+    | "biometric";
   title: string;
   body: string;
   date: string;

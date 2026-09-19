@@ -25,6 +25,22 @@ export const MOBILE_MONEY_HOLD_NOTE =
   "Mobile money is paused for now. Payments are cash, confirmed by an admin.";
 
 /**
+ * Group fee master switch (client mirror of the API's GROUP_FEES_ENABLED).
+ * OFF for the non-financial tracker build: group creation is free and instant,
+ * no fee screen, and groups are never locked for an unpaid fee. Flip to true
+ * (with the API flag) for the organization-account build to restore fees.
+ */
+export const GROUP_FEES_ENABLED = false;
+
+/**
+ * KYC master switch (client mirror of the API's KYC_ENABLED). OFF for the
+ * non-financial tracker build: no identity verification anywhere - founding a
+ * group needs no KYC and the verify screen is unreachable. Flip to true (with
+ * the API flag) for the organization-account build to restore verification.
+ */
+export const KYC_ENABLED = false;
+
+/**
  * Legal / support links surfaced in the app and required by the app stores
  * (privacy policy is mandatory; terms and a data-deletion page are expected for
  * a fintech app). Point these at the real hosted pages before submitting -

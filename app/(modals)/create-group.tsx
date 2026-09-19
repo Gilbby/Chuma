@@ -40,6 +40,7 @@ import Slider from "@react-native-community/slider";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { isProjectFundType } from "@/src/types";
 import type { GroupType, GroupConstitution, LoanRepaymentTier } from "@/src/types";
+import { GROUP_FEES_ENABLED, KYC_ENABLED } from "@/src/constants";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -285,7 +286,7 @@ export default function CreateGroup() {
         kyc?: { status?: string };
         phone?: string;
       }>();
-      if (user?.kyc?.status !== "verified") {
+      if (KYC_ENABLED && user?.kyc?.status !== "verified") {
         router.replace("/kyc?return=create-group" as never);
         return;
       }
@@ -919,18 +920,22 @@ export default function CreateGroup() {
               ) : (
                 <RRow label="Cycle" value={cycleDuration} colors={colors} />
               )}
-              <RRow
-                label="Registration fee"
-                value={
-                  settled
-                    ? `K100.00 paid · ${network}`
-                    : feeState === "timeout"
-                      ? `K100.00 not received · ${network}`
-                      : `K100.00 awaiting your PIN · ${network}`
-                }
-                colors={colors}
-                last
-              />
+              {GROUP_FEES_ENABLED ? (
+                <RRow
+                  label="Registration fee"
+                  value={
+                    settled
+                      ? `K100.00 paid · ${network}`
+                      : feeState === "timeout"
+                        ? `K100.00 not received · ${network}`
+                        : `K100.00 awaiting your PIN · ${network}`
+                  }
+                  colors={colors}
+                  last
+                />
+              ) : (
+                <RRow label="Status" value="Active" colors={colors} last />
+              )}
             </Card>
           </View>
 
@@ -1769,9 +1774,12 @@ export default function CreateGroup() {
 
                 <View style={{ flexGrow: 1, minHeight: 24 }} />
                 <Button
-                  label="Continue to payment"
-                  disabled={!termsAccepted}
-                  onPress={() => goToStep(6)}
+                  label={GROUP_FEES_ENABLED ? "Continue to payment" : "Create group"}
+                  disabled={!termsAccepted || paying}
+                  loading={!GROUP_FEES_ENABLED && paying}
+                  onPress={() =>
+                    GROUP_FEES_ENABLED ? goToStep(6) : handlePayAndCreate()
+                  }
                   testID="create-group-step5-continue"
                 />
               </>

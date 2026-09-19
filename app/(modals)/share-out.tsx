@@ -858,20 +858,24 @@ export default function ShareOutScreen() {
                   blurb:
                     "Cash, your own mobile money, a bank transfer, however the group agreed. Mark each member paid here as you go.",
                 },
-                {
-                  key: "mobile-money" as const,
-                  icon: Smartphone,
-                  title: "Pay through Chuma",
-                  blurb:
-                    "Every member's share goes to their mobile wallet automatically once approved.",
-                },
+                // Automatic (Chuma/pawaPay) payout is only offered when mobile
+                // money is active. On the cash-only build it is left out entirely
+                // rather than shown locked.
+                ...(mobileMoneyHold
+                  ? []
+                  : [
+                      {
+                        key: "mobile-money" as const,
+                        icon: Smartphone,
+                        title: "Pay through Chuma",
+                        blurb:
+                          "Every member's share goes to their mobile wallet automatically once approved.",
+                      },
+                    ]),
               ]).map((opt) => {
                 const selected = chosenMethod === opt.key;
-                // Mobile money cannot pay anyone while the hold is on, so it is
-                // offered but locked, with the reason underneath - hiding it
-                // would just look like the feature does not exist.
-                const locked = opt.key === "mobile-money" && mobileMoneyHold;
-                const Icon = locked ? Lock : opt.icon;
+                const locked = false;
+                const Icon = opt.icon;
                 return (
                   <Pressable
                     key={opt.key}
@@ -914,8 +918,9 @@ export default function ShareOutScreen() {
                 style={{ color: colors.textMuted, fontSize: 11, marginBottom: 14, lineHeight: 16 }}
                 testID="shareout-method-locked-note"
               >
-                Automatic payouts are paused, so the group pays members directly this
-                time. Nothing is deducted. Members take their full share.
+                The group pays each member their share directly - cash, mobile
+                money or a bank transfer - and marks each one paid here. Nothing
+                is deducted; members take their full share.
               </Text>
             ) : (
               <View style={{ height: 14 }} />

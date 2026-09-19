@@ -40,12 +40,8 @@ import {
   PiggyBank,
   HandCoins,
   AlertTriangle,
-  Lock,
 } from "lucide-react-native";
-import {
-  MOBILE_MONEY_ON_HOLD,
-  MOBILE_MONEY_HOLD_NOTE,
-} from "@/src/constants";
+import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
 // What giving that names no project is called. It is not something a member
@@ -693,28 +689,27 @@ export default function Contribute() {
                   </Text>
                 )}
 
-                {/* Cash toggle - applies to the whole payment. Locked on while
-                    mobile money is held: there is no other way to pay. */}
-                <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Pay with cash</Text>
-                      {MOBILE_MONEY_ON_HOLD ? <Lock size={13} color={colors.textMuted} /> : null}
+                {/* Cash vs mobile-money toggle. Only shown when mobile money is
+                    active; in the cash-only (hold) build there is nothing to
+                    choose, so the whole control is hidden and payment is cash. */}
+                {!MOBILE_MONEY_ON_HOLD && (
+                  <View style={[styles.picker, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "600" }}>Pay with cash</Text>
+                      </View>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                        Recorded by an admin, no mobile money charge
+                      </Text>
                     </View>
-                    <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                      {MOBILE_MONEY_ON_HOLD
-                        ? MOBILE_MONEY_HOLD_NOTE
-                        : "Recorded by an admin, no mobile money charge"}
-                    </Text>
+                    <Switch
+                      value={payCash}
+                      onValueChange={setPayCash}
+                      trackColor={{ false: colors.border, true: colors.primary }}
+                      testID="contribute-cash-toggle"
+                    />
                   </View>
-                  <Switch
-                    value={payCash}
-                    onValueChange={setPayCash}
-                    disabled={MOBILE_MONEY_ON_HOLD}
-                    trackColor={{ false: colors.border, true: colors.primary }}
-                    testID="contribute-cash-toggle"
-                  />
-                </View>
+                )}
 
                 {/* Cycle progress - a project-fund group has no cycle to be
                     partway through; its progress is per project, shown above. */}

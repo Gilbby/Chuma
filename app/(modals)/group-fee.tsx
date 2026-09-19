@@ -14,6 +14,7 @@ import { getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { Check, Clock, CalendarClock } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
+import { GROUP_FEES_ENABLED } from "@/src/constants";
 
 type Receipt = {
   amount: number;
@@ -65,6 +66,13 @@ export default function GroupFeeScreen() {
       navigation.setOptions({ gestureEnabled: false });
     }
   }, [paid, navigation]);
+
+  // Group fees are off in the tracker build. This screen is unreachable through
+  // the UI, but bounce any stale deep link straight to the Groups tab.
+  useEffect(() => {
+    if (!GROUP_FEES_ENABLED) router.replace("/(tabs)/groups");
+  }, [router]);
+  if (!GROUP_FEES_ENABLED) return null;
 
   // A group still waiting on its registration fee owes exactly month 1, even
   // though feePaidThrough was stamped at creation and so reads as nothing owed.

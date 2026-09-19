@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { ShieldCheck, ScanFace, IdCard, Clock, AlertTriangle } from "lucide-reac
 import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { useTheme } from "@/src/theme/ThemeContext";
+import { KYC_ENABLED } from "@/src/constants";
 import { storage } from "@/src/utils/storage";
 import { updateProfile } from "@/src/services/auth";
 import { setCurrentUser, getCurrentUser } from "@/src/utils/currentUser";
@@ -51,6 +52,13 @@ export default function Kyc() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // KYC is off in the tracker build. This screen is unreachable through the UI,
+  // but bounce any stale deep link back into the app rather than show it.
+  useEffect(() => {
+    if (!KYC_ENABLED) router.replace("/(tabs)");
+  }, [router]);
+  if (!KYC_ENABLED) return null;
 
   const busy = phase === "starting" || phase === "verifying" || phase === "checking";
 

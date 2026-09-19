@@ -79,3 +79,29 @@ export async function isBalanceHidden(): Promise<boolean> {
 export async function setBalanceHidden(hidden: boolean): Promise<boolean> {
   return storage.setItem(BALANCE_HIDDEN_KEY, hidden);
 }
+
+const NUDGE_DISMISSED_KEY = "chuma.biometric.nudgeDismissed";
+
+/** Has the user permanently dismissed the "turn on biometrics" home card? */
+export async function isBiometricNudgeDismissed(): Promise<boolean> {
+  return (await storage.getItem<boolean>(NUDGE_DISMISSED_KEY, false)) ?? false;
+}
+
+export async function setBiometricNudgeDismissed(
+  dismissed: boolean
+): Promise<boolean> {
+  return storage.setItem(NUDGE_DISMISSED_KEY, dismissed);
+}
+
+/**
+ * Wipe device-local auth/display preferences. These are stored per-device, not
+ * per-account, so they MUST be cleared on logout and account deletion -
+ * otherwise the next person to sign up on this phone inherits the previous
+ * account's biometric-enabled flag (and would get a fingerprint prompt they
+ * never set up), its hidden-balance state, or a dismissed enable-biometrics card.
+ */
+export async function clearLocalAuthPrefs(): Promise<void> {
+  await storage.removeItem(ENABLED_KEY);
+  await storage.removeItem(BALANCE_HIDDEN_KEY);
+  await storage.removeItem(NUDGE_DISMISSED_KEY);
+}

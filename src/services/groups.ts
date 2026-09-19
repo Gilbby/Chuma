@@ -2,6 +2,7 @@ import { api } from "./apiClient";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { Group, GroupProject } from "@/src/types";
 import { phoneKey } from "@/src/utils/invites";
+import { GROUP_FEES_ENABLED } from "@/src/constants";
 
 function mapGroup(raw: any, currentUserId?: string): Group {
   // Member subdocs come back with _id only (lean/toObject). A "removed" row is
@@ -80,7 +81,9 @@ export async function getGroups(
     includeClosed ? "/groups?includeClosed=true" : "/groups"
   );
   return (res.groups ?? [])
-    .filter((g) => includePending || g.status !== "pending-payment")
+    // With fees off, nothing is "pending-payment" in any meaningful sense, so
+    // never hide a group for it (covers legacy groups from before the change).
+    .filter((g) => includePending || !GROUP_FEES_ENABLED || g.status !== "pending-payment")
     .map((g) => mapGroup(g, user?._id));
 }
 

@@ -4,10 +4,12 @@
 // functions work against real payment records.
 
 import { Group } from "@/src/types";
+import { GROUP_FEES_ENABLED } from "@/src/constants";
 
 export const GRACE_PERIOD_DAYS = 5;
 
 export function getMonthsOwed(group: Group): number {
+  if (!GROUP_FEES_ENABLED) return 0;
   if (!group.feePaidThrough || !group.monthlyFee) return 0;
   const paidThrough = new Date(group.feePaidThrough);
   const now = new Date();
@@ -29,6 +31,7 @@ export function getAmountOwed(group: Group): number {
 
 /** A brand-new group whose registration fee has not settled yet. */
 export function isAwaitingFirstPayment(group: Group): boolean {
+  if (!GROUP_FEES_ENABLED) return false;
   return group.status === "pending-payment";
 }
 
@@ -37,6 +40,11 @@ export function getGraceInfo(group: Group): {
   daysIntoGrace: number;
   daysLeft: number;
 } {
+  // Fees disabled (tracker build): every group reads as fully paid, so nothing
+  // is ever locked or awaiting payment.
+  if (!GROUP_FEES_ENABLED) {
+    return { status: "paid", daysIntoGrace: 0, daysLeft: GRACE_PERIOD_DAYS };
+  }
   // Not a lapsed fee - a group that has not started. Reported separately so
   // screens can say "waiting for payment" instead of "your fee is overdue".
   if (isAwaitingFirstPayment(group)) {

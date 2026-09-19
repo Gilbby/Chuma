@@ -10,11 +10,8 @@ import { payPenalty } from "@/src/services/penalties";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, Clock, Receipt, Lock } from "lucide-react-native";
-import {
-  MOBILE_MONEY_ON_HOLD,
-  MOBILE_MONEY_HOLD_NOTE,
-} from "@/src/constants";
+import { Check, Clock, Receipt } from "lucide-react-native";
+import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
 type Step = "confirm" | "success";
@@ -139,9 +136,7 @@ export default function PenaltyPay() {
           <View style={[styles.confirmRow, { borderBottomWidth: 0 }]}>
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>From</Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {MOBILE_MONEY_ON_HOLD ? (
-                <Lock size={13} color={colors.textMuted} style={{ marginRight: 6 }} />
-              ) : (
+              {MOBILE_MONEY_ON_HOLD ? null : (
                 <View style={[styles.dot, { backgroundColor: wallet.color }]} />
               )}
               <Text style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }}>
@@ -153,7 +148,7 @@ export default function PenaltyPay() {
 
         <Text style={[styles.note, { color: colors.textMuted }]}>
           {MOBILE_MONEY_ON_HOLD
-            ? `${MOBILE_MONEY_HOLD_NOTE} Hand the cash to your treasurer. The penalty clears once they confirm it.`
+            ? "Cash penalty - hand the cash to your treasurer. The penalty clears once they confirm it."
             : "Penalties are collected from your registered wallet."}
         </Text>
 
