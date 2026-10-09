@@ -323,7 +323,7 @@ export default function GroupFeeScreen() {
           <Text style={[styles.amount, { color: colors.textMain }]}>{formatZMW(amountOwed)}</Text>
           <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 4 }}>
             {awaitingFirstPayment
-              ? "Registration fee - month 1"
+              ? "Registration fee for month 1"
               : `${monthsOwed} month${monthsOwed === 1 ? "" : "s"} × ${formatZMW(group.monthlyFee ?? 100)}`}
           </Text>
         </Card>

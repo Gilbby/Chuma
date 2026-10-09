@@ -905,7 +905,7 @@ export default function CreateGroup() {
               }}
             >
               {feeState === "timeout"
-                ? `We haven't received the K100.00 registration fee yet. ${groupName} stays closed until it arrives - open it from Groups to try the payment again.`
+                ? `We haven't received the K100.00 registration fee yet. ${groupName} stays closed until it arrives. Open it from Groups to try the payment again.`
                 : `Enter your ${network} PIN on your phone to pay the K100.00 registration fee. ${groupName} opens as soon as it goes through.`}
             </Text>
           )}
@@ -1053,9 +1053,9 @@ export default function CreateGroup() {
                   </Text>
                 ) : isChilimba ? (
                   <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>
-                    Everyone contributes a fixed amount each round, and the whole pool goes to one
-                    member at a time. The turn rotates until everyone has received once - no lending
-                    and no end-of-cycle share-out.
+                    Everyone contributes the same fixed amount each round, and the whole pool goes to
+                    one member at a time. The turn rotates until everyone has received it once. No one
+                    lends money, and nothing gets shared out when the cycle ends.
                   </Text>
                 ) : groupType && !lendingAvailable ? (
                   <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>

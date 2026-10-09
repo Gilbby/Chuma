@@ -918,8 +918,8 @@ export default function ShareOutScreen() {
                 style={{ color: colors.textMuted, fontSize: 11, marginBottom: 14, lineHeight: 16 }}
                 testID="shareout-method-locked-note"
               >
-                The group pays each member their share directly - cash, mobile
-                money or a bank transfer - and marks each one paid here. Nothing
+                The group pays each member their share directly (cash, mobile
+                money or a bank transfer) and marks each one paid here. Nothing
                 is deducted; members take their full share.
               </Text>
             ) : (

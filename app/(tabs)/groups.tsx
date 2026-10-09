@@ -367,7 +367,7 @@ export default function Groups() {
                         numberOfLines={1}
                       >
                         {GROUP_FEES_ENABLED && g.status === "pending-payment"
-                          ? "Awaiting registration fee - tap to finish"
+                          ? "Awaiting registration fee. Tap to finish"
                           : isProjectFundType(g.groupType)
                             ? projectSubtitle(g)
                             : `${g.contributionFrequency} · ${formatZMW(g.contributionAmount)}`}

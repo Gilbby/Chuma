@@ -307,7 +307,7 @@ export default function Repay() {
             }}
           >
             <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
-              Cash repayment - hand the cash to your treasurer. It comes off your
+              Cash repayment. Hand the cash to your treasurer. It comes off your
               loan once they confirm it.
             </Text>
           </View>

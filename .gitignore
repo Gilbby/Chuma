@@ -42,7 +42,7 @@ yarn-error.*
 .env.local
 .env*.local
 
-# markdown docs (not used by the app — CLAUDE.md, README, docs/*.md, etc.)
+# markdown docs (not used by the app - CLAUDE.md, README, docs/*.md, etc.)
 *.md
 
 # typescript
@@ -50,5 +50,5 @@ yarn-error.*
 
 app-example
 
-# Signing keystore + passwords — NEVER commit
+# Signing keystore + passwords - NEVER commit
 /credentials

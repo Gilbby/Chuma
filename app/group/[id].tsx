@@ -428,7 +428,7 @@ export default function GroupDetails() {
 
 The group's other admins vote on this. ${member.name} does not. ${
           churchFund
-            ? `Their ${formatZMW(savings)} contribution stays in the group fund - nothing is refunded.`
+            ? `Their ${formatZMW(savings)} contribution stays in the group fund. Nothing is refunded.`
             : `If it carries, their ${formatZMW(savings)} in savings is refunded to their mobile wallet${owed > 0 ? ` after ${formatZMW(owed)} clears their outstanding loan` : ""}.`
         }`,
         [
@@ -492,7 +492,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   router.replace("/(tabs)/groups");
                   Alert.alert(
                     "Group deleted",
-                    `${groupName} is closed. Its records stay in the app - open Transactions or a statement to see them.`
+                    `${groupName} is closed. Its records stay in the app. Open Transactions or a statement to see them.`
                   );
                   return;
                 }
@@ -1126,7 +1126,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                       <Text style={[styles.helperText, { color: colors.textMuted, marginTop: 0 }]}>
                         Members contribute a fixed amount each round, and the whole
                         pool goes to one member at a time. Draw the order to set who
-                        receives when - it is random and locks the group to new
+                        receives when. The draw is random and locks the group to new
                         members once drawn.
                       </Text>
                       {isChair && (
@@ -1170,7 +1170,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
 
                   {complete && (
                     <Text style={[styles.helperText, { color: colors.textMuted }]}>
-                      Every member has received the pool once - this chilimba is
+                      Every member has received the pool once. This chilimba is
                       complete.
                     </Text>
                   )}
@@ -1797,7 +1797,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   </View>
                   <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 19, marginTop: 12 }}>
                     Records are kept. Contributions, receipts, penalties and statements all
-                    stay in the app and can still be opened from Transactions - deleting the
+                    stay in the app and can still be opened from Transactions. Deleting the
                     group only closes it, it never erases what happened in it.
                   </Text>
                   {(group.totalSavings ?? 0) > 0 || (group.loanCirculation ?? 0) > 0 ? (
@@ -2331,7 +2331,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 {awaitingFirstPayment
                   ? canPayFee
                     ? `${group.name} opens once its ${formatZMW(amountOwed)} registration fee is received. Nothing can be added or contributed until then.`
-                    : "This group has not started yet - its registration fee is still being confirmed. Please check back soon."
+                    : "This group has not started yet. Its registration fee is still being confirmed. Please check back soon."
                   : canPayFee
                     ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
                     : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}

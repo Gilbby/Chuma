@@ -202,7 +202,7 @@ export default function StatementScreen() {
       : groups.map((g) => g.groupType)
   );
   const copy = statementCopy(flavour, scope);
-  const periodLabel = `${fmtDay(range.from)} - ${fmtDay(range.to)}`;
+  const periodLabel = `${fmtDay(range.from)} to ${fmtDay(range.to)}`;
 
   const choosePreset = (key: PresetKey) => {
     if (key === "custom") {

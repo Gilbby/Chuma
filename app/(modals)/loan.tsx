@@ -568,7 +568,7 @@ export default function Loan() {
                   This isn&apos;t a loan from Chuma or any outside lender. You&apos;re
                   borrowing from{" "}
                   <Text style={{ color: colors.textMain, fontWeight: "600" }}>{grp.name}</Text>
-                  &apos;s own pooled savings - money you and the other members have
+                  &apos;s own pooled savings, money you and the other members have
                   saved together. Your group set the {grp.loanInterestRate}% monthly
                   interest rate, and the interest you repay goes back into the group
                   fund and is shared among the members at share-out.
