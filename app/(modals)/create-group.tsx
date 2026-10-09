@@ -8,8 +8,6 @@ import {
   Pressable,
   Switch,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback,
-  Keyboard,
   Platform,
   Image,
   Alert,
@@ -38,7 +36,7 @@ import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X, CreditCard, Plus, Calendar } from "lucide-react-native";
 import Slider from "@react-native-community/slider";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { isProjectFundType } from "@/src/types";
+import { isProjectFundType, isChilimbaType } from "@/src/types";
 import type { GroupType, GroupConstitution, LoanRepaymentTier } from "@/src/types";
 import { GROUP_FEES_ENABLED, KYC_ENABLED } from "@/src/constants";
 
@@ -66,13 +64,19 @@ const GROUP_TYPES: { label: string; value: GroupType }[] = [
   { label: "Women's Group", value: "womens-group" },
   { label: "Church Group", value: "church-group" },
   { label: "Investment Group", value: "investment-group" },
+  { label: "Chilimba", value: "chilimba" },
 ];
 
 // Project-fund types (church) collect toward named projects instead of running
 // a contribution cycle: no fixed amount, no frequency, no deadline, no late
 // penalty, no lending and no share-out. The loan-rules step is skipped and the
 // API enforces the same rules on its side (logic.service.js PROJECT_FUND_TYPES).
-const lendsToMembers = (t: GroupType | "") => !!t && !isProjectFundType(t);
+// A chilimba (rotating savings) never lends - it hands the whole pool to one
+// member each round instead - so it skips the loan-rules step exactly like a
+// project-fund group does, and the API enforces the same (logic.service.js
+// CHILIMBA_TYPES).
+const lendsToMembers = (t: GroupType | "") =>
+  !!t && !isProjectFundType(t) && !isChilimbaType(t);
 
 const MAX_PROJECTS = 30;
 
@@ -230,6 +234,11 @@ export default function CreateGroup() {
 
   // Church-style group: gives toward named projects, no cycle of any kind.
   const isProjectFund = isProjectFundType(groupType);
+  // Chilimba (rotating savings): keeps a contribution cycle but never lends and
+  // never shares out - the pool rotates to one member each round instead. The
+  // loan-rules step is skipped (lendsToMembers) and the payout order is drawn
+  // inside the group after members join.
+  const isChilimba = isChilimbaType(groupType);
 
   // Re-baseline loan repayment tiers whenever the cycle length changes, so the
   // defaults always fit the cycle (a longer cycle allows longer loans). Skips
@@ -776,9 +785,8 @@ export default function CreateGroup() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-invite-screen">
         <ScreenHeader title="Invite members" onBack={() => setShowInvite(false)} />
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
               <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 22, marginBottom: 24 }}>
                 Invite people to {groupName} by phone number. They&apos;ll get an SMS and see the invite in their app.
               </Text>
@@ -855,7 +863,6 @@ export default function CreateGroup() {
               />
             </ScrollView>
           </KeyboardAvoidingView>
-        </TouchableWithoutFeedback>
       </SafeAreaView>
     );
   }
@@ -976,13 +983,15 @@ export default function CreateGroup() {
 
   const groupTypeLabel = GROUP_TYPES.find((t) => t.value === groupType)?.label ?? "";
   const thresholdLabel = APPROVAL_THRESHOLDS.find((t) => t.value === approvalThreshold)?.label ?? "";
-  // A project-fund group never lends and never shares out, so voting on either
-  // is a permission over something that cannot happen.
-  const permissionItems = isProjectFund
-    ? PERMISSION_ITEMS.filter(
-        (p) => p.key !== "loanApprovals" && p.key !== "shareOutApprovals"
-      )
-    : PERMISSION_ITEMS;
+  // A project-fund group never lends and never shares out, and a chilimba never
+  // lends and rotates its pool instead of sharing out - so for both, voting on a
+  // loan or a share-out is a permission over something that cannot happen.
+  const permissionItems =
+    isProjectFund || isChilimba
+      ? PERMISSION_ITEMS.filter(
+          (p) => p.key !== "loanApprovals" && p.key !== "shareOutApprovals"
+        )
+      : PERMISSION_ITEMS;
   const activePermCount = permissionItems.filter((p) => permissions[p.key]).length;
 
   // ─── Main render ─────────────────────────────────────────────────────────────
@@ -1003,9 +1012,8 @@ export default function CreateGroup() {
         </View>
       </View>
 
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
 
             {/* ─── STEP 1 - Group Basics ──────────────────────────────────────── */}
             {step === 1 && (
@@ -1042,6 +1050,12 @@ export default function CreateGroup() {
                   <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>
                     Members can give whatever they choose, whenever they choose, either toward a
                     specific project you name or toward the church&rsquo;s general savings.
+                  </Text>
+                ) : isChilimba ? (
+                  <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>
+                    Everyone contributes a fixed amount each round, and the whole pool goes to one
+                    member at a time. The turn rotates until everyone has received once - no lending
+                    and no end-of-cycle share-out.
                   </Text>
                 ) : groupType && !lendingAvailable ? (
                   <Text style={[styles.fieldHint, { color: colors.textMuted, marginTop: 8 }]}>
@@ -1236,6 +1250,28 @@ export default function CreateGroup() {
             {/* ─── STEP 2 - Contribution Setup ────────────────────────────────── */}
             {step === 2 && !isProjectFund && (
               <>
+                {isChilimba && (
+                  <View
+                    style={{
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      borderRadius: 12,
+                      padding: 14,
+                      marginBottom: 18,
+                    }}
+                  >
+                    <Text style={{ color: colors.textMain, fontWeight: "700", marginBottom: 4 }}>
+                      How a chilimba works
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
+                      Everyone contributes this amount each round, and the whole
+                      pool goes to one member at a time. Once members have joined,
+                      you draw the payout order inside the group and it rotates
+                      until everyone has received once.
+                    </Text>
+                  </View>
+                )}
                 <FL text="Contribution frequency" colors={colors} />
                 <View style={styles.chipsRow}>
                   {CONTRIB_FREQS.map((f) => {
@@ -1712,7 +1748,7 @@ export default function CreateGroup() {
                 </RC>
                 )}
 
-                {!isProjectFund && (
+                {!isProjectFund && !isChilimba && (
                 <RC
                   title="Loans"
                   onEdit={() => goToStep(lendingAvailable ? 3 : 1)}
@@ -1878,8 +1914,7 @@ export default function CreateGroup() {
             )}
 
           </ScrollView>
-        </KeyboardAvoidingView>
-      </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

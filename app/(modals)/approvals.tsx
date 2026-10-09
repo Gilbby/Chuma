@@ -15,7 +15,7 @@ import { Approval } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
 import { useRole } from "@/src/contexts/RoleContext";
-import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles, UserMinus, Trash2, HandCoins } from "lucide-react-native";
+import { Banknote, Wallet, Scale, ShieldCheck, Check, X, Info, Sparkles, UserMinus, Trash2, HandCoins, Coins } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
 const TYPE_ICONS: Record<Approval["type"], typeof Banknote> = {
@@ -26,6 +26,7 @@ const TYPE_ICONS: Record<Approval["type"], typeof Banknote> = {
   "member-removal": UserMinus,
   "group-deletion": Trash2,
   "share-out": Sparkles,
+  "chilimba-payout": Coins,
   "cash-receipt": HandCoins,
 };
 

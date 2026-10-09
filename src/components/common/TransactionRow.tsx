@@ -14,6 +14,7 @@ import {
   Wallet,
   AlertTriangle,
   Receipt,
+  Coins,
 } from "lucide-react-native";
 
 interface Props {
@@ -27,6 +28,7 @@ const ICONS = {
   loan: Banknote,
   repayment: RefreshCw,
   "share-out": Gift,
+  "chilimba-payout": Coins,
   withdrawal: Wallet,
   penalty: AlertTriangle,
   fee: Receipt,
@@ -61,7 +63,9 @@ export const TransactionRow: React.FC<Props> = ({ txn, onPress, testID }) => {
         <Text style={[styles.title, { color: colors.textMain }]} numberOfLines={1}>
           {txn.type === "share-out"
             ? "Share-out"
-            : txn.type.charAt(0).toUpperCase() + txn.type.slice(1)}
+            : txn.type === "chilimba-payout"
+              ? "Chilimba payout"
+              : txn.type.charAt(0).toUpperCase() + txn.type.slice(1)}
         </Text>
         <Text style={[styles.sub, { color: colors.textMuted }]} numberOfLines={1}>
           {txn.groupName} · {txn.date}

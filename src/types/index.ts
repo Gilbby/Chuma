@@ -16,6 +16,13 @@ export interface Member {
   invitedByName?: string;
   invitedAt?: string;
   lastInviteSentAt?: string;
+  // Chilimba (rotating savings) only: this member's 1-based slot in the payout
+  // order (null until the order is drawn), and whether they have taken the pool
+  // yet - the round they took it and when. See isChilimbaType.
+  payoutPosition?: number | null;
+  payoutReceived?: boolean;
+  payoutRound?: number;
+  payoutReceivedAt?: string;
   // Frozen at removal. A former member's row is kept as the group's record of
   // them - savings goes to 0 when the refund lands, these do not.
   exitedAt?: string;
@@ -29,7 +36,10 @@ export type GroupType =
   | "cooperative"
   | "womens-group"
   | "church-group"
-  | "investment-group";
+  | "investment-group"
+  // Rotating savings (ROSCA): everyone contributes a fixed amount each round and
+  // one member takes the whole pool, rotating until all have. See isChilimbaType.
+  | "chilimba";
 
 /**
  * Types that collect toward NAMED PROJECTS instead of running a contribution
@@ -43,6 +53,29 @@ export const PROJECT_FUND_TYPES: GroupType[] = ["church-group"];
 
 export const isProjectFundType = (t?: GroupType | "" | null): boolean =>
   !!t && PROJECT_FUND_TYPES.includes(t);
+
+/**
+ * Rotating-savings types (chilimba / ROSCA). Members contribute a fixed amount
+ * each round on a schedule and the whole pool goes to ONE member that round,
+ * rotating in a random order drawn at the start until everyone has received
+ * once. So a chilimba keeps a contribution cycle and its late-contribution
+ * penalties, but has no internal lending and no end-of-cycle share-out - the
+ * pool empties every round instead. Mirrors CHILIMBA_TYPES in the API's
+ * logic.service.js. Rotation state lives on `Group.chilimba` and the member
+ * `payoutPosition`/`payoutReceived` fields.
+ */
+export const CHILIMBA_TYPES: GroupType[] = ["chilimba"];
+
+export const isChilimbaType = (t?: GroupType | "" | null): boolean =>
+  !!t && CHILIMBA_TYPES.includes(t);
+
+/** Rotation state for a chilimba group - mirrors `group.chilimba` in the API. */
+export interface ChilimbaState {
+  orderDrawn: boolean;
+  orderDrawnAt?: string | null;
+  currentRound: number; // 0 before the draw; > totalRounds once complete
+  totalRounds?: number;
+}
 
 /** A thing the group is raising money for - "Church building", "Mission trip". */
 export interface GroupProject {
@@ -132,6 +165,8 @@ export interface Group {
    *  isProjectFundType. Always set by the service layer; optional so older
    *  shapes still type. */
   projects?: GroupProject[];
+  /** Rotation state. Only chilimba types have any - see isChilimbaType. */
+  chilimba?: ChilimbaState;
   /** Removed members, kept as history. Never counted as members of the group.
    *  Always set by the service layer; optional so older shapes still type. */
   formerMembers?: Member[];
@@ -156,7 +191,7 @@ export interface Group {
 
 export interface TxnItem {
   id: string;
-  type: "contribution" | "loan" | "repayment" | "share-out" | "withdrawal" | "penalty" | "fee";
+  type: "contribution" | "loan" | "repayment" | "share-out" | "chilimba-payout" | "withdrawal" | "penalty" | "fee";
   amount: number;
   status: "completed" | "pending" | "failed";
   groupId: string;
@@ -205,6 +240,9 @@ export interface Approval {
     | "member-removal"
     | "group-deletion"
     | "share-out"
+    // A chilimba round payout: admins approve handing the whole pool to the
+    // member whose turn it is this round. See isChilimbaType.
+    | "chilimba-payout"
     // An admin acknowledging that cash physically reached them. Needs one
     // admin, not a quorum - see the API's cashReceipt service.
     | "cash-receipt";

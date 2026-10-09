@@ -57,7 +57,14 @@ import {
   TxnItem,
   Loan,
   isProjectFundType,
+  isChilimbaType,
 } from "@/src/types";
+import {
+  getChilimbaRotation,
+  drawChilimbaOrder,
+  proposeChilimbaPayout,
+  type ChilimbaRotation,
+} from "@/src/services/chilimba";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Clipboard from "expo-clipboard";
 import {
@@ -87,6 +94,8 @@ import {
   Target,
   Trash2,
   Pencil,
+  Repeat,
+  Coins,
 } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
@@ -94,6 +103,7 @@ type TabKey =
   | "members"
   | "projects"
   | "contributions"
+  | "rotation"
   | "loans"
   | "approvals"
   | "reports"
@@ -103,6 +113,7 @@ const TAB_KEYS: TabKey[] = [
   "members",
   "projects",
   "contributions",
+  "rotation",
   "loans",
   "approvals",
   "reports",
@@ -191,6 +202,10 @@ export default function GroupDetails() {
   const [groupApprovals, setGroupApprovals] = useState<Approval[]>([]);
   const [groupTxn, setGroupTxn] = useState<TxnItem[]>([]);
   const [groupLoans, setGroupLoans] = useState<Loan[]>([]);
+  // Chilimba rotation state (rotating-savings groups only). Null for every other
+  // type and until the first fetch lands.
+  const [rotation, setRotation] = useState<ChilimbaRotation | null>(null);
+  const [chilimbaBusy, setChilimbaBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -212,6 +227,17 @@ export default function GroupDetails() {
         } catch {
           setGroupTxn([]);
           setGroupLoans([]);
+        }
+        // Rotation state feeds the Chilimba tab; only rotating-savings groups
+        // have any, and a failure here should not blank the whole screen.
+        if (isChilimbaType(g.groupType)) {
+          try {
+            setRotation(await getChilimbaRotation(id));
+          } catch {
+            setRotation(null);
+          }
+        } else {
+          setRotation(null);
         }
       } else {
         setError(true);
@@ -244,6 +270,71 @@ export default function GroupDetails() {
       // keep showing what we have; the next pull-to-refresh will surface errors
     }
   }, [id]);
+
+  /**
+   * Draw the chilimba payout order (chairperson only). Random and one-time, and
+   * it locks the group to new members, so both are said plainly before asking.
+   */
+  const onDrawOrder = useCallback(() => {
+    Alert.alert(
+      "Draw payout order",
+      "This randomly sets the order in which members receive the pool each round, and locks it. Once it's drawn, no new members can join this chilimba. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Draw order",
+          onPress: async () => {
+            setChilimbaBusy(true);
+            try {
+              await drawChilimbaOrder(id);
+              await load();
+              Alert.alert("Order drawn", "The payout order is set. Round 1 is ready.");
+            } catch (e: any) {
+              Alert.alert("Could not draw order", e?.message || "Please try again.");
+            } finally {
+              setChilimbaBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [id, load]);
+
+  /**
+   * Propose paying this round's pool to whoever's turn it is. Never pays on its
+   * own - it opens an approval for the group's admins, and the rotation advances
+   * once it carries.
+   */
+  const onProposePayout = useCallback(
+    (recipientName: string, pool: number) => {
+      Alert.alert(
+        "Propose payout",
+        `Hand this round's pool of ${formatZMW(pool)} to ${recipientName}? The group's admins vote to approve it. Once approved, the payout is recorded and the rotation moves to the next member.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Propose payout",
+            onPress: async () => {
+              setChilimbaBusy(true);
+              try {
+                await proposeChilimbaPayout(id);
+                await load();
+                Alert.alert(
+                  "Payout proposed",
+                  "The group's admins have been asked to approve this round's payout."
+                );
+              } catch (e: any) {
+                Alert.alert("Could not propose payout", e?.message || "Please try again.");
+              } finally {
+                setChilimbaBusy(false);
+              }
+            },
+          },
+        ]
+      );
+    },
+    [id, load]
+  );
 
   // Someone who was invited but hasn't accepted is NOT a member of the group:
   // they have no savings, owe no contribution and can't be given a loan. Keep
@@ -559,6 +650,10 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
   // Church-style group: gives toward named projects. No cycle, no dues, no
   // loans, no penalties and no share-out - so none of that is shown here.
   const isProjectFund = isProjectFundType(group.groupType);
+  // Rotating savings (chilimba): keeps a contribution cycle and penalties, but
+  // never lends and never shares out - the whole pool rotates to one member each
+  // round instead. Shown through a Rotation tab; the Loans tab is hidden.
+  const isChilimba = isChilimbaType(group.groupType);
   const projects = group.projects ?? [];
   const activeProjects = projects.filter((p) => p.status === "active");
   const totalRaised = projects.reduce((sum, p) => sum + p.collected, 0);
@@ -591,7 +686,8 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
   // link still pointing at "contributions" lands there rather than nowhere.
   const tab: TabKey =
     (rawTab === "projects" && !isProjectFund) ||
-    (rawTab === "loans" && isProjectFund) ||
+    (rawTab === "loans" && (isProjectFund || isChilimba)) ||
+    (rawTab === "rotation" && !isChilimba) ||
     (rawTab === "approvals" && !isAdmin)
       ? "members"
       : rawTab === "contributions" && isProjectFund
@@ -638,21 +734,48 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 most people open it to find out. The group's total sits under it
                 as context, not as the headline. */}
             <Text style={styles.heroLabel}>
-              {isProjectFund ? "You have given" : "Your savings"}
+              {isProjectFund
+                ? "You have given"
+                : isChilimba
+                  ? "This round's pot"
+                  : "Your savings"}
             </Text>
-            <Text style={styles.heroAmount}>{formatZMW(group.yourSavings ?? 0)}</Text>
+            <Text style={styles.heroAmount}>
+              {/* A chilimba's headline is the pot building up this round, not a
+                  personal savings balance - the money passes straight through to
+                  whoever's turn it is. */}
+              {formatZMW(isChilimba ? group.walletBalance : group.yourSavings ?? 0)}
+            </Text>
             <View style={styles.heroYouRow}>
               <Text style={styles.heroYouLabel}>
-                {isProjectFund ? "Church total raised" : "Total group savings"}
+                {isProjectFund
+                  ? "Church total raised"
+                  : isChilimba
+                    ? "Per member each round"
+                    : "Total group savings"}
               </Text>
-              <Text style={styles.heroYouValue}>{formatZMW(group.totalSavings)}</Text>
+              <Text style={styles.heroYouValue}>
+                {formatZMW(isChilimba ? group.contributionAmount : group.totalSavings)}
+              </Text>
             </View>
             <View style={styles.heroRow}>
               {/* A church group never lends and holds nothing back for a
                   share-out, so a wallet figure would only repeat the total
-                  raised. It shows what it is raising for instead. */}
+                  raised. It shows what it is raising for instead. A chilimba
+                  never lends either, so it shows the round instead of loans. */}
               {isProjectFund ? (
                 <HeroStat label="Projects" value={String(activeProjects.length)} />
+              ) : isChilimba ? (
+                <HeroStat
+                  label="Round"
+                  value={
+                    rotation?.orderDrawn
+                      ? rotation.complete
+                        ? "Done"
+                        : `${rotation.currentRound}/${rotation.totalRounds}`
+                      : "Not set"
+                  }
+                />
               ) : (
                 <>
                   <HeroStat label="Wallet" value={formatZMW(group.walletBalance, { compact: true })} />
@@ -688,6 +811,24 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 colors={colors}
               />
             </Card>
+          ) : isChilimba ? (
+            // A chilimba never lends and never shares out, so its rules are just
+            // the round contribution and how the pool rotates.
+            <Card padding={16}>
+              <RuleRow
+                icon={<CircleDollarSign size={18} color={colors.primary} />}
+                label="Contribution"
+                value={`${formatZMW(group.contributionAmount)} · ${group.contributionFrequency}`}
+                colors={colors}
+              />
+              <View style={[styles.sep, { backgroundColor: colors.border }]} />
+              <RuleRow
+                icon={<Repeat size={18} color={colors.primary} />}
+                label="Payout"
+                value="Whole pool to one member each round"
+                colors={colors}
+              />
+            </Card>
           ) : (
           <Card padding={16}>
             <RuleRow
@@ -714,9 +855,10 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
           )}
         </View>
 
-        {/* Cycle progress - a project-fund group has no cycle; progress is per
-            project, on the Projects tab. */}
-        {!isProjectFund && (
+        {/* Cycle progress - a project-fund group has no cycle (progress is per
+            project, on the Projects tab), and a chilimba tracks rounds instead
+            of a single cycle (shown on the Rotation tab). */}
+        {!isProjectFund && !isChilimba && (
         <View style={{ paddingHorizontal: 20, marginTop: 14 }}>
           <Card padding={16}>
             <View style={styles.rowBetween}>
@@ -748,14 +890,23 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 { k: "reports", label: "Reports" },
                 { k: "governance", label: "Governance" },
               ] as { k: TabKey; label: string }[])
-            : ([
-                { k: "members", label: "Members" },
-                { k: "contributions", label: "Contributions" },
-                { k: "loans", label: "Loans" },
-                { k: "approvals", label: "Approvals" },
-                { k: "reports", label: "Reports" },
-                { k: "governance", label: "Governance" },
-              ] as { k: TabKey; label: string }[])
+            : isChilimba
+              ? ([
+                  { k: "members", label: "Members" },
+                  { k: "contributions", label: "Contributions" },
+                  { k: "rotation", label: "Rotation" },
+                  { k: "approvals", label: "Approvals" },
+                  { k: "reports", label: "Reports" },
+                  { k: "governance", label: "Governance" },
+                ] as { k: TabKey; label: string }[])
+              : ([
+                  { k: "members", label: "Members" },
+                  { k: "contributions", label: "Contributions" },
+                  { k: "loans", label: "Loans" },
+                  { k: "approvals", label: "Approvals" },
+                  { k: "reports", label: "Reports" },
+                  { k: "governance", label: "Governance" },
+                ] as { k: TabKey; label: string }[])
           )
             // Voting is an admin duty - the API refuses a member's vote outright
             // ("Only group admins can vote on approvals"), so a member opening
@@ -900,6 +1051,203 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 </Text>
               </View>
             )}
+          </View>
+        )}
+
+        {tab === "rotation" && (
+          <View style={{ paddingHorizontal: 20 }}>
+            {(() => {
+              const isChair = effectiveRole === "Chairperson";
+              // Only one payout may be in flight at a time (the API enforces the
+              // same), so the propose button waits while a vote is open.
+              const payoutPending = groupApprovals.some(
+                (a) => a.type === "chilimba-payout" && a.status === "pending"
+              );
+              const drawn = !!rotation?.orderDrawn;
+              const complete = !!rotation?.complete;
+              const recipient = rotation?.currentRecipient ?? null;
+              const pot = rotation?.collectedPool ?? group.walletBalance ?? 0;
+
+              return (
+                <>
+                  {/* Round / pot summary */}
+                  <Card padding={16}>
+                    <View style={styles.rowBetween}>
+                      <Text style={[styles.cardLabel, { color: colors.textMuted }]}>
+                        {drawn ? "Rotation" : "Payout order"}
+                      </Text>
+                      <Text style={[styles.cardValue, { color: colors.textMain }]}>
+                        {!drawn
+                          ? "Not drawn yet"
+                          : complete
+                            ? "Complete"
+                            : `Round ${rotation?.currentRound} of ${rotation?.totalRounds}`}
+                      </Text>
+                    </View>
+                    {drawn && !complete && (
+                      <>
+                        <View style={{ marginTop: 10 }}>
+                          <ProgressBar
+                            progress={
+                              rotation && rotation.totalRounds
+                                ? (rotation.currentRound - 1) / rotation.totalRounds
+                                : 0
+                            }
+                          />
+                        </View>
+                        <View style={[styles.rowBetween, { marginTop: 14 }]}>
+                          <Text style={[styles.cardLabel, { color: colors.textMuted }]}>
+                            This round&apos;s pot
+                          </Text>
+                          <Text style={[styles.cardValue, { color: colors.textMain }]}>
+                            {formatZMW(pot)}
+                            {rotation && pot < rotation.expectedPool
+                              ? ` of ${formatZMW(rotation.expectedPool)}`
+                              : ""}
+                          </Text>
+                        </View>
+                        {recipient && (
+                          <View style={[styles.rowBetween, { marginTop: 8 }]}>
+                            <Text style={[styles.cardLabel, { color: colors.textMuted }]}>
+                              Goes to
+                            </Text>
+                            <Text style={[styles.cardValue, { color: colors.primary }]}>
+                              {recipient.name}
+                            </Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </Card>
+
+                  {/* Draw the order (before it is drawn) */}
+                  {!drawn && (
+                    <View style={{ marginTop: 14 }}>
+                      <Text style={[styles.helperText, { color: colors.textMuted, marginTop: 0 }]}>
+                        Members contribute a fixed amount each round, and the whole
+                        pool goes to one member at a time. Draw the order to set who
+                        receives when - it is random and locks the group to new
+                        members once drawn.
+                      </Text>
+                      {isChair && (
+                        <Button
+                          label="Draw payout order"
+                          onPress={onDrawOrder}
+                          loading={chilimbaBusy}
+                          disabled={chilimbaBusy || group.memberCount < 2}
+                          testID="chilimba-draw-btn"
+                          style={{ marginTop: 12 }}
+                        />
+                      )}
+                      {isChair && group.memberCount < 2 && (
+                        <Text style={[styles.helperText, { color: colors.textMuted }]}>
+                          You need at least two members before drawing the order.
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Propose this round's payout (after the order is drawn) */}
+                  {drawn && !complete && isChair && (
+                    <View style={{ marginTop: 14 }}>
+                      <Button
+                        label={payoutPending ? "Payout awaiting approval" : "Propose payout"}
+                        onPress={() => {
+                          if (recipient) onProposePayout(recipient.name, pot);
+                        }}
+                        loading={chilimbaBusy}
+                        disabled={chilimbaBusy || payoutPending || pot <= 0 || !recipient}
+                        testID="chilimba-payout-btn"
+                      />
+                      {pot <= 0 && (
+                        <Text style={[styles.helperText, { color: colors.textMuted }]}>
+                          Nothing has been collected for this round yet. Members
+                          need to contribute first.
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {complete && (
+                    <Text style={[styles.helperText, { color: colors.textMuted }]}>
+                      Every member has received the pool once - this chilimba is
+                      complete.
+                    </Text>
+                  )}
+
+                  {/* The payout order */}
+                  {drawn && (rotation?.order?.length ?? 0) > 0 && (
+                    <View style={{ marginTop: 20 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                        <Repeat size={14} color={colors.textMuted} />
+                        <Text
+                          style={{
+                            color: colors.textMuted,
+                            fontSize: 11,
+                            fontWeight: "700",
+                            letterSpacing: 1.2,
+                            marginLeft: 6,
+                          }}
+                        >
+                          PAYOUT ORDER
+                        </Text>
+                      </View>
+                      <Card padding={0}>
+                        {rotation!.order.map((o, i, arr) => (
+                          <View key={o.userId}>
+                            <View style={styles.rotationRow}>
+                              <View
+                                style={[
+                                  styles.rotationPos,
+                                  {
+                                    backgroundColor: o.isCurrent
+                                      ? colors.primary
+                                      : o.received
+                                        ? colors.border
+                                        : colors.surface,
+                                    borderColor: colors.border,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={{
+                                    color: o.isCurrent ? "#fff" : colors.textMain,
+                                    fontWeight: "800",
+                                    fontSize: 13,
+                                  }}
+                                >
+                                  {o.position}
+                                </Text>
+                              </View>
+                              <View style={{ flex: 1, marginLeft: 12 }}>
+                                <Text style={{ color: colors.textMain, fontWeight: "700" }}>
+                                  {o.name}
+                                </Text>
+                                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                                  {o.received
+                                    ? `Received · round ${o.round}`
+                                    : o.isCurrent
+                                      ? "Receiving this round"
+                                      : "Upcoming"}
+                                </Text>
+                              </View>
+                              {o.received ? (
+                                <Coins size={18} color={colors.textMuted} />
+                              ) : o.isCurrent ? (
+                                <Coins size={18} color={colors.primary} />
+                              ) : null}
+                            </View>
+                            {i < arr.length - 1 && (
+                              <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />
+                            )}
+                          </View>
+                        ))}
+                      </Card>
+                    </View>
+                  )}
+                </>
+              );
+            })()}
           </View>
         )}
 
@@ -2482,6 +2830,15 @@ const styles = StyleSheet.create({
   sep: { height: 1, marginVertical: 4 },
   cardLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.3 },
   cardValue: { fontSize: 13, fontWeight: "700" },
+  rotationRow: { flexDirection: "row", alignItems: "center", padding: 16 },
+  rotationPos: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   tabsRow: { paddingHorizontal: 20, paddingVertical: 16, gap: 8 },
   tab: {
     paddingHorizontal: 14,
