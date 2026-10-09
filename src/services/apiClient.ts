@@ -74,8 +74,13 @@ export async function api<T = any>(path: string, opts: Options = {}): Promise<T>
   }
 
   if (!res.ok) {
-    // Expired/invalid session: clear credentials and return to sign-in
-    if (res.status === 401 && auth) {
+    // Expired/invalid session: clear credentials and return to sign-in.
+    // Only a token failure counts - those come back without an app-level `code`
+    // ("Authentication required" / "Invalid or expired token"). An endpoint may
+    // return 401 to mean something specific (e.g. `bad_pin` from verify-pin);
+    // those carry a `code` and must propagate as normal errors, not log the user
+    // out - otherwise a single wrong PIN ends the session.
+    if (res.status === 401 && auth && !data?.code) {
       await onSessionExpired();
       throw new Error("Session expired. Please sign in again.");
     }
