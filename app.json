@@ -2,7 +2,7 @@
   "expo": {
     "name": "Chuma",
     "slug": "chuma",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "chuma",
@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "com.chuma.zm",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A5C36"
