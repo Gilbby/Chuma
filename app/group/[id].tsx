@@ -30,6 +30,8 @@ import {
   inviteMember,
   resendInvite,
   cancelInvite,
+  approveJoinRequest,
+  declineJoinRequest,
   requestMemberRemoval,
   requestGroupDeletion,
   addGroupProject,
@@ -53,6 +55,7 @@ import {
   Member,
   Group,
   GroupProject,
+  JoinRequest,
   Approval,
   TxnItem,
   Loan,
@@ -177,6 +180,8 @@ export default function GroupDetails() {
   const [inviting, setInviting] = useState(false);
   // memberId of the pending invite currently being resent / cancelled
   const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
+  // id of the join request currently being approved / declined
+  const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
   // member row id whose removal is being proposed
   const [removingId, setRemovingId] = useState<string | null>(null);
   // true while a group deletion is being requested
@@ -368,6 +373,55 @@ export default function GroupDetails() {
       } finally {
         setBusyInviteId(null);
       }
+    },
+    [id, refreshGroup]
+  );
+
+  // Approving lets them straight in - they asked, so there is nothing left for
+  // them to accept.
+  const onApproveRequest = useCallback(
+    async (r: JoinRequest) => {
+      setBusyRequestId(r.id);
+      try {
+        const res = await approveJoinRequest(id, r.id);
+        await refreshGroup();
+        if (res.alreadyMember)
+          Alert.alert("Already a member", `${r.name || "They"} had already joined the group.`);
+      } catch (e: any) {
+        await refreshGroup();
+        Alert.alert("Could not approve", e?.message || "Please try again.");
+      } finally {
+        setBusyRequestId(null);
+      }
+    },
+    [id, refreshGroup]
+  );
+
+  const onDeclineRequest = useCallback(
+    (r: JoinRequest) => {
+      Alert.alert(
+        "Decline request?",
+        `${r.name || r.phone || "They"} won't join the group. They'll be told, and can ask again later.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Decline",
+            style: "destructive",
+            onPress: async () => {
+              setBusyRequestId(r.id);
+              try {
+                await declineJoinRequest(id, r.id);
+                await refreshGroup();
+              } catch (e: any) {
+                await refreshGroup();
+                Alert.alert("Could not decline", e?.message || "Please try again.");
+              } finally {
+                setBusyRequestId(null);
+              }
+            },
+          },
+        ]
+      );
     },
     [id, refreshGroup]
   );
@@ -968,6 +1022,47 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               Showing {Math.min(activeMembers.length, 12)} of {group.memberCount} member
               {group.memberCount === 1 ? "" : "s"}
             </Text>
+
+            {/* Asked to join after finding the group through search. Admins
+                only - the same people who can invite decide who gets in. */}
+            {isAdmin && (group.joinRequests ?? []).length > 0 && (
+              <View style={{ marginTop: 20 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                  <UserPlus size={14} color={colors.textMuted} />
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 1.2,
+                      marginLeft: 6,
+                    }}
+                  >
+                    REQUESTS TO JOIN ({(group.joinRequests ?? []).length})
+                  </Text>
+                </View>
+                <Card padding={0}>
+                  {(group.joinRequests ?? []).map((r, i, arr) => (
+                    <View key={r.id || String(i)}>
+                      <JoinRequestRow
+                        request={r}
+                        colors={colors}
+                        busy={busyRequestId === r.id}
+                        onApprove={() => onApproveRequest(r)}
+                        onDecline={() => onDeclineRequest(r)}
+                      />
+                      {i < arr.length - 1 && (
+                        <View style={[styles.sep, { backgroundColor: colors.border, marginHorizontal: 16 }]} />
+                      )}
+                    </View>
+                  ))}
+                </Card>
+                <Text style={[styles.helperText, { color: colors.textMuted }]}>
+                  These people found the group through search. Approving adds them
+                  as a Member straight away.
+                </Text>
+              </View>
+            )}
 
             {/* Invited, not yet joined. Kept out of the members list above so the
                 group's headcount and savings never count someone who hasn't
@@ -2692,6 +2787,60 @@ const FormerMemberRow = ({
         ) : null}
       </View>
       <StatusBadge label="Former" variant="neutral" />
+    </View>
+  );
+};
+
+/** Someone asking to join, with the admin's approve / decline. */
+const JoinRequestRow = ({
+  request,
+  colors,
+  busy,
+  onApprove,
+  onDecline,
+}: {
+  request: JoinRequest;
+  colors: ReturnType<typeof useTheme>["colors"];
+  busy: boolean;
+  onApprove: () => void;
+  onDecline: () => void;
+}) => {
+  const ago = invitedAgo(request.requestedAt);
+  return (
+    <View style={[styles.memberRow, { opacity: busy ? 0.5 : 1 }]}>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{ color: colors.textMain, fontSize: 14, fontWeight: "600" }}
+          numberOfLines={1}
+        >
+          {request.name || request.phone || "Someone"}
+        </Text>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }} numberOfLines={1}>
+          {[request.name ? request.phone : null, ago ? `asked ${ago}` : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </Text>
+      </View>
+      <View style={{ flexDirection: "row", gap: 8, marginLeft: 8 }}>
+        <Button
+          label="Decline"
+          variant="outline"
+          size="sm"
+          fullWidth={false}
+          disabled={busy}
+          onPress={onDecline}
+          testID={`join-request-decline-${request.id}`}
+        />
+        <Button
+          label="Approve"
+          variant="primary"
+          size="sm"
+          fullWidth={false}
+          disabled={busy}
+          onPress={onApprove}
+          testID={`join-request-approve-${request.id}`}
+        />
+      </View>
     </View>
   );
 };

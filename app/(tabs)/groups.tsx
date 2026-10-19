@@ -1,5 +1,14 @@
-import React, { useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from "react-native";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Alert,
+  RefreshControl,
+  TextInput,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
@@ -15,7 +24,11 @@ import {
   acceptInvite,
   declineInvite,
   getMyInvites,
+  searchGroups,
+  requestToJoin,
+  cancelJoinRequest,
   type GroupInvite,
+  type GroupSearchResult,
 } from "@/src/services/groups";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import { Group, Member, isProjectFundType } from "@/src/types";
@@ -29,7 +42,11 @@ import {
   savedAgo,
   type CreateGroupDraft,
 } from "@/src/utils/groupDraft";
-import { Users, Plus, ChevronRight, Clock, FileText } from "lucide-react-native";
+import { Users, Plus, ChevronRight, Clock, FileText, Search, X } from "lucide-react-native";
+
+// The API returns nothing for shorter queries - matching every group on one
+// letter is a directory dump, not a search.
+const SEARCH_MIN_CHARS = 2;
 
 export default function Groups() {
   const { colors } = useTheme();
@@ -43,6 +60,78 @@ export default function Groups() {
   // The half-finished group creation this device has saved, if any. Local to
   // the phone - nothing has been sent to the API yet.
   const [draft, setDraft] = useState<CreateGroupDraft | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  // Every group on Chuma whose name matches - the ones the user is not in yet
+  // are what "Request to join" works on.
+  // Tagged with the query it answers, so a reply can be told apart from a
+  // stale one and "searching" is simply "no answer for this query yet".
+  const [search, setSearch] = useState<{
+    q: string;
+    results: GroupSearchResult[];
+    failed: boolean;
+  } | null>(null);
+  // id of the group a join request is being sent to / withdrawn from
+  const [busyJoin, setBusyJoin] = useState<string | null>(null);
+
+  // The user's own groups, invites and draft are filtered on the phone - they
+  // are already loaded, so they narrow as you type, even offline.
+  const q = query.trim().toLowerCase();
+  const matches = useCallback(
+    (name: string | undefined) => !q || (name || "").toLowerCase().includes(q),
+    [q]
+  );
+  const shownGroups = useMemo(() => groups.filter((g) => matches(g.name)), [groups, matches]);
+  const shownInvites = useMemo(
+    () => invites.filter((inv) => matches(inv.groupName)),
+    [invites, matches]
+  );
+  const shownDraft = draft && matches(draftTitle(draft)) ? draft : null;
+
+  // Groups the user could ask to join. Ones they are in, or hold an invite to,
+  // are already listed above (with Accept for an invite), so they are left out
+  // here rather than shown twice.
+  // While the next answer is on its way the previous results stay up, rather
+  // than the list emptying on every keystroke.
+  const searchable = q.length >= SEARCH_MIN_CHARS;
+  const searching = searchable && search?.q !== q;
+  const searchFailed = searchable && search?.q === q && search.failed;
+  const otherGroups = useMemo(() => {
+    if (!searchable) return [];
+    const mine = new Set([...groups.map((g) => g.id), ...invites.map((i) => i.groupId)]);
+    return (search?.results ?? []).filter(
+      (r) =>
+        (r.relation === "none" || r.relation === "requested") &&
+        !mine.has(r.id) &&
+        r.name.toLowerCase().includes(q)
+    );
+  }, [searchable, search, groups, invites, q]);
+
+  // Search the whole of Chuma, debounced so typing a name is one request, not
+  // one per letter. The API needs 2+ characters.
+  useEffect(() => {
+    if (q.length < SEARCH_MIN_CHARS) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const results = await searchGroups(q);
+        if (!cancelled) setSearch({ q, results, failed: false });
+      } catch {
+        if (!cancelled) setSearch((prev) => ({ q, results: prev?.results ?? [], failed: true }));
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [q]);
+
+  // Closing the bar drops the query too, so a hidden filter can't leave the
+  // list looking mysteriously short.
+  const toggleSearch = useCallback(() => {
+    if (searchOpen) setQuery("");
+    setSearchOpen(!searchOpen);
+  }, [searchOpen]);
 
   // Founding a group needs no identity check in the tracker build (KYC off).
   // When KYC is re-enabled for the org-account build, this asks for it here -
@@ -201,6 +290,85 @@ export default function Groups() {
     [load]
   );
 
+  const setRelation = useCallback(
+    (groupId: string, relation: GroupSearchResult["relation"]) =>
+      setSearch((prev) =>
+        prev
+          ? { ...prev, results: prev.results.map((r) => (r.id === groupId ? { ...r, relation } : r)) }
+          : prev
+      ),
+    []
+  );
+
+  const handleRequestJoin = useCallback(
+    async (r: GroupSearchResult) => {
+      setBusyJoin(r.id);
+      try {
+        const res = await requestToJoin(r.id);
+        if (res.alreadyMember) {
+          await load();
+          Alert.alert("Already a member", `You're already a member of ${r.name}.`);
+          return;
+        }
+        setRelation(r.id, "requested");
+        Alert.alert(
+          "Request sent",
+          `We've asked the admins of ${r.name} to let you in. You'll get a notification when they answer.`
+        );
+      } catch (e: any) {
+        if (e?.code === "already_invited") {
+          // The invite is the shorter path - reload so it shows up top with
+          // its Accept button.
+          await load();
+          Alert.alert(
+            "You're already invited",
+            `${r.name} has invited you. Accept the invitation at the top of this list to join.`
+          );
+          return;
+        }
+        if (e?.code === "needs_name") {
+          Alert.alert(
+            "Add your name first",
+            "Group admins need to know who's asking to join.",
+            [
+              { text: "Not now", style: "cancel" },
+              { text: "Add name", onPress: () => router.push("/name?return=tabs" as never) },
+            ]
+          );
+          return;
+        }
+        Alert.alert("Could not send request", e?.message || "Please try again.");
+      } finally {
+        setBusyJoin(null);
+      }
+    },
+    [load, router, setRelation]
+  );
+
+  const confirmWithdrawRequest = useCallback(
+    (r: GroupSearchResult) => {
+      Alert.alert("Withdraw request?", `Stop asking to join ${r.name}?`, [
+        { text: "Keep it", style: "cancel" },
+        {
+          text: "Withdraw",
+          style: "destructive",
+          onPress: async () => {
+            setBusyJoin(r.id);
+            try {
+              await cancelJoinRequest(r.id);
+              setRelation(r.id, "none");
+            } catch (e: any) {
+              Alert.alert("Could not withdraw", e?.message || "Please try again.");
+            } finally {
+              setBusyJoin(null);
+            }
+          },
+        },
+      ]);
+    },
+    [setRelation]
+  );
+
   // Discarding throws away typed setup and nothing else - no group exists yet
   // and no fee has been taken - but it is still unrecoverable, so confirm.
   const confirmDiscardDraft = useCallback(() => {
@@ -242,14 +410,59 @@ export default function Groups() {
               : ""}
           </Text>
         </View>
-        <Pressable
-          style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          onPress={openCreateGroup}
-          testID="groups-add-btn"
-        >
-          <Plus size={20} color="#fff" strokeWidth={2.4} />
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <Pressable
+            style={[
+              styles.addBtn,
+              searchOpen
+                ? { backgroundColor: colors.primary }
+                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+            ]}
+            onPress={toggleSearch}
+            accessibilityLabel={searchOpen ? "Close search" : "Search groups"}
+            testID="groups-search-btn"
+          >
+            {searchOpen ? (
+              <X size={20} color="#fff" strokeWidth={2.4} />
+            ) : (
+              <Search size={20} color={colors.primary} strokeWidth={2.4} />
+            )}
+          </Pressable>
+          <Pressable
+            style={[styles.addBtn, { backgroundColor: colors.primary }]}
+            onPress={openCreateGroup}
+            testID="groups-add-btn"
+          >
+            <Plus size={20} color="#fff" strokeWidth={2.4} />
+          </Pressable>
+        </View>
       </View>
+
+      {searchOpen ? (
+        <View style={styles.searchWrap}>
+          <View
+            style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <Search size={18} color={colors.textMuted} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search all groups by name"
+              placeholderTextColor={colors.textMuted}
+              autoFocus
+              autoCorrect={false}
+              returnKeyType="search"
+              style={[styles.searchInput, { color: colors.textMain }]}
+              testID="groups-search-input"
+            />
+            {query ? (
+              <Pressable onPress={() => setQuery("")} hitSlop={8} testID="groups-search-clear">
+                <X size={16} color={colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={{ marginHorizontal: 20, marginTop: 12 }}>
@@ -275,12 +488,12 @@ export default function Groups() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {invites.length > 0 && (
+        {shownInvites.length > 0 && (
           <>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
               PENDING INVITATIONS
             </Text>
-            {invites.map((inv) => (
+            {shownInvites.map((inv) => (
               <Card key={inv.groupId} padding={14} style={{ marginBottom: 10 }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}>
@@ -320,20 +533,23 @@ export default function Groups() {
             ))}
           </>
         )}
-        {draft ? (
+        {shownDraft ? (
           <>
             <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
               UNFINISHED GROUP
             </Text>
             <DraftCard
-              draft={draft}
+              draft={shownDraft}
               colors={colors}
               onResume={resumeDraft}
               onDiscard={confirmDiscardDraft}
             />
           </>
         ) : null}
-        {groups.map((g) => (
+        {q && shownGroups.length > 0 ? (
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>YOUR GROUPS</Text>
+        ) : null}
+        {shownGroups.map((g) => (
           <Pressable
             key={g.id}
             onPress={() => router.push(`/group/${g.id}`)}
@@ -429,6 +645,59 @@ export default function Groups() {
           </Pressable>
         ))}
 
+        {/* Everyone else's groups. Asking to join notifies the group's admins;
+            an admin approving it makes the user a member with nothing left to
+            accept. */}
+        {q.length >= SEARCH_MIN_CHARS && (otherGroups.length > 0 || searching || searchFailed) ? (
+          <>
+            <Text
+              style={[
+                styles.sectionLabel,
+                { color: colors.textMuted, marginTop: shownGroups.length > 0 ? 8 : 0 },
+              ]}
+            >
+              OTHER GROUPS
+            </Text>
+            {otherGroups.map((r) => (
+              <SearchResultCard
+                key={r.id}
+                result={r}
+                colors={colors}
+                busy={busyJoin === r.id}
+                onRequest={() => handleRequestJoin(r)}
+                onWithdraw={() => confirmWithdrawRequest(r)}
+              />
+            ))}
+            {searching && otherGroups.length === 0 ? (
+              <Text style={[styles.searchNote, { color: colors.textMuted }]}>Searching…</Text>
+            ) : null}
+            {searchFailed && !searching ? (
+              <Text style={[styles.searchNote, { color: colors.textMuted }]}>
+                Couldn&apos;t search other groups right now. Check your connection.
+              </Text>
+            ) : null}
+          </>
+        ) : null}
+
+        {q &&
+        shownGroups.length === 0 &&
+        shownInvites.length === 0 &&
+        !shownDraft &&
+        otherGroups.length === 0 &&
+        !searching &&
+        !searchFailed ? (
+          <View style={styles.noResults} testID="groups-search-empty">
+            <Search size={28} color={colors.textMuted} />
+            <Text style={[styles.noResultsTitle, { color: colors.textMain }]}>
+              {`No groups match "${query.trim()}"`}
+            </Text>
+            <Text style={[styles.noResultsSub, { color: colors.textMuted }]}>
+              {q.length < SEARCH_MIN_CHARS
+                ? "Type at least 2 letters to search every group on Chuma."
+                : "Check the spelling, or try part of the name."}
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
       )}
     </SafeAreaView>
@@ -502,6 +771,88 @@ const DraftCard = ({
         </View>
       </Card>
     </Pressable>
+  );
+};
+
+/**
+ * A group found through search that the user is not in. Shows only what the
+ * API shares with outsiders - size, dues and who chairs it - never balances.
+ */
+const SearchResultCard = ({
+  result,
+  colors,
+  busy,
+  onRequest,
+  onWithdraw,
+}: {
+  result: GroupSearchResult;
+  colors: ReturnType<typeof useTheme>["colors"];
+  busy: boolean;
+  onRequest: () => void;
+  onWithdraw: () => void;
+}) => {
+  const dues =
+    result.contributionFrequency && result.contributionAmount
+      ? `${result.contributionFrequency} · ${formatZMW(result.contributionAmount)}`
+      : null;
+  const details = [
+    `${result.memberCount} member${result.memberCount === 1 ? "" : "s"}`,
+    dues,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <Card padding={14} style={{ marginBottom: 10 }} testID={`group-search-result-${result.id}`}>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={[styles.inviteIcon, { backgroundColor: colors.primarySoft }]}>
+          <Users size={18} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text
+            style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}
+            numberOfLines={1}
+          >
+            {result.name}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+            {details}
+          </Text>
+          {result.chairpersonName ? (
+            <Text
+              style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}
+              numberOfLines={1}
+            >
+              Chaired by {result.chairpersonName}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 12 }}>
+        {result.closedToNewMembers ? (
+          <StatusBadge label="Not taking new members" variant="neutral" />
+        ) : result.relation === "requested" ? (
+          <Button
+            label="Requested · Withdraw"
+            variant="outline"
+            size="sm"
+            fullWidth={false}
+            disabled={busy}
+            onPress={onWithdraw}
+            testID={`group-join-withdraw-${result.id}`}
+          />
+        ) : (
+          <Button
+            label="Request to join"
+            variant="primary"
+            size="sm"
+            fullWidth={false}
+            disabled={busy}
+            onPress={onRequest}
+            testID={`group-join-request-${result.id}`}
+          />
+        )}
+      </View>
+    </Card>
   );
 };
 
@@ -607,6 +958,20 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, marginTop: 4 },
   addBtn: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 },
+  searchWrap: { paddingHorizontal: 20, paddingTop: 4 },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+  },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 14, paddingVertical: 0 },
+  searchNote: { fontSize: 13, paddingVertical: 12, textAlign: "center" },
+  noResults: { alignItems: "center", paddingVertical: 48, paddingHorizontal: 24 },
+  noResultsTitle: { fontSize: 15, fontWeight: "700", marginTop: 12, textAlign: "center" },
+  noResultsSub: { fontSize: 13, marginTop: 4, textAlign: "center" },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   groupIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   groupName: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },

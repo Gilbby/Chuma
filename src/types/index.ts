@@ -135,6 +135,16 @@ export interface FeeStatus {
   locked: boolean;
 }
 
+/** Someone who found a group through search and asked to join. Not a member
+ *  and not invited - an admin approving it is what makes them a member. */
+export interface JoinRequest {
+  id: string;
+  userId: string;
+  name?: string;
+  phone?: string;
+  requestedAt?: string;
+}
+
 export interface Group {
   id: string;
   name: string;
@@ -170,6 +180,9 @@ export interface Group {
   /** Removed members, kept as history. Never counted as members of the group.
    *  Always set by the service layer; optional so older shapes still type. */
   formerMembers?: Member[];
+  /** Asks to join from people who found the group through search. Shown to
+   *  admins only. Always set by the service layer. */
+  joinRequests?: JoinRequest[];
   yourRole: Role;
   healthScore?: number;
   savingsGrowth?: number;
@@ -304,6 +317,7 @@ export interface Notice {
     | "repayment"
     | "invite"
     | "invite_accepted"
+    | "join_request"
     | "penalty"
     | "kyc"
     | "biometric";

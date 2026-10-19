@@ -1,6 +1,6 @@
 import { api } from "./apiClient";
 import { getCurrentUser } from "@/src/utils/currentUser";
-import { Group, GroupProject } from "@/src/types";
+import { Group, GroupProject, JoinRequest } from "@/src/types";
 import { phoneKey } from "@/src/utils/invites";
 import { GROUP_FEES_ENABLED } from "@/src/constants";
 
@@ -46,12 +46,19 @@ function mapGroup(raw: any, currentUserId?: string): Group {
     status: p.status ?? "active",
   }));
 
+  const joinRequests: JoinRequest[] = (raw.joinRequests ?? []).map((r: any) => ({
+    ...r,
+    id: String(r._id ?? r.id ?? ""),
+    userId: String(r.userId ?? ""),
+  }));
+
   return {
     ...raw,
     id: String(raw._id),
     members,
     projects,
     formerMembers,
+    joinRequests,
     memberCount: members.filter((m: any) => m.status === "active").length,
     yourRole: mine?.role ?? "Member",
     yourSavings: mine?.savings ?? 0,
@@ -282,4 +289,67 @@ export async function declineInvite(
     method: "POST",
   });
   return { alreadyHandled: !!res?.alreadyHandled };
+}
+
+/** How the signed-in user stands with a group found through search. */
+export type GroupRelation = "member" | "invited" | "requested" | "none";
+
+/** A group as search shows it to someone who may not be in it: enough to
+ *  decide whether to ask, never its balances or member list. */
+export interface GroupSearchResult {
+  id: string;
+  name: string;
+  groupType?: string;
+  memberCount: number;
+  contributionAmount?: number;
+  contributionFrequency?: string | null;
+  chairpersonName?: string | null;
+  relation: GroupRelation;
+  /** A chilimba whose payout order is drawn takes nobody new. */
+  closedToNewMembers: boolean;
+}
+
+/** Search every active group by name. Under 2 characters returns nothing. */
+export async function searchGroups(query: string): Promise<GroupSearchResult[]> {
+  const res = await api<{ groups: GroupSearchResult[] }>(
+    `/groups/search?q=${encodeURIComponent(query)}`
+  );
+  return res.groups ?? [];
+}
+
+/**
+ * Ask to join a group found through search. The group's admins are notified
+ * and any one of them can approve it. Throws with code "already_invited" (409)
+ * when the user already holds an invite - accepting that is all it takes.
+ */
+export async function requestToJoin(
+  groupId: string
+): Promise<{ alreadyMember: boolean; alreadyRequested: boolean }> {
+  const res = await api<{ alreadyMember?: boolean; alreadyRequested?: boolean }>(
+    `/groups/${groupId}/join-request`,
+    { method: "POST" }
+  );
+  return { alreadyMember: !!res?.alreadyMember, alreadyRequested: !!res?.alreadyRequested };
+}
+
+/** Withdraw the user's own request to join. */
+export async function cancelJoinRequest(groupId: string): Promise<void> {
+  await api(`/groups/${groupId}/join-request`, { method: "DELETE" });
+}
+
+/** Admin: let a requester in. They become an active member straight away. */
+export async function approveJoinRequest(
+  groupId: string,
+  requestId: string
+): Promise<{ alreadyMember: boolean }> {
+  const res = await api<{ alreadyMember?: boolean }>(
+    `/groups/${groupId}/join-requests/${requestId}/approve`,
+    { method: "POST" }
+  );
+  return { alreadyMember: !!res?.alreadyMember };
+}
+
+/** Admin: turn a request down. The requester is told and may ask again. */
+export async function declineJoinRequest(groupId: string, requestId: string): Promise<void> {
+  await api(`/groups/${groupId}/join-requests/${requestId}/decline`, { method: "POST" });
 }
