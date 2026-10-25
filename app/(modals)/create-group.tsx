@@ -131,7 +131,7 @@ export default function CreateGroup() {
   // empty initial state would overwrite the very draft being restored.
   const [hydrated, setHydrated] = useState(false);
   const [userId, setUserId] = useState("");
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   // Step 1 - Group Basics
   const [groupName, setGroupName] = useState("");

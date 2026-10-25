@@ -28,7 +28,7 @@ export default function Otp() {
   const mode = rawMode ?? "signup";
   const phone = rawPhone ?? "";
   const [code, setCode] = useState<string[]>(Array(LEN).fill(""));
-  const refs = useRef<(TextInput | null)[]>([]);
+  const refs = useRef<(React.ComponentRef<typeof TextInput> | null)[]>([]);
   const [seconds, setSeconds] = useState(30);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

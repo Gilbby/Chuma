@@ -95,7 +95,7 @@ export default function ShareOutHistoryScreen() {
                   EVERY SHARE-OUT
                 </Text>
               </View>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <Text
