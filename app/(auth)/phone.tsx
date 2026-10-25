@@ -6,27 +6,40 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Input } from "@/src/components/ui/Input";
 import { Button } from "@/src/components/ui/Button";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
+import { CountryPicker } from "@/src/components/common/CountryPicker";
 import { useTheme } from "@/src/theme/ThemeContext";
-import { Phone } from "lucide-react-native";
+import { ChevronDown } from "lucide-react-native";
 import { requestOtp } from "@/src/services/auth";
+import {
+  DEFAULT_COUNTRY,
+  nationalLengthBounds,
+  type Country,
+} from "@/src/constants/countries";
 
 export default function PhoneLogin() {
   const { colors } = useTheme();
   const router = useRouter();
   const { mode: rawMode } = useLocalSearchParams<{ mode: "signup" | "signin" }>();
   const mode = rawMode ?? "signup";
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const national = phone.replace(/\D/g, "");
+  const { min: minLen, max: maxLen } = nationalLengthBounds(country);
+  const phoneValid = national.length >= minLen && national.length <= maxLen;
+
   const onContinue = async () => {
-    const fullPhone = "+260" + phone.replace(/\D/g, "");
+    const fullPhone = country.dial + national;
     setLoading(true);
     setError("");
     try {
@@ -65,11 +78,18 @@ export default function PhoneLogin() {
             keyboardType="phone-pad"
             value={phone}
             onChangeText={setPhone}
+            maxLength={maxLen + 4}
             prefix={
-              <View style={styles.prefix}>
-                <Phone size={16} color={colors.primary} />
-                <Text style={[styles.prefixText, { color: colors.textMain }]}>+260</Text>
-              </View>
+              <Pressable
+                onPress={() => setPickerOpen(true)}
+                style={styles.prefix}
+                hitSlop={8}
+                testID="phone-country-btn"
+              >
+                <Text style={styles.flag}>{country.flag}</Text>
+                <Text style={[styles.prefixText, { color: colors.textMain }]}>{country.dial}</Text>
+                <ChevronDown size={16} color={colors.textMuted} />
+              </Pressable>
             }
             testID="phone-input"
           />
@@ -80,7 +100,7 @@ export default function PhoneLogin() {
             label="Continue"
             onPress={onContinue}
             loading={loading}
-            disabled={phone.replace(/\D/g, "").length < 9}
+            disabled={!phoneValid}
             testID="phone-continue-btn"
           />
           {error ? (
@@ -91,6 +111,16 @@ export default function PhoneLogin() {
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CountryPicker
+        visible={pickerOpen}
+        selectedCode={country.code}
+        onSelect={(c) => {
+          setCountry(c);
+          setError("");
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -99,8 +129,9 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 24 },
   title: { fontSize: 28, fontWeight: "700", letterSpacing: -0.4 },
   sub: { fontSize: 15, marginTop: 8, lineHeight: 22 },
-  prefix: { flexDirection: "row", alignItems: "center", gap: 6 },
-  prefixText: { fontSize: 16, fontWeight: "600", marginLeft: 6 },
+  prefix: { flexDirection: "row", alignItems: "center", gap: 4 },
+  flag: { fontSize: 18 },
+  prefixText: { fontSize: 16, fontWeight: "600" },
   legal: { fontSize: 11, textAlign: "center", marginTop: 14 },
   errorText: { fontSize: 13, textAlign: "center", marginTop: 10, fontWeight: "500" },
 });
