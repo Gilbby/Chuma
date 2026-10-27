@@ -596,7 +596,9 @@ export default function Groups() {
 
               <View style={styles.stats}>
                 <Stat label="Pool" value={formatZMW(g.totalSavings, { compact: true })} muted={colors.textMuted} main={colors.textMain} />
+                <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
                 <Stat label="Members" value={String(g.memberCount)} muted={colors.textMuted} main={colors.textMain} />
+                <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
                 {isProjectFundType(g.groupType) ? (
                   <Stat
                     label="Projects"
@@ -978,11 +980,14 @@ const styles = StyleSheet.create({
   groupSub: { fontSize: 12, marginTop: 2 },
   stats: {
     flexDirection: "row",
+    alignItems: "center",
     marginTop: 16,
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: "transparent",
   },
+  // Hairline between stats, matching the group screen's hero.
+  statDivider: { width: 1, height: 28, marginHorizontal: 12 },
   cycleLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.3 },
   cycleValue: { fontSize: 13, fontWeight: "700" },
   sectionLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 8 },
