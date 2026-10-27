@@ -401,7 +401,7 @@ function statementHtml(
           <td>${fmtDate(a.date)}</td>
           <td>${esc(movementLabel(copy, a))}</td>
           <td class="muted">${esc(forGroup ? a.memberName ?? "" : a.groupName)}</td>
-          <td class="num ${a.direction === "out" ? "neg" : "pos"}">${a.direction === "out" ? "−" : "+"}${formatZMW(a.amount)}</td>
+          <td class="num ${a.direction === "out" ? "neg" : a.direction === "in" ? "pos" : ""}">${a.direction === "out" ? "−" : a.direction === "in" ? "+" : ""}${formatZMW(a.amount)}</td>
         </tr>`
     )
     .join("");

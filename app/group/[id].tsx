@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { BlurView } from "expo-blur";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
@@ -50,10 +50,12 @@ import {
   pendingInvites,
 } from "@/src/utils/invites";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
-import { GROUP_FEES_ENABLED } from "@/src/constants";
+import { GENERAL_GIVING_LABEL, GROUP_FEES_ENABLED } from "@/src/constants";
+import { findPile, getGroupFunds, handlesCash } from "@/src/services/funds";
 import {
   Member,
   Group,
+  GroupFunds,
   GroupProject,
   JoinRequest,
   Approval,
@@ -211,6 +213,10 @@ export default function GroupDetails() {
   // type and until the first fetch lands.
   const [rotation, setRotation] = useState<ChilimbaRotation | null>(null);
   const [chilimbaBusy, setChilimbaBusy] = useState(false);
+  // Where a church group's money is (project-fund groups only). Null for every
+  // other type, and when it could not be loaded - the Projects tab then simply
+  // shows no Funds card rather than wrong figures.
+  const [funds, setFunds] = useState<GroupFunds | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -244,6 +250,15 @@ export default function GroupDetails() {
         } else {
           setRotation(null);
         }
+        if (isProjectFundType(g.groupType)) {
+          try {
+            setFunds(await getGroupFunds(id));
+          } catch {
+            setFunds(null);
+          }
+        } else {
+          setFunds(null);
+        }
       } else {
         setError(true);
       }
@@ -275,6 +290,37 @@ export default function GroupDetails() {
       // keep showing what we have; the next pull-to-refresh will surface errors
     }
   }, [id]);
+
+  // Coming back to the group - from the approval center, a payment, a delivery
+  // - has to show what changed there. A quiet refresh, no skeleton; the first
+  // focus is skipped because load() has only just run.
+  const focusedOnce = useRef(false);
+  const quietRefresh = useCallback(async () => {
+    if (!id) return;
+    try {
+      const g = await getGroupById(id);
+      if (!g) return;
+      setGroup(g);
+      const [a, txns] = await Promise.all([
+        getApprovals({ groupId: id }),
+        getGroupTransactions(id),
+      ]);
+      setGroupApprovals(a);
+      setGroupTxn(txns);
+      if (isProjectFundType(g.groupType)) setFunds(await getGroupFunds(id));
+    } catch {
+      // Keep showing what we have; pull-to-refresh surfaces errors.
+    }
+  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusedOnce.current) {
+        focusedOnce.current = true;
+        return;
+      }
+      quietRefresh();
+    }, [quietRefresh])
+  );
 
   /**
    * Draw the chilimba payout order (chairperson only). Random and one-time, and
@@ -839,6 +885,25 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               )}
               <View style={styles.divider} />
               <HeroStat label="Members" value={String(group.memberCount)} />
+              {/* Same figure as Home's Payouts: cash the viewer confirmed and
+                  has not yet paid out. Only whoever keeps the cash sees it, and
+                  it opens the Payouts tab. */}
+              {isProjectFund && funds && handlesCash(group) && (
+                <>
+                  <View style={styles.divider} />
+                  <Pressable
+                    onPress={() =>
+                      router.push({ pathname: "/approvals", params: { tab: "deliveries", groupId: id } })
+                    }
+                    hitSlop={8}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                    accessibilityLabel="Payouts"
+                    testID="group-hero-payouts"
+                  >
+                    <HeroStat label="Payouts" value={`${formatZMW(funds.cashOnHand)} ›`} />
+                  </Pressable>
+                </>
+              )}
             </View>
           </Card>
         </View>
@@ -1348,6 +1413,41 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
 
         {tab === "projects" && (
           <View style={{ paddingHorizontal: 20 }}>
+            {/* Where the money given to the church is now. Totals only - who
+                gave what stays with the leadership (canSeeMemberMoney) - so
+                every member can see it. Bank and mobile money are what was
+                deposited: the app records nothing leaving either account. */}
+            {funds && (
+              <Card padding={16} style={{ marginBottom: 12 }} testID="group-funds-card">
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>FUNDS</Text>
+                <FundRow
+                  label="Cash on hand (to pay out)"
+                  value={funds.cashOnHand}
+                  colors={colors}
+                  strong={funds.cashOnHand > 0}
+                />
+                <FundRow label="Deposited to bank" value={funds.banked} colors={colors} />
+                <FundRow label="Deposited to mobile money" value={funds.mobileMoney} colors={colors} />
+                <FundRow label="Paid out" value={funds.paidOut} colors={colors} last />
+                {handlesCash(group) && (
+                  <Pressable
+                    onPress={() =>
+                      router.push({ pathname: "/approvals", params: { tab: "deliveries", groupId: id } })
+                    }
+                    hitSlop={8}
+                    style={{ marginTop: 12 }}
+                    testID="group-funds-deliver-link"
+                  >
+                    <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>
+                      {funds.cashOnHand > 0
+                        ? `Declare where ${formatZMW(funds.cashOnHand)} went ›`
+                        : "Payouts ›"}
+                    </Text>
+                  </Pressable>
+                )}
+              </Card>
+            )}
+
             {/* One form, two jobs: it sits at the top of the tab when adding,
                 and the same fields open in place under the project being
                 edited. Both offer every field a project is created with. */}
@@ -1447,6 +1547,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                         {formatProjectDeadline(p.deadline)}
                       </Text>
                     ) : null}
+                    <PileBreakdown pile={findPile(funds, p.id)} colors={colors} />
 
                     {projectFormFor === p.id && canManageProjects && (
                       <ProjectForm
@@ -1471,6 +1572,31 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                     )}
                   </View>
                 ))}
+                {/* Untagged giving is not a project, but it is money the church
+                    holds and spends like one, so it is accounted for here too. */}
+                {(() => {
+                  const general = findPile(funds, null);
+                  if (!general || general.raised <= 0) return null;
+                  return (
+                    <View
+                      style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border }}
+                      testID="project-row-general"
+                    >
+                      <View style={styles.rowBetween}>
+                        <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 15, flex: 1 }}>
+                          {GENERAL_GIVING_LABEL}
+                        </Text>
+                        <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
+                          {formatZMW(general.raised)}
+                        </Text>
+                      </View>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                        Given toward no project in particular
+                      </Text>
+                      <PileBreakdown pile={general} colors={colors} />
+                    </View>
+                  );
+                })()}
                 <View style={[styles.rowBetween, { marginTop: 14 }]}>
                   <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>
                     Total raised
@@ -2945,6 +3071,74 @@ const LoanLine = ({
     </Text>
   </View>
 );
+
+/** One line of the Funds card. */
+const FundRow = ({
+  label,
+  value,
+  colors,
+  strong,
+  last,
+}: {
+  label: string;
+  value: number;
+  colors: ReturnType<typeof useTheme>["colors"];
+  /** Draws the eye to cash still waiting to be delivered. */
+  strong?: boolean;
+  last?: boolean;
+}) => (
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 10,
+      borderBottomWidth: last ? 0 : 1,
+      borderBottomColor: colors.border,
+    }}
+  >
+    <Text style={{ color: strong ? colors.textMain : colors.textMuted, fontSize: 13, fontWeight: strong ? "600" : "400" }}>
+      {label}
+    </Text>
+    <Text style={{ color: strong ? colors.warning : colors.textMain, fontSize: 14, fontWeight: "700" }}>
+      {formatZMW(value)}
+    </Text>
+  </View>
+);
+
+/**
+ * Where one pile's money is now: paid out, banked, on mobile money, and still
+ * to deliver. Those four add up to what the pile raised. General giving spent
+ * on a project is named separately - it was spent on the project, not raised
+ * for it. Nothing renders until the pile has moved at all.
+ */
+const PileBreakdown = ({
+  pile,
+  colors,
+}: {
+  pile: ReturnType<typeof findPile>;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) => {
+  if (!pile) return null;
+  const parts = [
+    pile.paidOut > 0 && `Paid out ${formatZMW(pile.paidOut)}`,
+    pile.banked > 0 && `Banked ${formatZMW(pile.banked)}`,
+    pile.mobileMoney > 0 && `MoMo ${formatZMW(pile.mobileMoney)}`,
+    pile.cashOnHand > 0 && `To pay out ${formatZMW(pile.cashOnHand)}`,
+  ].filter(Boolean) as string[];
+  if (!parts.length && pile.paidFromGeneral <= 0) return null;
+  return (
+    <View style={{ marginTop: 6 }}>
+      {parts.length > 0 && (
+        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>{parts.join(" · ")}</Text>
+      )}
+      {pile.paidFromGeneral > 0 && (
+        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+          + {formatZMW(pile.paidFromGeneral)} paid for it from {GENERAL_GIVING_LABEL.toLowerCase()}
+        </Text>
+      )}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   heroLabel: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "500", letterSpacing: 0.3 },

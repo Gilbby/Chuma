@@ -1,4 +1,5 @@
 import { api } from "./apiClient";
+import type { GivingChannel } from "@/src/types";
 
 /**
  * The unified "pay everything at once" checkout. Settles the caller's own
@@ -26,6 +27,15 @@ export type CheckoutPayload = {
   /** "MTN MoMo" | "Airtel Money" | "Zamtel Kwacha" | "Cash" | ... */
   paymentMethod: string;
   payerPhone?: string;
+  /** Project-fund groups (church) only: how the member says the money reached
+   *  the church. Every channel is a manual payment the cash handler confirms,
+   *  so paymentMethod stays "Cash" for all three - anything else would be sent
+   *  to pawaPay. "bank" / "mobile-money" mean the member paid the church
+   *  account directly and the money never passes through anyone's hands. */
+  channel?: GivingChannel;
+  /** The transfer reference the member gives for "bank" / "mobile-money", so
+   *  the cash handler can match it against the church account. */
+  reference?: string;
 };
 
 export type CheckoutResult = {

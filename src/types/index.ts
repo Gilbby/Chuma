@@ -214,6 +214,81 @@ export interface TxnItem {
   note?: string;
   direction: "in" | "out";
   networkFee?: number; // member's own MMO fee on money-in (display-only, stored on the txn)
+  /** Project-fund groups (church): the project this money was given toward.
+   *  Absent on untagged giving, which reads as "General giving". */
+  projectId?: string;
+  projectName?: string;
+  /** Project-fund groups: how the member says the money reached the church. */
+  channel?: GivingChannel;
+}
+
+// ─── Church cash flow ────────────────────────────────────────────────────────
+// Mobile money is off in the app, so a church group's money moves outside it
+// and the app keeps the record. A member says how they paid; the cash handler
+// confirms it arrived (an approval of type "cash-receipt"); cash then sits with
+// the cash handler until they declare where they delivered it. Bank and mobile
+// money are final: the app never records money leaving either, so only cash
+// that is still being held can be spent on a project.
+
+/** How a member's giving reached the church. Only "cash" passes through the
+ *  cash handler's hands - the other two land in the church account directly. */
+export type GivingChannel = "cash" | "bank" | "mobile-money";
+
+/** Where the cash handler delivered cash they were holding. */
+export type DeliveryDestination = "bank" | "mobile-money" | "project";
+
+/**
+ * The money given toward one project - or, with `projectId: null`, the money
+ * given toward nothing in particular ("General giving") - and where every
+ * kwacha of it is now. raised = cashOnHand + banked + mobileMoney + paidOut.
+ */
+export interface FundPile {
+  projectId: string | null;
+  name: string;
+  raised: number;
+  /** Confirmed cash the cash handler still holds: still to be delivered. */
+  cashOnHand: number;
+  banked: number;
+  mobileMoney: number;
+  /** Cash from THIS pile paid out for a project. General giving's can have
+   *  gone toward any project; a project's own only toward itself. */
+  paidOut: number;
+  /** General giving cash paid out toward this project. Spent on it, never
+   *  raised for it. Always 0 on the General giving pile. */
+  paidFromGeneral: number;
+}
+
+/** A declaration that held cash went somewhere. */
+export interface CashDelivery {
+  id: string;
+  groupId: string;
+  /** The pile the cash came from; null = General giving. */
+  sourceProjectId: string | null;
+  sourceName: string;
+  destination: DeliveryDestination;
+  /** destination "project" only: the project it was paid out for. Null when
+   *  General giving was paid out for no project in particular. */
+  targetProjectId?: string | null;
+  targetName?: string;
+  amount: number;
+  /** Deposit slip, transaction ID or receipt number. */
+  reference?: string;
+  /** destination "project" only: who was paid. */
+  payee?: string;
+  recordedByName?: string;
+  date: string;
+}
+
+/** Where a project-fund group's money sits, pile by pile, plus the totals. */
+export interface GroupFunds {
+  groupId: string;
+  piles: FundPile[];
+  cashOnHand: number;
+  banked: number;
+  mobileMoney: number;
+  paidOut: number;
+  /** Newest first. */
+  deliveries: CashDelivery[];
 }
 
 export interface Loan {
@@ -282,6 +357,12 @@ export interface Approval {
    *  Any admin may still confirm it; this is who it was addressed to. Absent on
    *  receipts raised before the role was recorded. */
   confirmerRole?: "Treasurer" | "Chairperson";
+  /** cash-receipt on a project-fund group: how the member says they paid, the
+   *  reference they gave for a bank / mobile-money transfer, and the project
+   *  the money was given toward (absent = General giving). */
+  channel?: GivingChannel;
+  reference?: string;
+  projectName?: string;
   /** Who a member-removal is about - they never vote on their own removal. */
   targetUserId?: string;
   targetName?: string;

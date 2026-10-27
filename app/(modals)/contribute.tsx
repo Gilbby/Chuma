@@ -28,8 +28,8 @@ import { getPenalties } from "@/src/services/penalties";
 import { checkout } from "@/src/services/payments";
 import { api } from "@/src/services/apiClient";
 import { getCurrentUser } from "@/src/utils/currentUser";
-import { detectNetwork } from "@/src/services/mobileMoney";
-import { Group, Penalty, Loan, isProjectFundType } from "@/src/types";
+import { detectNetwork, MOMO_NETWORKS } from "@/src/services/mobileMoney";
+import { Group, Penalty, Loan, GivingChannel, isProjectFundType } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import {
   Check,
@@ -40,15 +40,12 @@ import {
   PiggyBank,
   HandCoins,
   AlertTriangle,
+  Lock,
+  Wallet,
 } from "lucide-react-native";
-import { MOBILE_MONEY_ON_HOLD } from "@/src/constants";
+import { GENERAL_GIVING_LABEL, MOBILE_MONEY_ON_HOLD } from "@/src/constants";
+import { CHANNEL_LABELS } from "@/src/services/funds";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
-
-// What giving that names no project is called. It is not something a member
-// picks - leaving the project picker alone is what produces it. The API labels
-// these the same way on the statement (see statement.service.js), so the
-// receipt and the statement call the one thing by the one name.
-const GENERAL_GIVING_LABEL = "General giving";
 
 type Step = "entry" | "confirm" | "success";
 type LoanMode = "installment" | "full" | "custom";
@@ -337,6 +334,10 @@ export default function Contribute() {
         receiptId={serverTxn?.receiptId ?? receiptId}
         status={serverTxn?.status ?? "completed"}
         isCash={payCash}
+        channel={isProjectFund ? "cash" : null}
+        projectLabel={
+          isProjectFund ? selectedProject?.name ?? GENERAL_GIVING_LABEL : undefined
+        }
       />
     );
   }
@@ -395,15 +396,51 @@ export default function Contribute() {
                   <Text style={[styles.errText, { color: colors.danger }]}>{displayError}</Text>
                 ) : null}
 
+                {/* Group picker */}
+                <Picker
+                  label="Group"
+                  value={selectedGroup.name}
+                  onPress={() => setShowGroupPicker((s) => !s)}
+                  colors={colors}
+                  testID="contribute-group-picker"
+                />
+                {showGroupPicker && (
+                  <Card padding={4} style={{ marginTop: 8 }}>
+                    {groups.map((g) => (
+                      <Pressable
+                        key={g.id}
+                        onPress={() => {
+                          setSelectedGroup(g);
+                          // Obligations belong to a group - a switch invalidates
+                          // them; reset and let them reload + reprice the base.
+                          setLoans([]);
+                          setPenalties([]);
+                          setLoanModes({});
+                          setExpandedLoanId(null);
+                          setAmount("");
+                          setSubmitAttempted(false);
+                          setShowGroupPicker(false);
+                          setShowProjectPicker(false);
+                          setProjectId(null);
+                        }}
+                        style={({ pressed }) => [
+                          styles.option,
+                          { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+                        ]}
+                      >
+                        <Text style={{ color: colors.textMain, fontWeight: "500" }}>{g.name}</Text>
+                        {g.id === selectedGroup.id && <Check size={18} color={colors.primary} />}
+                      </Pressable>
+                    ))}
+                  </Card>
+                )}
+
                 {/* Giving toward - project-fund groups pick a project instead
                     of settling a list of dues. */}
                 {isProjectFund && (
                   <>
-                    <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
-                      Giving toward
-                    </Text>
                     {openProjects.length === 0 ? (
-                      <Card padding={16}>
+                      <Card padding={16} style={{ marginTop: 18 }}>
                         <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 20 }}>
                           {selectedGroup.name} has no open projects right now. The Chairperson
                           adds them from the group screen.
@@ -626,46 +663,59 @@ export default function Contribute() {
                   </Card>
                 )}
 
-                {/* Group picker */}
-                <Picker
-                  label="Group"
-                  value={selectedGroup.name}
-                  onPress={() => setShowGroupPicker((s) => !s)}
-                  colors={colors}
-                  testID="contribute-group-picker"
-                />
-                {showGroupPicker && (
-                  <Card padding={4} style={{ marginTop: 8 }}>
-                    {groups.map((g) => (
-                      <Pressable
-                        key={g.id}
-                        onPress={() => {
-                          setSelectedGroup(g);
-                          // Obligations belong to a group - a switch invalidates
-                          // them; reset and let them reload + reprice the base.
-                          setLoans([]);
-                          setPenalties([]);
-                          setLoanModes({});
-                          setExpandedLoanId(null);
-                          setAmount("");
-                          setSubmitAttempted(false);
-                          setShowGroupPicker(false);
-                          setShowProjectPicker(false);
-                          setProjectId(null);
-                        }}
-                        style={({ pressed }) => [
-                          styles.option,
-                          { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+                {/* Paying through Chuma itself: every network and the bank,
+                    straight from the app. Shown locked while payments are on
+                    hold, so a member can see what is coming - and why, for
+                    now, they pay the church themselves and say how below. */}
+                {isProjectFund && MOBILE_MONEY_ON_HOLD && (
+                  <>
+                    <View style={[styles.rowBetween, { marginTop: 22, marginBottom: 8 }]}>
+                      <Text style={[styles.label, { color: colors.textMuted, marginBottom: 0 }]}>
+                        Pay through Chuma
+                      </Text>
+                      <View
+                        style={[
+                          styles.lockBadge,
+                          { backgroundColor: colors.surfaceSecondary, borderColor: colors.border },
                         ]}
                       >
-                        <Text style={{ color: colors.textMain, fontWeight: "500" }}>{g.name}</Text>
-                        {g.id === selectedGroup.id && <Check size={18} color={colors.primary} />}
-                      </Pressable>
-                    ))}
-                  </Card>
+                        <Lock size={12} color={colors.textMuted} />
+                        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", marginLeft: 4 }}>
+                          Paused for now
+                        </Text>
+                      </View>
+                    </View>
+                    <View
+                      accessible
+                      accessibilityState={{ disabled: true }}
+                      accessibilityLabel="Paying through Chuma by mobile money or bank is locked for now."
+                      testID="contribute-gateway-locked"
+                    >
+                    <Card padding={4} style={{ opacity: 0.6 }}>
+                      <View style={styles.lockedRow}>
+                        <View style={[styles.obIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                          <Wallet size={18} color={colors.textMuted} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={{ color: colors.textMain, fontWeight: "600", fontSize: 14 }}>
+                            Mobile money or bank
+                          </Text>
+                          <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2, lineHeight: 17 }}>
+                            {MOMO_NETWORKS.map((n) => n.network).join(", ")} or your bank
+                          </Text>
+                        </View>
+                        <Lock size={16} color={colors.textMuted} />
+                      </View>
+                    </Card>
+                    </View>
+                  </>
                 )}
 
-                {/* Payment method (auto-detected) */}
+                {/* Payment method (auto-detected). "Cash" means paid outside
+                    the app - notes to the treasurer, or a deposit straight
+                    into the group's own bank or mobile money - and the app
+                    only records it: nothing counts until the treasurer
+                    confirms it arrived. */}
                 <View
                   style={[
                     styles.picker,
@@ -673,13 +723,18 @@ export default function Contribute() {
                   ]}
                   testID="contribute-payment-detected"
                 >
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600", letterSpacing: 0.3 }}>
                       FROM
                     </Text>
                     <Text style={{ color: networkUnknown ? colors.danger : colors.textMain, fontSize: 15, fontWeight: "600", marginTop: 4 }}>
                       {payCash ? "Cash" : detectedNetwork}
                     </Text>
+                    {payCash && (
+                      <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                        Paid outside the app
+                      </Text>
+                    )}
                   </View>
                 </View>
                 {networkUnknown && (
@@ -803,7 +858,12 @@ export default function Contribute() {
                     />
                   )}
                   <ConfirmRow label="Group" value={selectedGroup.name} colors={colors} />
-                  <ConfirmRow label="From" value={paymentMethodLabel} colors={colors} last />
+                  <ConfirmRow
+                    label={isProjectFund ? "Paid by" : "From"}
+                    value={isProjectFund ? CHANNEL_LABELS.cash : paymentMethodLabel}
+                    colors={colors}
+                    last
+                  />
                 </Card>
 
                 {!payCash && (pricing?.networkFee ?? 0) > 0 ? (
@@ -841,6 +901,8 @@ export default function Contribute() {
                         projectId: selectedProject?.id,
                         paymentMethod: paymentMethodLabel,
                         payerPhone,
+                        // Church giving is cash handed to the treasurer.
+                        ...(isProjectFund ? { channel: "cash" as const } : {}),
                       });
                       setServerTxn(res.transaction);
                       setStep("success");
@@ -991,6 +1053,8 @@ const SuccessScreen = ({
   receiptId,
   status,
   isCash,
+  channel,
+  projectLabel,
 }: {
   amount: number;
   group: string;
@@ -999,17 +1063,22 @@ const SuccessScreen = ({
   receiptId: string;
   status: "completed" | "pending" | string;
   isCash: boolean;
+  /** Church groups only: how the member paid. */
+  channel?: GivingChannel | null;
+  /** Church groups only: the project it was given toward. */
+  projectLabel?: string;
 }) => {
   const pending = status === "pending";
+  const toward = projectLabel ? ` toward ${projectLabel}` : "";
   const title = !pending
     ? "Payment received"
     : isCash
       ? "Awaiting treasurer confirmation"
       : "Payment processing";
   const message = !pending
-    ? `Your payment of ${formatZMW(amount)} to ${group} has been recorded and your account updated.`
+    ? `Your payment of ${formatZMW(amount)}${toward} to ${group} has been recorded and your account updated.`
     : isCash
-      ? `Your ${formatZMW(amount)} cash payment to ${group} has been recorded. It will be applied once the treasurer confirms receiving the cash.`
+      ? `Your ${formatZMW(amount)} cash payment${toward} to ${group} has been recorded. It will be applied once the treasurer confirms receiving the cash.`
       : `Approve the ${formatZMW(amount)} payment on your phone. Your dues in ${group} will be settled as soon as it's confirmed, usually within seconds.`;
   return (
     <SafeAreaView
@@ -1083,10 +1152,12 @@ const SuccessScreen = ({
                   type: "contribution",
                   group,
                   date: new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }),
-                  note: "Combined payment",
+                  note: projectLabel ? "" : "Combined payment",
                   status,
                   direction: "out",
                   txnId: receiptId,
+                  ...(projectLabel ? { project: projectLabel } : {}),
+                  ...(channel ? { channel } : {}),
                 },
               })
             }
@@ -1186,6 +1257,20 @@ const styles = StyleSheet.create({
   confirmAmount: { fontSize: 36, fontWeight: "700", letterSpacing: -0.6, marginTop: 4 },
   divider: { height: 1, marginVertical: 14 },
   confirmRow: { paddingVertical: 12, flexDirection: "row", justifyContent: "space-between" },
+  lockedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  lockBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   successWrap: { flex: 1, alignItems: "center", paddingTop: 60, paddingBottom: 20 },
   successCircle: {
     width: 110,

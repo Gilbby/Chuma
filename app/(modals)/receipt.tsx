@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,9 @@ import { Button } from "@/src/components/ui/Button";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { formatZMW } from "@/src/utils/currency";
 import { CHUMA_LOGO_DATA_URI, printOrShareHtml } from "@/src/utils/exports";
+import { CHANNEL_LABELS } from "@/src/services/funds";
+import { getCurrentUser } from "@/src/utils/currentUser";
+import type { GivingChannel } from "@/src/types";
 import {
   CheckCircle2,
   Download,
@@ -46,6 +49,13 @@ interface ReceiptParams {
   txnId?: string;
   status?: string;
   direction?: string;
+  /** Church groups: the project the money was given toward. */
+  project?: string;
+  /** Church groups: how the member paid (a GivingChannel). */
+  channel?: string;
+  /** Who the money belongs to, when it is not the viewer - a line on a group
+   *  statement. Left out, the receipt is the signed-in user's own. */
+  member?: string;
 }
 
 export default function ReceiptScreen() {
@@ -56,6 +66,16 @@ export default function ReceiptScreen() {
   // Generated once, not per render, so a receipt opened without a txnId keeps a
   // stable number instead of a new one each time params change.
   const [fallbackTxnId] = useState(() => `CHM-${Date.now().toString().slice(-8)}`);
+
+  // Every caller but a group statement opens the viewer's own money, so the
+  // member is whoever is signed in unless the caller names someone else.
+  const [me, setMe] = useState<{ name?: string; phone?: string } | null>(null);
+  useEffect(() => {
+    getCurrentUser<{ name?: string; phone?: string }>().then(setMe);
+  }, []);
+  const memberLabel = params.member
+    ? params.member
+    : [me?.name, me?.phone].filter(Boolean).join(" · ");
 
   // Build the receipt entirely from params - callers pass all needed data.
   const data = useMemo(() => {
@@ -73,6 +93,11 @@ export default function ReceiptScreen() {
       status: (params.status ?? "completed") as "completed" | "pending" | "failed",
       direction: (params.direction ?? "out") as "in" | "out",
       txnId,
+      project: params.project ?? "",
+      paidBy:
+        params.channel && params.channel in CHANNEL_LABELS
+          ? CHANNEL_LABELS[params.channel as GivingChannel]
+          : "",
     };
   }, [params, fallbackTxnId]);
 
@@ -128,9 +153,11 @@ export default function ReceiptScreen() {
       <div class="row"><span class="k">Transaction ID</span><span class="v id">${data.txnId}</span></div>
       <div class="row"><span class="k">Type</span><span class="v">${typeLabel}</span></div>
       <div class="row"><span class="k">Group</span><span class="v">${data.groupName}</span></div>
+      ${data.project ? `<div class="row"><span class="k">Toward</span><span class="v">${data.project}</span></div>` : ""}
+      ${data.paidBy ? `<div class="row"><span class="k">Paid by</span><span class="v">${data.paidBy}</span></div>` : ""}
       <div class="row"><span class="k">Date</span><span class="v">${data.date}</span></div>
       ${data.note ? `<div class="row"><span class="k">Note</span><span class="v">${data.note}</span></div>` : ""}
-      <div class="row"><span class="k">Member</span><span class="v">Gilbert · +260 977 234 567</span></div>
+      ${memberLabel ? `<div class="row"><span class="k">Member</span><span class="v">${memberLabel}</span></div>` : ""}
       ${data.status === "completed" ? '<div style="text-align:center;"><span class="stamp">PAID</span></div>' : ""}
       <div class="foot">
         This is an official Chuma receipt.<br />
@@ -237,6 +264,16 @@ export default function ReceiptScreen() {
             <Row k="Group" colors={colors}>
               <Text style={[styles.val, { color: colors.textMain }]}>{data.groupName}</Text>
             </Row>
+            {data.project ? (
+              <Row k="Toward" colors={colors}>
+                <Text style={[styles.val, { color: colors.textMain }]}>{data.project}</Text>
+              </Row>
+            ) : null}
+            {data.paidBy ? (
+              <Row k="Paid by" colors={colors}>
+                <Text style={[styles.val, { color: colors.textMain }]}>{data.paidBy}</Text>
+              </Row>
+            ) : null}
             <Row k="Date" colors={colors}>
               <Text style={[styles.val, { color: colors.textMain }]}>{data.date}</Text>
             </Row>
@@ -245,9 +282,11 @@ export default function ReceiptScreen() {
                 <Text style={[styles.val, { color: colors.textMain }]}>{data.note}</Text>
               </Row>
             ) : null}
-            <Row k="Member" colors={colors} last>
-              <Text style={[styles.val, { color: colors.textMain }]}>Gilbert · +260 977 234 567</Text>
-            </Row>
+            {memberLabel ? (
+              <Row k="Member" colors={colors} last>
+                <Text style={[styles.val, { color: colors.textMain }]}>{memberLabel}</Text>
+              </Row>
+            ) : null}
           </View>
 
           {/* Footer */}

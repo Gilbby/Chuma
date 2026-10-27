@@ -90,6 +90,7 @@ export default function TransactionsScreen() {
       (t) =>
         t.groupName.toLowerCase().includes(q) ||
         t.type.toLowerCase().includes(q) ||
+        (t.projectName ?? "").toLowerCase().includes(q) ||
         (t.note ?? "").toLowerCase().includes(q)
     );
   }, [transactions, query]);
@@ -264,6 +265,8 @@ export default function TransactionsScreen() {
                     status: item.status,
                     direction: item.direction,
                     id: item.id,
+                    ...(item.projectName ? { project: item.projectName } : {}),
+                    ...(item.channel ? { channel: item.channel } : {}),
                   },
                 })
               }

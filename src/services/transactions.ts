@@ -3,11 +3,18 @@ import { api } from "./apiClient";
 
 function mapTxn(raw: any): TxnItem {
   const signed = Number(raw.amount ?? 0);
+  // Church giving names its project in the checkout meta, and the API labels
+  // it (`projectLabel`: the project's name, or "General giving") on every
+  // transaction of a project-fund group. Null on every other group type.
+  const projectId = raw.projectId ?? raw.meta?.projectId;
   return {
     ...raw,
     id: String(raw._id),
     amount: Math.abs(signed),
     direction: signed >= 0 ? "in" : "out",
+    projectId: projectId ? String(projectId) : undefined,
+    projectName: raw.projectLabel ?? raw.projectName ?? undefined,
+    channel: raw.channel ?? raw.meta?.channel,
   };
 }
 

@@ -17,7 +17,11 @@ export type StatementTxnType =
   | "share-out"
   | "penalty"
   | "fee"
-  | "withdrawal";
+  | "withdrawal"
+  // Church groups, group statement only: where the cash handler said held cash
+  // went. A deposit to the church bank / mobile money is direction "transfer"
+  // (still the church's money); a payout for a project is "out".
+  | "payout";
 
 export type StatementScope = "member" | "group";
 
@@ -52,7 +56,9 @@ export interface StatementActivity {
   projectLabel?: string | null;
   note: string;
   amount: number; // absolute
-  direction: "in" | "out";
+  /** "transfer" moves money the group still holds (a church deposit to its
+   *  own bank or mobile money): listed, but neither in nor out. */
+  direction: "in" | "out" | "transfer";
   status: "completed" | "pending" | "failed";
   receiptId: string | null;
 }

@@ -25,6 +25,15 @@ export const MOBILE_MONEY_HOLD_NOTE =
   "Mobile money is paused for now. Payments are cash, confirmed by an admin.";
 
 /**
+ * What church giving that names no project is called. It is not something a
+ * member picks - leaving the project picker alone is what produces it. The API
+ * labels these the same way on the statement (see statement.service.js), so
+ * the receipt, the statement and the funds screens call the one thing by the
+ * one name.
+ */
+export const GENERAL_GIVING_LABEL = "General giving";
+
+/**
  * Group fee master switch (client mirror of the API's GROUP_FEES_ENABLED).
  * OFF for the non-financial tracker build: group creation is free and instant,
  * no fee screen, and groups are never locked for an unpaid fee. Flip to true

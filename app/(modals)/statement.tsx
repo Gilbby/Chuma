@@ -437,6 +437,10 @@ export default function StatementScreen() {
                         // Every line here has settled, so it has a real receipt
                         // number; the id fallback is belt and braces.
                         ...(a.receiptId ? { txnId: a.receiptId } : { id: a.id }),
+                        // A group's book holds everyone's money; the receipt
+                        // names whose this was, not the viewer. Older lines
+                        // never stored a name, and guessing would be worse.
+                        ...(forGroup ? { member: a.memberName || "Unknown member" } : {}),
                       },
                     })
                   }
@@ -613,13 +617,19 @@ const ActivityRow: React.FC<{
       </View>
       <Text
         style={{
-          color: item.direction === "in" ? colors.success : colors.danger,
+          color:
+            item.direction === "in"
+              ? colors.success
+              : item.direction === "out"
+                ? colors.danger
+                : colors.textMuted,
           fontWeight: "700",
           fontSize: 13,
           marginLeft: 12,
         }}
       >
-        {item.direction === "in" ? "+" : "−"}
+        {/* A transfer is still the group's money: no sign, no colour. */}
+        {item.direction === "in" ? "+" : item.direction === "out" ? "−" : ""}
         {formatZMW(item.amount)}
       </Text>
       <ChevronRight size={16} color={colors.textMuted} style={{ marginLeft: 6 }} />

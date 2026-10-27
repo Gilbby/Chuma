@@ -68,6 +68,7 @@ export const TransactionRow: React.FC<Props> = ({ txn, onPress, testID }) => {
               : txn.type.charAt(0).toUpperCase() + txn.type.slice(1)}
         </Text>
         <Text style={[styles.sub, { color: colors.textMuted }]} numberOfLines={1}>
+          {txn.projectName ? `${txn.projectName} · ` : ""}
           {txn.groupName} · {txn.date}
         </Text>
       </View>

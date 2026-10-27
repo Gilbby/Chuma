@@ -35,6 +35,7 @@ import { getPenalties } from "@/src/services/penalties";
 import { getNotifications } from "@/src/services/notifications";
 import { getApprovals } from "@/src/services/approvals";
 import { getTransactions } from "@/src/services/transactions";
+import { getGroupFunds, handlesCash } from "@/src/services/funds";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import {
   isBiometricEnabled,
@@ -97,6 +98,10 @@ export default function Home() {
   // never flashes into view on launch.
   const [balanceHidden, setBalanceHidden] = useState(true);
   const [pinOpen, setPinOpen] = useState(false);
+  // Cash the viewer keeps for a church group and has not yet said where it
+  // went. Null hides the figure: they keep no church group's cash, or none of
+  // the amounts could be loaded.
+  const [cashToDeliver, setCashToDeliver] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,6 +123,18 @@ export default function Home() {
         getTransactions({ range: "month" }),
       ]);
       setGroups(g);
+      // Fetched apart from the rest, so a slow funds call never holds up home.
+      const cashGroups = g.filter(handlesCash);
+      if (cashGroups.length) {
+        Promise.allSettled(cashGroups.map((cg) => getGroupFunds(cg.id))).then((rs) => {
+          const loaded = rs.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+          setCashToDeliver(
+            loaded.length ? loaded.reduce((sum, f) => sum + f.cashOnHand, 0) : null
+          );
+        });
+      } else {
+        setCashToDeliver(null);
+      }
       setLoans(l);
       setPenalties(p);
       setNotifications(n);
@@ -426,6 +443,28 @@ export default function Home() {
                 {groups.length} {groups.length === 1 ? "group" : "groups"}
               </Text>
             </View>
+            {/* The cash keeper's loose ends: money they took in that is not yet
+                banked or spent. Smaller than the total on purpose - it is not
+                theirs, it is what they still have to account for. */}
+            {cashToDeliver !== null && (
+              <>
+                <View style={styles.heroDivider} />
+                <Pressable
+                  onPress={() =>
+                    router.push({ pathname: "/approvals", params: { tab: "deliveries" } })
+                  }
+                  hitSlop={8}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                  accessibilityLabel="Payouts"
+                  testID="home-cash-to-deliver"
+                >
+                  <Text style={styles.heroSubLabel}>Payouts</Text>
+                  <Text style={styles.heroSubValue}>
+                    {balanceHidden ? "K ••••" : formatZMW(cashToDeliver)} ›
+                  </Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
 
