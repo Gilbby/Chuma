@@ -512,13 +512,15 @@ export default function Approvals() {
   );
 }
 
-const DELIVERY_ICONS = { bank: Landmark, "mobile-money": Smartphone, project: Hammer };
+const DELIVERY_ICONS = { bank: Landmark, "mobile-money": Smartphone, project: Hammer, other: Wallet };
 
 /** One line of the record of where held cash went. */
 const deliveryLine = (d: CashDelivery) =>
   d.destination === "project"
     ? `${d.sourceName} paid out${d.targetName && d.targetName !== d.sourceName ? ` for ${d.targetName}` : ""}${d.payee ? ` · ${d.payee}` : ""}`
-    : `${d.sourceName} ${d.destination === "bank" ? "banked" : "put on mobile money"}`;
+    : d.destination === "other"
+      ? `${d.sourceName} — ${d.destinationNote || "moved elsewhere"}`
+      : `${d.sourceName} ${d.destination === "bank" ? "banked" : "put on mobile money"}`;
 
 // The Payouts tab. One church group: its payouts straight away. Two or more:
 // a card per group to choose from, then that one group's payouts, with a way
@@ -775,9 +777,11 @@ const PayoutDetails = ({
       ? "Deposited to the church bank account"
       : d.destination === "mobile-money"
         ? "Deposited to the church mobile money"
-        : d.targetName
-          ? `Paid out for ${d.targetName}`
-          : "Paid out (no project)";
+        : d.destination === "other"
+          ? "Other"
+          : d.targetName
+            ? `Paid out for ${d.targetName}`
+            : "Paid out (no project)";
   const when = d.date
     ? new Date(d.date).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
     : "";
@@ -785,6 +789,7 @@ const PayoutDetails = ({
     ["Amount", formatZMW(d.amount)],
     ["From", d.sourceName],
     ["Payout method", method],
+    ...(d.destinationNote ? ([["Where it went", d.destinationNote]] as [string, string][]) : []),
     ...(d.payee ? ([["Paid to", d.payee]] as [string, string][]) : []),
     ...(d.reference ? ([["Reference", d.reference]] as [string, string][]) : []),
     ...(d.recordedByName ? ([["Recorded by", d.recordedByName]] as [string, string][]) : []),

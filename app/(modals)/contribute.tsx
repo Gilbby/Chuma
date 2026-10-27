@@ -58,7 +58,10 @@ type LoanMode = "installment" | "full" | "custom";
 export default function Contribute() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const { groupId, projectId: projectParam } = useLocalSearchParams<{
+    groupId?: string;
+    projectId?: string;
+  }>();
 
   const [step, setStep] = useState<Step>("entry");
   const [groups, setGroups] = useState<Group[]>([]);
@@ -121,6 +124,16 @@ export default function Contribute() {
       const group =
         fetchedGroups.find((g) => g.id === groupId) ?? fetchedGroups[0] ?? null;
       setSelectedGroup(group);
+      // Opened from a project row: give toward that project straight away, as
+      // long as it is still an open project of the group we landed on.
+      if (
+        projectParam &&
+        (group?.projects ?? []).some(
+          (p) => p.id === projectParam && p.status === "active"
+        )
+      ) {
+        setProjectId(projectParam);
+      }
       setPayerPhone(user?.phone ?? "");
     } catch {
       // Without this the empty list below would claim they have no groups when
@@ -129,7 +142,7 @@ export default function Contribute() {
     } finally {
       setGroupsLoading(false);
     }
-  }, [groupId]);
+  }, [groupId, projectParam]);
 
   useAsyncEffect(load);
 

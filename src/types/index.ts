@@ -234,8 +234,10 @@ export interface TxnItem {
  *  cash handler's hands - the other two land in the church account directly. */
 export type GivingChannel = "cash" | "bank" | "mobile-money";
 
-/** Where the cash handler delivered cash they were holding. */
-export type DeliveryDestination = "bank" | "mobile-money" | "project";
+/** Where the cash handler delivered cash they were holding. "other" is a
+ *  free-text destination they describe (destinationNote). "mobile-money" is
+ *  kept for older records but is no longer offered. */
+export type DeliveryDestination = "bank" | "mobile-money" | "project" | "other";
 
 /**
  * The money given toward one project - or, with `projectId: null`, the money
@@ -250,6 +252,9 @@ export interface FundPile {
   cashOnHand: number;
   banked: number;
   mobileMoney: number;
+  /** Cash moved to some other place the handler described (destination
+   *  "other"). Held like banked/mobileMoney, not spent. */
+  other: number;
   /** Cash from THIS pile paid out for a project. General giving's can have
    *  gone toward any project; a project's own only toward itself. */
   paidOut: number;
@@ -273,6 +278,8 @@ export interface CashDelivery {
   amount: number;
   /** Deposit slip, transaction ID or receipt number. */
   reference?: string;
+  /** destination "other" only: free text saying where the cash went. */
+  destinationNote?: string;
   /** destination "project" only: who was paid. */
   payee?: string;
   recordedByName?: string;
@@ -286,6 +293,7 @@ export interface GroupFunds {
   cashOnHand: number;
   banked: number;
   mobileMoney: number;
+  other: number;
   paidOut: number;
   /** Newest first. */
   deliveries: CashDelivery[];

@@ -41,6 +41,7 @@ export const CHANNEL_LABELS: Record<GivingChannel, string> = {
 export const DESTINATION_LABELS: Record<DeliveryDestination, string> = {
   bank: "Deposited to the church bank account",
   "mobile-money": "Deposited to the church mobile money",
+  other: "Other",
   project: "Paid out for a project",
 };
 
@@ -55,6 +56,7 @@ function mapPile(raw: any): FundPile {
     cashOnHand: n(raw.cashOnHand),
     banked: n(raw.banked),
     mobileMoney: n(raw.mobileMoney),
+    other: n(raw.other),
     paidOut: n(raw.paidOut),
     paidFromGeneral: projectId ? n(raw.paidFromGeneral) : 0,
   };
@@ -84,6 +86,7 @@ function mapFunds(raw: any, groupId: string): GroupFunds {
     cashOnHand: sum("cashOnHand"),
     banked: sum("banked"),
     mobileMoney: sum("mobileMoney"),
+    other: sum("other"),
     paidOut: sum("paidOut"),
     deliveries: (raw?.deliveries ?? []).map(mapDelivery),
   };
@@ -114,6 +117,8 @@ export type DeclareDeliveryPayload = {
   /** Up to the source pile's cash on hand. */
   amount: number;
   reference?: string;
+  /** destination "other": free text describing where the cash went. */
+  destinationNote?: string;
   payee?: string;
 };
 

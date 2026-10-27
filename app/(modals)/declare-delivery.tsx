@@ -30,7 +30,7 @@ import { formatZMW } from "@/src/utils/currency";
 import { Check, Info } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 
-const DESTINATIONS: DeliveryDestination[] = ["bank", "mobile-money", "project"];
+const DESTINATIONS: DeliveryDestination[] = ["bank", "project", "other"];
 
 /** The route param for the General giving pile, which has no project id. */
 const GENERAL = "general";
@@ -57,9 +57,10 @@ export default function DeclareDelivery() {
   const [error, setError] = useState(false);
 
   const [destination, setDestination] = useState<DeliveryDestination | null>(null);
-  const [targetProjectId, setTargetProjectId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
+  // destination "other": free text saying where the cash went.
+  const [destinationNote, setDestinationNote] = useState("");
   const [payee, setPayee] = useState("");
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -101,19 +102,23 @@ export default function DeclareDelivery() {
   const held = allMode ? funds?.cashOnHand ?? 0 : pile?.cashOnHand ?? 0;
   const fromGeneral = !allMode && sourceProjectId === null;
 
-  // A project's own cash can only be paid out for that project. General giving
-  // was given toward nothing in particular, so it can pay for any open project.
-  // Paying out all of it at once goes to the bank or mobile money only: money
-  // is spent on a project from that project's own row.
+  // A project's own cash paid out is spent on that project. General giving was
+  // given toward nothing in particular, so its payout names no project.
+  // Paying out all of it at once goes to the bank or elsewhere only: money is
+  // spent on a project from that project's own row.
   const payableProjects = (group?.projects ?? []).filter((p) => p.status !== "archived");
   const destinations = allMode ? DESTINATIONS.filter((d) => d !== "project") : DESTINATIONS;
   const target = fromGeneral
-    ? payableProjects.find((p) => p.id === targetProjectId) ?? null
+    ? null
     : payableProjects.find((p) => p.id === sourceProjectId) ?? null;
   const pileName = allMode ? "all" : pile?.name ?? "this";
 
-  const num = allMode ? held : parseFloat(amount.replace(/,/g, "")) || 0;
   const isProject = destination === "project";
+  const isOther = destination === "other";
+  // Only a project payout can be a partial amount; a deposit (bank/other) moves
+  // the whole pile, and "pay out all" moves everything - so those use the full
+  // held figure and show no amount field.
+  const num = allMode || !isProject ? held : parseFloat(amount.replace(/,/g, "")) || 0;
   const errors = {
     destination: !destination ? "Choose a payout method" : "",
     amount:
@@ -123,6 +128,8 @@ export default function DeclareDelivery() {
           ? `You are holding ${formatZMW(held)} of ${pileName} cash`
           : "",
     payee: isProject && payee.trim().length < 2 ? "Say who was paid" : "",
+    // "Other" needs to say where - that free text is the only record of it.
+    destinationNote: isOther && destinationNote.trim().length < 2 ? "Describe where it went" : "",
     // The reference is optional: the payout is on the group statement either
     // way, saying where the money went.
   };
@@ -134,6 +141,12 @@ export default function DeclareDelivery() {
     const parts = cleaned.split(".");
     if (parts.length > 2) return;
     if (parts[1] !== undefined && parts[1].length > 2) return;
+    // Can't pay out more of a project than is held in its pile - cap it there.
+    const value = parseFloat(cleaned);
+    if (!isNaN(value) && value > held) {
+      setAmount(String(held));
+      return;
+    }
     setAmount(cleaned);
   };
 
@@ -150,6 +163,7 @@ export default function DeclareDelivery() {
         targetProjectId: isProject ? target?.id ?? null : undefined,
         amount: num,
         reference: reference.trim() || undefined,
+        destinationNote: isOther ? destinationNote.trim() : undefined,
         payee: isProject ? payee.trim() : undefined,
       });
       setFunds(res.funds);
@@ -209,7 +223,9 @@ export default function DeclareDelivery() {
         : "paid out"
       : destination === "bank"
         ? "deposited to the church bank account"
-        : "deposited to the church mobile money";
+        : isOther
+          ? "moved somewhere else"
+          : "deposited to the church mobile money";
     return shell(
       <View style={[styles.content, { flex: 1, alignItems: "center", paddingTop: 48 }]}>
         <View style={[styles.doneCircle, { backgroundColor: colors.primary }]}>
@@ -296,20 +312,7 @@ export default function DeclareDelivery() {
           {destinations.map((d) => (
             <RadioRow
               key={d}
-              label={
-                d === "project" && fromGeneral
-                  ? "Paid out"
-                  : d === "project" && target
-                    ? `Paid out for ${target.name}`
-                    : DESTINATION_LABELS[d]
-              }
-              sub={
-                d === "project"
-                  ? fromGeneral
-                    ? "Materials, a contractor, a bill"
-                    : "Spent on the project: materials, a contractor, a bill"
-                  : undefined
-              }
+              label={d === "project" ? "Paid out" : DESTINATION_LABELS[d]}
               active={destination === d}
               onPress={() => setDestination(d)}
               colors={colors}
@@ -321,90 +324,86 @@ export default function DeclareDelivery() {
           <Text style={[styles.errText, { color: colors.danger }]}>{show("destination")}</Text>
         ) : null}
 
-        {/* General giving can pay for any project - or for none, so picking
-            one is optional, and tapping the chosen project again clears it. A
-            project's own cash only pays for itself, so there is nothing to
-            pick. */}
-        {isProject && fromGeneral && (
+        {/* "Other" has no account behind it, so the free text IS the record of
+            where the money went - it is required, and shows on the statement. */}
+        {isOther && (
           <>
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
-              Paid for (optional)
+              Describe where it went
             </Text>
-            {payableProjects.length > 0 && (
-              <Card padding={4} testID="delivery-target">
-                {payableProjects.map((p) => (
-                  <RadioRow
-                    key={p.id}
-                    label={p.name}
-                    sub={`${formatZMW(p.collected)} raised`}
-                    active={targetProjectId === p.id}
-                    onPress={() => setTargetProjectId((cur) => (cur === p.id ? null : p.id))}
-                    colors={colors}
-                    testID={`delivery-target-${p.id}`}
-                  />
-                ))}
-              </Card>
-            )}
-            <Text style={[styles.hint, { color: colors.textMuted }]}>
-              {target
-                ? "Counts as spent on the project. It was not given toward it, so it does not add to what the project has raised."
-                : "Leave this empty if it was not for a project."}
-            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                styles.textArea,
+                {
+                  color: colors.textMain,
+                  backgroundColor: colors.surface,
+                  borderColor: show("destinationNote") ? colors.danger : colors.border,
+                },
+              ]}
+              value={destinationNote}
+              onChangeText={(t) => setDestinationNote(t.slice(0, 140))}
+              onFocus={revealBottom}
+              placeholder="e.g. Airtel Money"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+              editable={!submitting}
+              testID="delivery-other-note-input"
+            />
+            {show("destinationNote") ? (
+              <Text style={[styles.errText, { color: colors.danger }]}>{show("destinationNote")}</Text>
+            ) : null}
           </>
         )}
 
-        <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>Amount</Text>
-        {allMode ? (
-          <View
-            style={[styles.amountWrap, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
-            testID="delivery-amount-all-fixed"
-          >
-            <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
-            <Text style={[styles.amountInput, { color: colors.textMain }]}>
-              {formatZMW(held).replace(/^K\s?/, "")}
-            </Text>
-          </View>
-        ) : (
-        <View
-          style={[
-            styles.amountWrap,
-            {
-              backgroundColor: colors.surface,
-              borderColor: show("amount") ? colors.danger : colors.border,
-            },
-          ]}
-        >
-          <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
-          <TextInput
-            style={[styles.amountInput, { color: colors.textMain }]}
-            value={amount}
-            onChangeText={onAmountChange}
-            keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
-            placeholder="0"
-            placeholderTextColor={colors.textMuted}
-            editable={!submitting}
-            testID="delivery-amount-input"
-          />
-          {num !== held && (
-            <Pressable
-              onPress={() => setAmount(String(held))}
-              hitSlop={8}
-              style={[styles.allChip, { backgroundColor: colors.primarySoft }]}
-              testID="delivery-amount-all"
+
+        {/* Only a project payout can be partial, so only it shows an amount to
+            set. A deposit (bank/other) moves the whole pile, and pay-out-all
+            moves everything - the card at the top already shows those totals. */}
+        {isProject && (
+          <>
+            <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>Amount</Text>
+            <View
+              style={[
+                styles.amountWrap,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: show("amount") ? colors.danger : colors.border,
+                },
+              ]}
             >
-              <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12 }}>All</Text>
-            </Pressable>
-          )}
-        </View>
+              <Text style={[styles.currency, { color: colors.primary }]}>K</Text>
+              <TextInput
+                style={[styles.amountInput, { color: colors.textMain }]}
+                value={amount}
+                onChangeText={onAmountChange}
+                keyboardType={Platform.OS === "ios" ? "decimal-pad" : "numeric"}
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+                editable={!submitting}
+                testID="delivery-amount-input"
+              />
+              {num !== held && (
+                <Pressable
+                  onPress={() => setAmount(String(held))}
+                  hitSlop={8}
+                  style={[styles.allChip, { backgroundColor: colors.primarySoft }]}
+                  testID="delivery-amount-all"
+                >
+                  <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 12 }}>All</Text>
+                </Pressable>
+              )}
+            </View>
+            <Text style={[styles.errText, { color: show("amount") ? colors.danger : colors.textMuted, fontWeight: show("amount") ? "500" : "400" }]}>
+              {show("amount") ||
+                (num > 0 && num < held
+                  ? `${formatZMW(held - num)} stays with you to pay out later`
+                  : `Up to ${formatZMW(held)}`)}
+            </Text>
+          </>
         )}
-        <Text style={[styles.errText, { color: show("amount") ? colors.danger : colors.textMuted, fontWeight: show("amount") ? "500" : "400" }]}>
-          {allMode
-            ? "Everything you are holding. To pay out part of it, use a project's own Payout."
-            : show("amount") ||
-              (num > 0 && num < held
-                ? `${formatZMW(held - num)} stays with you to pay out later`
-                : `Up to ${formatZMW(held)}`)}
-        </Text>
 
         {isProject && (
           <>
@@ -421,7 +420,7 @@ export default function DeclareDelivery() {
               value={payee}
               onChangeText={(t) => setPayee(t.slice(0, 80))}
               onFocus={revealBottom}
-              placeholder="e.g. Zambezi Hardware, cement"
+              placeholder="e.g. Chuma Hardware, Cement"
               placeholderTextColor={colors.textMuted}
               editable={!submitting}
               testID="delivery-payee-input"
@@ -432,7 +431,7 @@ export default function DeclareDelivery() {
           </>
         )}
 
-        {destination && (
+        {destination && !isOther && (
           <>
             <Text style={[styles.label, { color: colors.textMuted, marginTop: 22 }]}>
               {isProject ? "Receipt number (optional)" : "Reference (optional)"}
@@ -558,6 +557,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 15,
   },
+  textArea: { minHeight: 84, paddingTop: 14 },
   radioRow: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 12, marginVertical: 2 },
   radio: {
     width: 22,

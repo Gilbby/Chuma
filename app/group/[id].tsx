@@ -170,9 +170,17 @@ export default function GroupDetails() {
   const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
-  const [rawTab, setTab] = useState<TabKey>(
+  const [rawTab, setRawTab] = useState<TabKey>(
     TAB_KEYS.includes(tabParam as TabKey) ? (tabParam as TabKey) : "members"
   );
+  // Whether the open tab is a real choice - the link named one, or someone
+  // tapped. Until it is, the default tab depends on the group type (resolved
+  // in `tab` below once the group has loaded), not this initial value.
+  const [tabChosen, setTabChosen] = useState(TAB_KEYS.includes(tabParam as TabKey));
+  const setTab = (k: TabKey) => {
+    setRawTab(k);
+    setTabChosen(true);
+  };
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -756,7 +764,16 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
   const isChilimba = isChilimbaType(group.groupType);
   const projects = group.projects ?? [];
   const activeProjects = projects.filter((p) => p.status === "active");
-  const totalRaised = projects.reduce((sum, p) => sum + p.collected, 0);
+  // The main call to give floats over the church-group screen so it is reachable
+  // from any tab. Hidden until a project is open, since giving must name one.
+  const showGiveFab = isProjectFund && activeProjects.length > 0;
+  // A church leader (treasurer/chairperson) opens the group to see what the
+  // church has raised, not their own giving - so on the hero card the two swap:
+  // the church total leads and their own giving sits under it. A member keeps
+  // their own figure as the headline.
+  const leadsChurchFunds =
+    isProjectFund &&
+    (effectiveRole === "Treasurer" || effectiveRole === "Chairperson");
   // Opening a project - and renaming one, or moving its goal or deadline -
   // decides what members' money can be given toward, so it is the
   // Chairperson's call. The API enforces the same on both routes.
@@ -784,11 +801,15 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
   // A project fund has no Giving tab of its own: giving IS the projects, so the
   // list of them and the button to give toward one belong on the same tab. A
   // link still pointing at "contributions" lands there rather than nowhere.
-  const tab: TabKey =
-    (rawTab === "projects" && !isProjectFund) ||
-    (rawTab === "loans" && (isProjectFund || isChilimba)) ||
-    (rawTab === "rotation" && !isChilimba) ||
-    (rawTab === "approvals" && !isAdmin)
+  // A church group opens on Projects - giving is what members come to do, and
+  // the projects (with the give button) live there. Every other type opens on
+  // Members. An explicit tab (a link, or a tap) always wins over this default.
+  const tab: TabKey = !tabChosen
+    ? (isProjectFund ? "projects" : "members")
+    : (rawTab === "projects" && !isProjectFund) ||
+      (rawTab === "loans" && (isProjectFund || isChilimba)) ||
+      (rawTab === "rotation" && !isChilimba) ||
+      (rawTab === "approvals" && !isAdmin)
       ? "members"
       : rawTab === "contributions" && isProjectFund
         ? "projects"
@@ -823,7 +844,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
       />
       <View style={{ flex: 1 }}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: showGiveFab ? 96 : 32 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
@@ -835,7 +856,9 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 as context, not as the headline. */}
             <Text style={styles.heroLabel}>
               {isProjectFund
-                ? "You have given"
+                ? leadsChurchFunds
+                  ? "Church total raised"
+                  : "You have given"
                 : isChilimba
                   ? "This round's pot"
                   : "Your savings"}
@@ -844,18 +867,32 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               {/* A chilimba's headline is the pot building up this round, not a
                   personal savings balance - the money passes straight through to
                   whoever's turn it is. */}
-              {formatZMW(isChilimba ? group.walletBalance : group.yourSavings ?? 0)}
+              {formatZMW(
+                isChilimba
+                  ? group.walletBalance
+                  : leadsChurchFunds
+                    ? group.totalSavings
+                    : group.yourSavings ?? 0
+              )}
             </Text>
             <View style={styles.heroYouRow}>
               <Text style={styles.heroYouLabel}>
                 {isProjectFund
-                  ? "Church total raised"
+                  ? leadsChurchFunds
+                    ? "You have given"
+                    : "Church total raised"
                   : isChilimba
                     ? "Per member each round"
                     : "Total group savings"}
               </Text>
               <Text style={styles.heroYouValue}>
-                {formatZMW(isChilimba ? group.contributionAmount : group.totalSavings)}
+                {formatZMW(
+                  isChilimba
+                    ? group.contributionAmount
+                    : leadsChurchFunds
+                      ? group.yourSavings ?? 0
+                      : group.totalSavings
+                )}
               </Text>
             </View>
             <View style={styles.heroRow}>
@@ -1003,8 +1040,8 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
         >
           {(isProjectFund
             ? ([
-                { k: "members", label: "Members" },
                 { k: "projects", label: "Projects" },
+                { k: "members", label: "Members" },
                 { k: "approvals", label: "Approvals" },
                 { k: "reports", label: "Reports" },
                 { k: "governance", label: "Governance" },
@@ -1413,41 +1450,6 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
 
         {tab === "projects" && (
           <View style={{ paddingHorizontal: 20 }}>
-            {/* Where the money given to the church is now. Totals only - who
-                gave what stays with the leadership (canSeeMemberMoney) - so
-                every member can see it. Bank and mobile money are what was
-                deposited: the app records nothing leaving either account. */}
-            {funds && (
-              <Card padding={16} style={{ marginBottom: 12 }} testID="group-funds-card">
-                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>FUNDS</Text>
-                <FundRow
-                  label="Cash on hand (to pay out)"
-                  value={funds.cashOnHand}
-                  colors={colors}
-                  strong={funds.cashOnHand > 0}
-                />
-                <FundRow label="Deposited to bank" value={funds.banked} colors={colors} />
-                <FundRow label="Deposited to mobile money" value={funds.mobileMoney} colors={colors} />
-                <FundRow label="Paid out" value={funds.paidOut} colors={colors} last />
-                {handlesCash(group) && (
-                  <Pressable
-                    onPress={() =>
-                      router.push({ pathname: "/approvals", params: { tab: "deliveries", groupId: id } })
-                    }
-                    hitSlop={8}
-                    style={{ marginTop: 12 }}
-                    testID="group-funds-deliver-link"
-                  >
-                    <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 13 }}>
-                      {funds.cashOnHand > 0
-                        ? `Declare where ${formatZMW(funds.cashOnHand)} went ›`
-                        : "Payouts ›"}
-                    </Text>
-                  </Pressable>
-                )}
-              </Card>
-            )}
-
             {/* One form, two jobs: it sits at the top of the tab when adding,
                 and the same fields open in place under the project being
                 edited. Both offer every field a project is created with. */}
@@ -1487,13 +1489,24 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   SAVING FOR
                 </Text>
                 {projects.map((p, i) => (
-                  <View
+                  <Pressable
                     key={p.id}
-                    style={{
+                    // Tapping an open project goes straight to giving toward it.
+                    // An archived project takes no more money, and a tap while
+                    // its edit form is open would yank the chair off the form.
+                    onPress={() => {
+                      if (p.status === "active" && projectFormFor !== p.id)
+                        router.push({
+                          pathname: "/contribute",
+                          params: { groupId: id, projectId: p.id },
+                        });
+                    }}
+                    style={({ pressed }) => ({
                       paddingVertical: 12,
                       borderBottomWidth: i < projects.length - 1 ? 1 : 0,
                       borderBottomColor: colors.border,
-                    }}
+                      opacity: pressed && p.status === "active" && projectFormFor !== p.id ? 0.6 : 1,
+                    })}
                     testID={`project-row-${p.id}`}
                   >
                     <View style={styles.rowBetween}>
@@ -1547,7 +1560,6 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                         {formatProjectDeadline(p.deadline)}
                       </Text>
                     ) : null}
-                    <PileBreakdown pile={findPile(funds, p.id)} colors={colors} />
 
                     {projectFormFor === p.id && canManageProjects && (
                       <ProjectForm
@@ -1570,16 +1582,25 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                         style={{ marginTop: 12 }}
                       />
                     )}
-                  </View>
+                  </Pressable>
                 ))}
                 {/* Untagged giving is not a project, but it is money the church
-                    holds and spends like one, so it is accounted for here too. */}
+                    holds and spends like one. Always offered as a way to give
+                    toward no project in particular - tapping it opens giving
+                    with nothing preselected. */}
                 {(() => {
                   const general = findPile(funds, null);
-                  if (!general || general.raised <= 0) return null;
                   return (
-                    <View
-                      style={{ paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border }}
+                    <Pressable
+                      onPress={() =>
+                        router.push({ pathname: "/contribute", params: { groupId: id } })
+                      }
+                      style={({ pressed }) => ({
+                        paddingVertical: 12,
+                        borderTopWidth: 1,
+                        borderTopColor: colors.border,
+                        opacity: pressed ? 0.6 : 1,
+                      })}
                       testID="project-row-general"
                     >
                       <View style={styles.rowBetween}>
@@ -1587,24 +1608,15 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                           {GENERAL_GIVING_LABEL}
                         </Text>
                         <Text style={{ color: colors.textMain, fontWeight: "700", fontSize: 14 }}>
-                          {formatZMW(general.raised)}
+                          {formatZMW(general?.raised ?? 0)}
                         </Text>
                       </View>
                       <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
                         Given toward no project in particular
                       </Text>
-                      <PileBreakdown pile={general} colors={colors} />
-                    </View>
+                    </Pressable>
                   );
                 })()}
-                <View style={[styles.rowBetween, { marginTop: 14 }]}>
-                  <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>
-                    Total raised
-                  </Text>
-                  <Text style={{ color: colors.textMain, fontWeight: "800", fontSize: 15 }}>
-                    {formatZMW(totalRaised)}
-                  </Text>
-                </View>
               </Card>
             )}
 
@@ -1624,15 +1636,6 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 </Text>
               </Pressable>
             )}
-
-            <View style={{ height: 14 }} />
-            <Button
-              label="Give toward a project"
-              onPress={() =>
-                router.push({ pathname: "/contribute", params: { groupId: id } })
-              }
-              testID="group-give-btn"
-            />
           </View>
         )}
 
@@ -2050,6 +2053,28 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
           </View>
         )}
       </ScrollView>
+
+      {/* Floating give button - the primary action on a church group, kept in
+          reach whatever tab is open. The contribute screen opens with this
+          group chosen; the giver picks the project there. */}
+      {showGiveFab && (
+        <Pressable
+          onPress={() => router.push({ pathname: "/contribute", params: { groupId: id } })}
+          style={({ pressed }) => [
+            styles.giveFab,
+            {
+              backgroundColor: colors.primary,
+              bottom: insets.bottom + 20,
+              opacity: pressed ? 0.9 : 1,
+              transform: [{ scale: pressed ? 0.97 : 1 }],
+            },
+          ]}
+          testID="group-give-fab"
+          accessibilityLabel="Give toward a project"
+        >
+          <Coins size={24} color={colors.textInverse} strokeWidth={2.2} />
+        </Pressable>
+      )}
       </View>
 
       <Modal
@@ -3072,75 +3097,22 @@ const LoanLine = ({
   </View>
 );
 
-/** One line of the Funds card. */
-const FundRow = ({
-  label,
-  value,
-  colors,
-  strong,
-  last,
-}: {
-  label: string;
-  value: number;
-  colors: ReturnType<typeof useTheme>["colors"];
-  /** Draws the eye to cash still waiting to be delivered. */
-  strong?: boolean;
-  last?: boolean;
-}) => (
-  <View
-    style={{
-      flexDirection: "row",
-      justifyContent: "space-between",
-      paddingVertical: 10,
-      borderBottomWidth: last ? 0 : 1,
-      borderBottomColor: colors.border,
-    }}
-  >
-    <Text style={{ color: strong ? colors.textMain : colors.textMuted, fontSize: 13, fontWeight: strong ? "600" : "400" }}>
-      {label}
-    </Text>
-    <Text style={{ color: strong ? colors.warning : colors.textMain, fontSize: 14, fontWeight: "700" }}>
-      {formatZMW(value)}
-    </Text>
-  </View>
-);
-
-/**
- * Where one pile's money is now: paid out, banked, on mobile money, and still
- * to deliver. Those four add up to what the pile raised. General giving spent
- * on a project is named separately - it was spent on the project, not raised
- * for it. Nothing renders until the pile has moved at all.
- */
-const PileBreakdown = ({
-  pile,
-  colors,
-}: {
-  pile: ReturnType<typeof findPile>;
-  colors: ReturnType<typeof useTheme>["colors"];
-}) => {
-  if (!pile) return null;
-  const parts = [
-    pile.paidOut > 0 && `Paid out ${formatZMW(pile.paidOut)}`,
-    pile.banked > 0 && `Banked ${formatZMW(pile.banked)}`,
-    pile.mobileMoney > 0 && `MoMo ${formatZMW(pile.mobileMoney)}`,
-    pile.cashOnHand > 0 && `To pay out ${formatZMW(pile.cashOnHand)}`,
-  ].filter(Boolean) as string[];
-  if (!parts.length && pile.paidFromGeneral <= 0) return null;
-  return (
-    <View style={{ marginTop: 6 }}>
-      {parts.length > 0 && (
-        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>{parts.join(" · ")}</Text>
-      )}
-      {pile.paidFromGeneral > 0 && (
-        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-          + {formatZMW(pile.paidFromGeneral)} paid for it from {GENERAL_GIVING_LABEL.toLowerCase()}
-        </Text>
-      )}
-    </View>
-  );
-};
-
 const styles = StyleSheet.create({
+  giveFab: {
+    position: "absolute",
+    right: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    // A lifted shadow so it reads as floating above the content.
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
   heroLabel: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "500", letterSpacing: 0.3 },
   heroAmount: { color: "#fff", fontSize: 30, fontWeight: "700", marginTop: 4, letterSpacing: -0.5 },
   // The group's total, sitting under the member's own headline figure:
