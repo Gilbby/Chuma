@@ -16,12 +16,15 @@ import { LineChart } from "@/src/components/charts/Charts";
 import { TrendingUp } from "lucide-react-native";
 import { getLoans } from "@/src/services/loans";
 import { getSavingsTrend } from "@/src/services/reports";
-import type { Group, Loan } from "@/src/types";
+import { isProjectFundType, type Group, type Loan } from "@/src/types";
 import {
   getSavingsGrowth,
   getRepaymentRate,
   getDefaults,
   getHealthScore,
+  getGoalProgress,
+  getGivers,
+  getChurchHealthScore,
 } from "@/src/services/groupStats";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -208,11 +211,20 @@ function HealthCardContent({
   trend: { label: string; value: number }[];
   onPress: () => void;
 }) {
+  // A church group never lends, so the lending stats (repayment, defaults) make
+  // no sense - it shows how far its projects are and how many members give.
+  const isChurch = isProjectFundType(group.groupType);
+
   const growth = getSavingsGrowth(group);
   const repayment = getRepaymentRate(group, loans);
   const defaults = getDefaults(group, loans);
-  const score = getHealthScore(group, loans);
+  const goal = getGoalProgress(group);
+  const givers = getGivers(group);
+  const participation = givers.total ? Math.round((givers.gave / givers.total) * 100) : 0;
+  const score = isChurch ? getChurchHealthScore(group) : getHealthScore(group, loans);
 
+  const tone = (pct: number) =>
+    pct >= 75 ? colors.success : pct >= 40 ? colors.warning : colors.danger;
   const growthColor = growth >= 0 ? colors.success : colors.danger;
   const repaymentColor =
     repayment >= 80 ? colors.success : repayment >= 50 ? colors.warning : colors.danger;
@@ -274,24 +286,49 @@ function HealthCardContent({
         </View>
 
         <View style={{ flexDirection: "row" }}>
-          <HealthStat
-            label="Savings ↑"
-            value={`${growth >= 0 ? "+" : ""}${growth}%`}
-            color={growthColor}
-            muted={colors.textMuted}
-          />
-          <HealthStat
-            label="Repayment"
-            value={`${repayment}%`}
-            color={repaymentColor}
-            muted={colors.textMuted}
-          />
-          <HealthStat
-            label="Defaults"
-            value={`${defaults}`}
-            color={defaultsColor}
-            muted={colors.textMuted}
-          />
+          {isChurch ? (
+            <>
+              <HealthStat
+                label="Raised ↑"
+                value={`${growth >= 0 ? "+" : ""}${growth}%`}
+                color={growthColor}
+                muted={colors.textMuted}
+              />
+              <HealthStat
+                label="Goal"
+                value={`${goal}%`}
+                color={tone(goal)}
+                muted={colors.textMuted}
+              />
+              <HealthStat
+                label="Givers"
+                value={`${givers.gave}/${givers.total}`}
+                color={tone(participation)}
+                muted={colors.textMuted}
+              />
+            </>
+          ) : (
+            <>
+              <HealthStat
+                label="Savings ↑"
+                value={`${growth >= 0 ? "+" : ""}${growth}%`}
+                color={growthColor}
+                muted={colors.textMuted}
+              />
+              <HealthStat
+                label="Repayment"
+                value={`${repayment}%`}
+                color={repaymentColor}
+                muted={colors.textMuted}
+              />
+              <HealthStat
+                label="Defaults"
+                value={`${defaults}`}
+                color={defaultsColor}
+                muted={colors.textMuted}
+              />
+            </>
+          )}
         </View>
       </Card>
     </Pressable>

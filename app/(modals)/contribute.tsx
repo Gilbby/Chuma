@@ -320,7 +320,7 @@ export default function Contribute() {
   if (groupsLoading || !selectedGroup) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-        <ScreenHeader title="Make Payment" />
+        <ScreenHeader title="Make Contribution" />
         {groupsLoading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator color={colors.primary} />
@@ -362,7 +362,7 @@ export default function Contribute() {
       testID="contribute-screen"
     >
       <ScreenHeader
-        title={step === "entry" ? "Make Payment" : "Confirm payment"}
+        title={step === "entry" ? "Make Contribution" : "Confirm payment"}
         onBack={step === "confirm" ? () => setStep("entry") : undefined}
       />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>

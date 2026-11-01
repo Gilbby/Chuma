@@ -19,6 +19,7 @@ import {
   Gift,
   Scale,
   Target,
+  Coins,
   Eye,
   EyeOff,
   type LucideIcon,
@@ -35,7 +36,7 @@ import { getPenalties } from "@/src/services/penalties";
 import { getNotifications } from "@/src/services/notifications";
 import { getApprovals } from "@/src/services/approvals";
 import { getTransactions } from "@/src/services/transactions";
-import { getGroupFunds, handlesCash } from "@/src/services/funds";
+import { getGroupFunds, handlesCash, paidOutTotal } from "@/src/services/funds";
 import { getCurrentUser } from "@/src/utils/currentUser";
 import {
   isBiometricEnabled,
@@ -98,9 +99,10 @@ export default function Home() {
   // never flashes into view on launch.
   const [balanceHidden, setBalanceHidden] = useState(true);
   const [pinOpen, setPinOpen] = useState(false);
-  // Cash the viewer keeps for a church group and has not yet said where it
-  // went. Null hides the figure: they keep no church group's cash, or none of
-  // the amounts could be loaded.
+  // How much the viewer has paid out of the church group cash they handle -
+  // banked, on mobile money, moved elsewhere or spent on a project. Null hides
+  // the figure: they keep no church group's cash, or none of the amounts could
+  // be loaded.
   const [cashToDeliver, setCashToDeliver] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -129,7 +131,7 @@ export default function Home() {
         Promise.allSettled(cashGroups.map((cg) => getGroupFunds(cg.id))).then((rs) => {
           const loaded = rs.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
           setCashToDeliver(
-            loaded.length ? loaded.reduce((sum, f) => sum + f.cashOnHand, 0) : null
+            loaded.length ? loaded.reduce((sum, f) => sum + paidOutTotal(f), 0) : null
           );
         });
       } else {
@@ -307,6 +309,11 @@ export default function Home() {
   const projectFundOnly =
     groups.length > 0 && groups.every((g) => isProjectFundType(g.groupType));
 
+  // Whoever keeps a church group's cash (treasurer, or chairperson when there
+  // is no treasurer) gets a Payouts tile in place of the Church/constitution
+  // one - declaring where the cash went is their job, not reading the rules.
+  const isCashHandler = groups.some(handlesCash);
+
   // What a project fund has in place of a share-out is the projects themselves,
   // so they take the slot Share-out leaves empty. The group screen resolves the
   // list from the id and opens on the tab named here.
@@ -336,9 +343,11 @@ export default function Home() {
       icon: PiggyBank,
       route: "/contribute",
     },
-    savingsOnly
-      ? { label: "Church", icon: Scale, route: "/governance" }
-      : { label: "Loan", icon: HandCoins, route: "/loan" },
+    isCashHandler
+      ? { label: "Payouts", icon: Coins, route: "/approvals?tab=deliveries" }
+      : savingsOnly
+        ? { label: "Church", icon: Scale, route: "/governance" }
+        : { label: "Loan", icon: HandCoins, route: "/loan" },
     // A project-fund Member came to give toward a project; the statement is the
     // record they check afterwards. So Projects goes third for them and pushes
     // Statements last. Every other row keeps Statements third.
@@ -443,9 +452,9 @@ export default function Home() {
                 {groups.length} {groups.length === 1 ? "group" : "groups"}
               </Text>
             </View>
-            {/* The cash keeper's loose ends: money they took in that is not yet
-                banked or spent. Smaller than the total on purpose - it is not
-                theirs, it is what they still have to account for. */}
+            {/* What the cash keeper has paid out so far of the church cash they
+                handle: banked, on mobile money, moved elsewhere or spent on a
+                project. Tapping opens the Payouts tab. */}
             {cashToDeliver !== null && (
               <>
                 <View style={styles.heroDivider} />

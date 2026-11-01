@@ -102,6 +102,13 @@ export function findPile(funds: GroupFunds | null, projectId: string | null) {
   return funds?.piles.find((p) => p.projectId === projectId) ?? null;
 }
 
+/** How much has actually been paid out so far - everything the cash handler
+ *  has delivered: banked, on mobile money, moved elsewhere, or spent on a
+ *  project. The counterpart to cashOnHand, which is what is still to pay out. */
+export function paidOutTotal(funds: GroupFunds): number {
+  return funds.banked + funds.mobileMoney + funds.other + funds.paidOut;
+}
+
 export type DeclareDeliveryPayload = {
   /** The pile the cash comes out of; null = General giving. Ignored with
    *  `all`. */

@@ -1,0 +1,7 @@
+{
+  // This is an Expo/React Native project: the Java extension doesn't need to
+  // import the generated android/ Gradle project. Left on, it spawns its own
+  // Gradle daemons after every prebuild, which collide with release builds.
+  "java.import.gradle.enabled": false,
+  "java.import.exclusions": ["**/node_modules/**", "**/android/**"]
+}

@@ -204,46 +204,51 @@ export default function Approvals() {
       testID="approvals-screen"
     >
       <ScreenHeader
-        title="Approval center"
-        subtitle={`${pendingCount} pending`}
+        title={activeFilter === "deliveries" ? "Payouts" : "Approval center"}
+        subtitle={
+          activeFilter === "deliveries"
+            ? holdingTotal > 0
+              ? `${formatZMW(holdingTotal, { compact: true })} in hand`
+              : undefined
+            : `${pendingCount} pending`
+        }
       />
-      {/* Scrolls sideways: with Deliveries there are three chips, which is
-          wider than a small phone. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0 }}
-        contentContainerStyle={styles.filters}
-      >
-        {(showDeliveries
-          ? (["pending", "deliveries", "history"] as const)
-          : (["pending", "history"] as const)
-        ).map((f) => {
-          const active = activeFilter === f;
-          return (
-            <Pressable
-              key={f}
-              onPress={() => setFilter(f)}
-              testID={`approvals-filter-${f}`}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: active ? colors.primary : colors.surface,
-                  borderColor: active ? colors.primary : colors.border,
-                },
-              ]}
-            >
-              <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600" }}>
-                {f === "pending"
-                  ? `Pending${pendingCount ? ` (${pendingCount})` : ""}`
-                  : f === "deliveries"
-                    ? `Payouts${holdingTotal > 0 ? ` · ${formatZMW(holdingTotal, { compact: true })}` : ""}`
+      {/* Payouts has its own entry point (the home tile and the hero cards), so
+          it is no longer one of the Approval center's tabs - only Pending and
+          History are. When the screen is opened straight on Payouts, the view
+          stands on its own with no tab row. */}
+      {activeFilter !== "deliveries" && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={styles.filters}
+        >
+          {(["pending", "history"] as const).map((f) => {
+            const active = activeFilter === f;
+            return (
+              <Pressable
+                key={f}
+                onPress={() => setFilter(f)}
+                testID={`approvals-filter-${f}`}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surface,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600" }}>
+                  {f === "pending"
+                    ? `Pending${pendingCount ? ` (${pendingCount})` : ""}`
                     : "History"}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
 
       <ScrollView
         contentContainerStyle={styles.content}

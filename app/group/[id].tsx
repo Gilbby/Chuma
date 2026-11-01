@@ -51,7 +51,7 @@ import {
 } from "@/src/utils/invites";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { GENERAL_GIVING_LABEL, GROUP_FEES_ENABLED } from "@/src/constants";
-import { findPile, getGroupFunds, handlesCash } from "@/src/services/funds";
+import { findPile, getGroupFunds, handlesCash, paidOutTotal } from "@/src/services/funds";
 import {
   Member,
   Group,
@@ -922,9 +922,9 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               )}
               <View style={styles.divider} />
               <HeroStat label="Members" value={String(group.memberCount)} />
-              {/* Same figure as Home's Payouts: cash the viewer confirmed and
-                  has not yet paid out. Only whoever keeps the cash sees it, and
-                  it opens the Payouts tab. */}
+              {/* Same figure as Home's Payouts: how much of the cash they
+                  handle has been paid out so far. Only whoever keeps the cash
+                  sees it, and it opens the Payouts tab. */}
               {isProjectFund && funds && handlesCash(group) && (
                 <>
                   <View style={styles.divider} />
@@ -937,7 +937,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                     accessibilityLabel="Payouts"
                     testID="group-hero-payouts"
                   >
-                    <HeroStat label="Payouts" value={`${formatZMW(funds.cashOnHand)} ›`} />
+                    <HeroStat label="Payouts" value={`${formatZMW(paidOutTotal(funds))} ›`} />
                   </Pressable>
                 </>
               )}
