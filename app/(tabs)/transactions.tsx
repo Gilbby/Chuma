@@ -102,13 +102,16 @@ export default function TransactionsScreen() {
       testID="transactions-screen"
     >
       <View style={[styles.header, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
-        <View>
+        {/* flex: 1 caps the text at the width the buttons leave, so a long
+            subtitle (or a large system font) wraps instead of pushing the
+            buttons off the edge of narrow screens. */}
+        <View style={{ flex: 1, marginRight: 12 }}>
           <Text style={[styles.title, { color: colors.textMain }]}>Transactions</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
             All your contributions, loans and share-outs
           </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8, flexShrink: 0 }}>
           <Pressable
             onPress={() => router.push("/statement")}
             style={[styles.headerBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}

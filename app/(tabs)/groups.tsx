@@ -401,7 +401,10 @@ export default function Groups() {
       testID="groups-screen"
     >
       <View style={styles.header}>
-        <View>
+        {/* flex: 1 caps the text at the width the buttons leave, so a long
+            subtitle ("… · 2 invites awaiting a reply") or a large system font
+            wraps instead of pushing the buttons off narrow screens. */}
+        <View style={{ flex: 1, marginRight: 12 }}>
           <Text style={[styles.title, { color: colors.textMain }]}>My Groups</Text>
           <Text style={[styles.sub, { color: colors.textMuted }]}>
             {groups.length} active chuma groups
@@ -410,7 +413,7 @@ export default function Groups() {
               : ""}
           </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flexDirection: "row", gap: 10, flexShrink: 0 }}>
           <Pressable
             style={[
               styles.addBtn,
