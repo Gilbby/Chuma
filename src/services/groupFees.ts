@@ -8,7 +8,22 @@ import { GROUP_FEES_ENABLED } from "@/src/constants";
 
 export const GRACE_PERIOD_DAYS = 5;
 
+/** Play billing is on for this group (the server says so in feeStatus). */
+export function isPlayBilled(group: Group): boolean {
+  return group.feeStatus?.billing === "play";
+}
+
+/**
+ * Does this group pay for itself at all? The pawaPay fee is a build flag; the
+ * Chuma Plan (Play billing) is switched on server-side, so it comes from the
+ * group itself.
+ */
+export function feesActive(group: Group): boolean {
+  return GROUP_FEES_ENABLED || isPlayBilled(group);
+}
+
 export function getMonthsOwed(group: Group): number {
+  // Play-billed groups owe a plan, not kwacha - never show an amount for them.
   if (!GROUP_FEES_ENABLED) return 0;
   if (!group.feePaidThrough || !group.monthlyFee) return 0;
   const paidThrough = new Date(group.feePaidThrough);
@@ -31,7 +46,7 @@ export function getAmountOwed(group: Group): number {
 
 /** A brand-new group whose registration fee has not settled yet. */
 export function isAwaitingFirstPayment(group: Group): boolean {
-  if (!GROUP_FEES_ENABLED) return false;
+  if (!feesActive(group)) return false;
   return group.status === "pending-payment";
 }
 
@@ -42,7 +57,7 @@ export function getGraceInfo(group: Group): {
 } {
   // Fees disabled (tracker build): every group reads as fully paid, so nothing
   // is ever locked or awaiting payment.
-  if (!GROUP_FEES_ENABLED) {
+  if (!feesActive(group)) {
     return { status: "paid", daysIntoGrace: 0, daysLeft: GRACE_PERIOD_DAYS };
   }
   // Not a lapsed fee - a group that has not started. Reported separately so

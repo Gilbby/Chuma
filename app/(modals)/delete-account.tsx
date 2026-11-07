@@ -15,6 +15,7 @@ import { Card } from "@/src/components/ui/Card";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { deleteAccount, DeleteBlocker } from "@/src/services/auth";
 import { AlertTriangle, Trash2 } from "lucide-react-native";
+import { PLAY_BILLING_AVAILABLE } from "@/src/services/billing";
 
 const CONFIRM_WORD = "DELETE";
 
@@ -81,6 +82,13 @@ export default function DeleteAccount() {
           {[
             "Your profile and login are removed, and you'll be signed out on this device.",
             "Group records keep only your name for the group's own history and audit; they no longer link back to you.",
+            // Google Play policy: deleting the account must not silently leave
+            // a subscription billing them.
+            ...(PLAY_BILLING_AVAILABLE
+              ? [
+                  "Deleting your account doesn't cancel a Chuma Plan. Cancel it first in Google Play, under Payments & subscriptions, then Subscriptions.",
+                ]
+              : []),
           ].map((line) => (
             <View key={line} style={styles.bullet}>
               <View style={[styles.dot, { backgroundColor: colors.textMuted }]} />

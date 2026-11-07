@@ -4,6 +4,7 @@ import { setCurrentUser, clearCurrentUser } from "@/src/utils/currentUser";
 import { clearPendingOnboarding } from "@/src/utils/onboarding";
 import { clearGroupDraft } from "@/src/utils/groupDraft";
 import { clearLocalAuthPrefs } from "@/src/utils/biometrics";
+import { resetBilling } from "./billing";
 
 export async function requestOtp(
   phone: string,
@@ -70,6 +71,9 @@ export async function logout() {
   // wipe them too - otherwise the next account on this phone inherits them (a
   // fingerprint prompt for a reveal the new user never set up).
   await clearLocalAuthPrefs();
+  // Detach the Play subscription from this phone's RevenueCat session, so the
+  // next account to sign in here doesn't see (or extend) someone else's plan.
+  await resetBilling();
 }
 
 export interface DeleteBlocker {

@@ -581,11 +581,15 @@ export default function Groups() {
                       <Text
                         style={[
                           styles.groupSub,
-                          { color: GROUP_FEES_ENABLED && g.status === "pending-payment" ? colors.warning : colors.textMuted },
+                          { color: (GROUP_FEES_ENABLED || g.feeStatus?.billing === "play") && g.status === "pending-payment" ? colors.warning : colors.textMuted },
                         ]}
                         numberOfLines={1}
                       >
-                        {GROUP_FEES_ENABLED && g.status === "pending-payment"
+                        {g.feeStatus?.billing === "play" && g.status === "pending-payment"
+                          ? g.youFounded
+                            ? "Needs a Chuma Plan. Tap to choose"
+                            : "Waiting for the founder's plan"
+                          : GROUP_FEES_ENABLED && g.status === "pending-payment"
                           ? "Awaiting registration fee. Tap to finish"
                           : isProjectFundType(g.groupType)
                             ? projectSubtitle(g)

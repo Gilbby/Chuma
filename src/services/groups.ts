@@ -61,6 +61,10 @@ function mapGroup(raw: any, currentUserId?: string): Group {
     joinRequests,
     memberCount: members.filter((m: any) => m.status === "active").length,
     yourRole: mine?.role ?? "Member",
+    // The founder is who pays for the group's Chuma Plan (Play billing).
+    youFounded:
+      !!currentUserId &&
+      String(raw.governance?.chairpersonUserId ?? "") === String(currentUserId),
     yourSavings: mine?.savings ?? 0,
     yourContributions: mine?.contributions ?? 0,
     // keep shareOutDate / nextContributionDate as ISO strings - Hermes date math
@@ -90,7 +94,12 @@ export async function getGroups(
   return (res.groups ?? [])
     // With fees off, nothing is "pending-payment" in any meaningful sense, so
     // never hide a group for it (covers legacy groups from before the change).
-    .filter((g) => includePending || !GROUP_FEES_ENABLED || g.status !== "pending-payment")
+    .filter(
+      (g) =>
+        includePending ||
+        !(GROUP_FEES_ENABLED || g.feeStatus?.billing === "play") ||
+        g.status !== "pending-payment"
+    )
     .map((g) => mapGroup(g, user?._id));
 }
 
@@ -149,7 +158,11 @@ export async function acceptInvite(
   return { alreadyMember: !!res?.alreadyMember };
 }
 
-export async function createGroup(payload: any): Promise<{ group: any; transaction?: any }> {
+// `needsPlan` (Play billing): the group was saved but waits, locked, until the
+// founder's Chuma Plan has room for it.
+export async function createGroup(
+  payload: any
+): Promise<{ group: any; transaction?: any; needsPlan?: boolean }> {
   return api("/groups", { method: "POST", body: payload });
 }
 

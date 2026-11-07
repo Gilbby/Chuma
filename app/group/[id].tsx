@@ -49,7 +49,7 @@ import {
   inviteDisplayName,
   pendingInvites,
 } from "@/src/utils/invites";
-import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
+import { isGroupLocked, getMonthsOwed, getAmountOwed, isPlayBilled } from "@/src/services/groupFees";
 import { GENERAL_GIVING_LABEL, GROUP_FEES_ENABLED } from "@/src/constants";
 import { findPile, getGroupFunds, handlesCash, paidOutTotal } from "@/src/services/funds";
 import {
@@ -722,14 +722,17 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
     );
   }
 
+  // Play billing (Chuma Plan) is switched on server-side, so it's read off the
+  // group; the pawaPay fee is a build flag.
+  const playBilled = isPlayBilled(group);
   // Fees off: never locked, whatever a stale/older backend reports in feeStatus.
-  const locked = GROUP_FEES_ENABLED
+  const locked = GROUP_FEES_ENABLED || playBilled
     ? (group.feeStatus?.locked ?? isGroupLocked(group))
     : false;
   // A group still waiting on its registration fee owes exactly month 1. The
   // server's monthsOwed reads 0 there (feePaidThrough was stamped at creation),
   // so the amount has to come from the fee itself or the overlay offers "K0".
-  const awaitingFirstPayment = GROUP_FEES_ENABLED && group.status === "pending-payment";
+  const awaitingFirstPayment = (GROUP_FEES_ENABLED || playBilled) && group.status === "pending-payment";
   const monthsOwed = awaitingFirstPayment ? 1 : (group.feeStatus?.monthsOwed ?? getMonthsOwed(group));
   const amountOwed = awaitingFirstPayment
     ? (group.monthlyFee ?? group.registrationFee ?? 0)
@@ -741,6 +744,8 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
   const canPayFee =
     effectiveRole === "Chairperson" ||
     effectiveRole === "Treasurer";
+  // Only the founder's own Google Play subscription can cover a group.
+  const canChoosePlan = playBilled && !!group.youFounded;
   // Resending or withdrawing an invite is an admin action - same set the API
   // enforces on /invite (requireGroupAdmin).
   const isAdmin = effectiveRole !== "Member";
@@ -2574,7 +2579,15 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   lineHeight: 21,
                 }}
               >
-                {awaitingFirstPayment
+                {playBilled
+                  ? awaitingFirstPayment
+                    ? canChoosePlan
+                      ? `${group.name} opens once your Chuma Plan covers it. Nothing can be added or contributed until then.`
+                      : "This group hasn't started yet. It opens once its founder chooses a Chuma Plan."
+                    : canChoosePlan
+                      ? `${group.name} is locked because your Chuma Plan doesn't cover it. Choose or upgrade your plan to reopen it.`
+                      : "This group is locked until its founder renews their Chuma Plan. Please check back soon."
+                  : awaitingFirstPayment
                   ? canPayFee
                     ? `${group.name} opens once its ${formatZMW(amountOwed)} registration fee is received. Nothing can be added or contributed until then.`
                     : "This group has not started yet. Its registration fee is still being confirmed. Please check back soon."
@@ -2582,7 +2595,16 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                     ? `This group is suspended because the monthly fee is unpaid. Pay ${formatZMW(amountOwed)} (${monthsOwed} month${monthsOwed === 1 ? "" : "s"}) to reactivate it.`
                     : "This group is suspended pending the monthly fee payment from the group admins. Please check back soon."}
               </Text>
-              {canPayFee && (
+              {canChoosePlan && (
+                <View style={{ marginTop: 24 }}>
+                  <Button
+                    label={awaitingFirstPayment ? "Choose a plan" : "Choose or renew plan"}
+                    onPress={() => router.push(`/plan?groupId=${group.id}` as never)}
+                    testID="group-choose-plan-btn"
+                  />
+                </View>
+              )}
+              {canPayFee && !playBilled && (
                 <View style={{ marginTop: 24 }}>
                   <Button
                     label={

@@ -15,7 +15,7 @@ import {
   AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
@@ -33,7 +33,7 @@ import {
 } from "@/src/utils/groupDraft";
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
-import { Check, Camera, X, CreditCard, Plus, Calendar } from "lucide-react-native";
+import { Check, Camera, X, CreditCard, Plus, Calendar, Lock } from "lucide-react-native";
 import Slider from "@react-native-community/slider";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { isProjectFundType, isChilimbaType } from "@/src/types";
@@ -225,7 +225,9 @@ export default function CreateGroup() {
   //   waiting → PIN prompt is on their phone, we are polling
   //   active  → fee settled, the group is usable
   //   timeout → still pending after POLL_LIMIT; they can retry from the group
-  const [feeState, setFeeState] = useState<"waiting" | "active" | "timeout">("waiting");
+  // "needs-plan" (Play billing): saved, but locked until the founder's Chuma
+  // Plan covers it - the plan screen is where that's fixed, not a PIN prompt.
+  const [feeState, setFeeState] = useState<"waiting" | "active" | "timeout" | "needs-plan">("waiting");
 
   //  Helpers 
 
@@ -284,6 +286,19 @@ export default function CreateGroup() {
       clearInterval(timer);
     };
   }, [step, newGroupId, feeState]);
+
+  // Play billing: back from the plan screen (bought, or backed out) - if the
+  // plan now covers this group it's open, so show the normal success state.
+  useFocusEffect(
+    useCallback(() => {
+      if (step !== 7 || feeState !== "needs-plan" || !newGroupId) return;
+      getGroupById(newGroupId)
+        .then((g) => {
+          if (g && g.status !== "pending-payment") setFeeState("active");
+        })
+        .catch(() => {});
+    }, [step, feeState, newGroupId])
+  );
 
   // Guards direct navigation (deep link) into a 6-step wizard that would only
   // 403 at the payment step - the Groups + button already checks this first -
@@ -766,7 +781,13 @@ export default function CreateGroup() {
       setNewGroupId(newId);
       // Simulated/cash payments settle inline and come back already active;
       // a real deposit comes back pending and the poll below takes over.
-      setFeeState(res.group.status === "pending-payment" ? "waiting" : "active");
+      setFeeState(
+        res.needsPlan
+          ? "needs-plan"
+          : res.group.status === "pending-payment"
+            ? "waiting"
+            : "active"
+      );
       // A real group now - even while the fee settles it is on the Groups tab,
       // so the draft has nothing left to restore.
       draftClosedRef.current = true;
@@ -872,6 +893,7 @@ export default function CreateGroup() {
   if (step === 7) {
     const typeLabel = GROUP_TYPES.find((t) => t.value === groupType)?.label ?? "";
     const settled = feeState === "active";
+    const needsPlan = feeState === "needs-plan";
     const network = networkKnown ? payerAccount.network : "Mobile money";
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]} testID="create-group-success">
@@ -884,12 +906,14 @@ export default function CreateGroup() {
           >
             {settled ? (
               <Check size={56} color="#fff" strokeWidth={3} />
+            ) : needsPlan ? (
+              <Lock size={48} color={colors.primary} />
             ) : (
               <ActivityIndicator size="large" color={colors.primary} />
             )}
           </View>
           <Text style={[styles.successTitle, { color: colors.textMain }]}>
-            {settled ? "Group created" : "Confirm the payment"}
+            {settled ? "Group created" : needsPlan ? "Choose a plan to open it" : "Confirm the payment"}
           </Text>
           <Text style={[styles.successSub, { color: colors.textMuted }]}>{groupName}</Text>
 
@@ -904,7 +928,9 @@ export default function CreateGroup() {
                 marginTop: 12,
               }}
             >
-              {feeState === "timeout"
+              {needsPlan
+                ? `${groupName} is saved. It opens as soon as your Chuma Plan covers it.`
+                : feeState === "timeout"
                 ? `We haven't received the K100.00 registration fee yet. ${groupName} stays closed until it arrives. Open it from Groups to try the payment again.`
                 : `Enter your ${network} PIN on your phone to pay the K100.00 registration fee. ${groupName} opens as soon as it goes through.`}
             </Text>
@@ -927,7 +953,9 @@ export default function CreateGroup() {
               ) : (
                 <RRow label="Cycle" value={cycleDuration} colors={colors} />
               )}
-              {GROUP_FEES_ENABLED ? (
+              {needsPlan ? (
+                <RRow label="Status" value="Waiting for a plan" colors={colors} last />
+              ) : GROUP_FEES_ENABLED ? (
                 <RRow
                   label="Registration fee"
                   value={
@@ -963,6 +991,21 @@ export default function CreateGroup() {
                   variant="ghost"
                   onPress={() => router.replace(`/group/${newGroupId}`)}
                   testID="create-group-open-btn"
+                />
+              </>
+            ) : needsPlan ? (
+              <>
+                <Button
+                  label="Choose a plan"
+                  onPress={() => router.push(`/plan?groupId=${newGroupId}` as never)}
+                  testID="create-group-plan-btn"
+                />
+                <View style={{ height: 10 }} />
+                <Button
+                  label="Later"
+                  variant="ghost"
+                  onPress={() => router.replace("/(tabs)/groups")}
+                  testID="create-group-close-btn"
                 />
               </>
             ) : (

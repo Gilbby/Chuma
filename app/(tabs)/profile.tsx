@@ -26,8 +26,10 @@ import {
   FileText,
   Scale,
   Trash2,
+  BadgeCheck,
 } from "lucide-react-native";
 import { LEGAL_URLS } from "@/src/constants";
+import { PLAY_BILLING_AVAILABLE } from "@/src/services/billing";
 import { getGroups } from "@/src/services/groups";
 import { getPenalties } from "@/src/services/penalties";
 import { logout } from "@/src/services/auth";
@@ -300,6 +302,18 @@ export default function Profile() {
             colors={colors}
             onPress={() => router.push("/(tabs)/groups")}
           />
+          {/* Only once the server bills groups through Play (it says so per
+              group) and only for people who founded one - they're the payers. */}
+          {PLAY_BILLING_AVAILABLE &&
+            groups.some((g) => g.youFounded && g.feeStatus?.billing === "play") && (
+              <Row
+                icon={<BadgeCheck size={20} color={colors.primary} />}
+                label="Chuma Plan"
+                colors={colors}
+                onPress={() => router.push("/plan" as never)}
+                testID="profile-plan-row"
+              />
+            )}
           <Row
             icon={<AlertTriangle size={20} color={colors.primary} />}
             label="Penalties"

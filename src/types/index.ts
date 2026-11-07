@@ -133,6 +133,13 @@ export interface FeeStatus {
   monthsOwed: number;
   amountOwed: number;
   locked: boolean;
+  /** How the group is paid for: "play" = Chuma Plan (Google Play
+   *  subscription), "pawapay" = monthly fee screen, "off" = free. */
+  billing?: "play" | "pawapay" | "off";
+  /** Play billing: the founder's plan covers this group. */
+  coveredByPlan?: boolean;
+  /** Play billing: a pre-billing group is free until this date. */
+  freeUntil?: string | null;
 }
 
 /** Someone who found a group through search and asked to join. Not a member
@@ -152,6 +159,8 @@ export interface Group {
   /** "pending-payment" means the registration fee has not landed: the group
    *  exists but nothing inside it can be opened or used yet. */
   status?: "pending-payment" | "active" | "closed" | "deletion-pending";
+  /** You founded this group, so your Chuma Plan is what pays for it. */
+  youFounded?: boolean;
   groupType?: GroupType;
   constitution?: GroupConstitution;
   governance?: GroupGovernance;

@@ -15,6 +15,7 @@ import { detectNetwork } from "@/src/services/mobileMoney";
 import { Check, Clock, CalendarClock } from "lucide-react-native";
 import { useAsyncEffect } from "@/src/hooks/useAsyncEffect";
 import { GROUP_FEES_ENABLED } from "@/src/constants";
+import { PLAY_BILLING_AVAILABLE } from "@/src/services/billing";
 
 type Receipt = {
   amount: number;
@@ -69,9 +70,16 @@ export default function GroupFeeScreen() {
 
   // Group fees are off in the tracker build. This screen is unreachable through
   // the UI, but bounce any stale deep link straight to the Groups tab.
+  // With the Chuma Plan (Play billing) on, a fee notification lands here - send
+  // it to the plan screen instead.
   useEffect(() => {
-    if (!GROUP_FEES_ENABLED) router.replace("/(tabs)/groups");
-  }, [router]);
+    if (!GROUP_FEES_ENABLED)
+      router.replace(
+        PLAY_BILLING_AVAILABLE && groupId
+          ? (`/plan?groupId=${groupId}` as never)
+          : "/(tabs)/groups"
+      );
+  }, [router, groupId]);
   if (!GROUP_FEES_ENABLED) return null;
 
   // A group still waiting on its registration fee owes exactly month 1, even
