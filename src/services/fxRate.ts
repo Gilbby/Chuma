@@ -3,7 +3,8 @@
 // Google Play bills Zambia in US dollars (it has no ZMW), so the app shows
 // Play's real price and, next to it, a kwacha estimate at today's rate. The
 // rate comes from ExchangeRate-API's free open endpoint (no key, updated
-// daily; its terms ask for attribution, shown on the plan screen). Nothing
+// daily; its terms ask for attribution - not shown in the app at the owner's
+// request, so consider crediting it on a Help/About screen). Nothing
 // about the user is sent - it's a plain GET for the USD rate table.
 //
 // Cached on the phone for 12 hours so the plan screen doesn't refetch on every

@@ -344,7 +344,7 @@ export default function PlanScreen() {
       </Text>
       {fx && kwacha && (
         <Text style={[styles.fine, { color: colors.textMuted, marginTop: 6 }]}>
-          1 USD ≈ K{fx.rate.toFixed(2)} · rate by ExchangeRate-API, updated {shortDate(fx.updatedAt)}
+          1 USD ≈ K{fx.rate.toFixed(2)} · updated {shortDate(fx.updatedAt)}
         </Text>
       )}
 
