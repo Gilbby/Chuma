@@ -142,11 +142,19 @@ export default function PlanScreen() {
 
 
   const option = options.find((o) => o.basePlanId === selected) ?? null;
+  // One plan on offer (the normal case now): no choosing, no switching.
+  const single = options.length === 1;
   // Live rate first; the API's optional fixed rate (BILLING_USD_ZMW_RATE) only
   // if the live lookup failed.
   const rate = fx?.rate ?? summary?.usdToZmwRate ?? null;
   const plan = summary?.plan;
-  const isCurrent = !!(option && plan?.active && plan.basePlanId === option.basePlanId);
+  // Already covered: the same plan, or any active plan at least this big (e.g.
+  // a retired groups-3/groups-5 subscription) - never try to switch those.
+  const isCurrent = !!(
+    option &&
+    plan?.active &&
+    (plan.basePlanId === option.basePlanId || plan.groupLimit >= option.groupLimit)
+  );
   const isUpgrade = !!(option && plan?.active && option.groupLimit > plan.groupLimit);
   const isDowngrade = !!(option && plan?.active && option.groupLimit < plan.groupLimit);
 
@@ -395,9 +403,9 @@ export default function PlanScreen() {
         )}
       </Card>
 
-      {/* Tiers */}
+      {/* The plan (the server offers one; the list form still copes with more) */}
       <Text style={[styles.overline, { color: colors.textMuted, marginTop: 24, marginBottom: 10 }]}>
-        CHOOSE HOW MANY GROUPS
+        {single ? "CHUMA PLAN" : "CHOOSE HOW MANY GROUPS"}
       </Text>
       {options.map((o) => {
         const on = o.basePlanId === selected;
@@ -417,9 +425,11 @@ export default function PlanScreen() {
               },
             ]}
           >
-            <View style={[styles.radio, { borderColor: on ? colors.primary : colors.borderStrong }]}>
-              {on && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
-            </View>
+            {!single && (
+              <View style={[styles.radio, { borderColor: on ? colors.primary : colors.borderStrong }]}>
+                {on && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <Text style={{ color: colors.textMain, fontSize: 16, fontWeight: "700" }}>{tierLabel(o.groupLimit)}</Text>
               {(current || tooSmall) && (
@@ -458,9 +468,10 @@ export default function PlanScreen() {
         {options.some((o) => approxKwacha(o, rate))
           ? ", in US dollars. Kwacha amounts are estimates. Your bank's rate may differ"
           : ""}
-        . Cancel anytime in Google Play. Your plan covers the groups you
-        founded, starting with any you moved it to, then oldest first. Upgrades start now, and unused time on your current plan counts toward the new
-        one. Switching to a smaller plan starts at your next renewal.
+        . Cancel anytime in Google Play.
+        {single
+          ? ` One plan lets you run up to ${options[0]?.groupLimit ?? 5} groups that you found.`
+          : " Your plan covers the groups you founded, starting with any you moved it to, then oldest first. Upgrades start now, and unused time on your current plan counts toward the new one. Switching to a smaller plan starts at your next renewal."}
       </Text>
 
       {fx && options.some((o) => approxKwacha(o, rate)) && (
