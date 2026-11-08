@@ -128,9 +128,11 @@ export async function getPlanOptions(tiers: Record<string, number>): Promise<Pla
 export type PurchaseOutcome = "purchased" | "cancelled";
 
 /**
- * Buy a tier, or switch to it from the current one. Upgrades apply now and
- * charge the prorated difference; downgrades wait for the next renewal so
- * nobody loses groups they've already paid for this month.
+ * Buy a tier, or switch to it from the current one. Upgrades apply now, with
+ * unused time on the old plan credited toward the new one (Play's default,
+ * WITH_TIME_PRORATION - CHARGE_PRORATED_PRICE was refused by Play with a
+ * generic "Something went wrong on our end" in testing). Downgrades wait for
+ * the next renewal so nobody loses groups they've already paid for.
  */
 export async function buyPlan(
   option: PlanOption,
@@ -147,7 +149,7 @@ export async function buyPlan(
           oldProductIdentifier: active.productIdentifier.split(":")[0],
           replacementMode:
             option.groupLimit > current.groupLimit
-              ? STORE_REPLACEMENT_MODE.CHARGE_PRORATED_PRICE
+              ? STORE_REPLACEMENT_MODE.WITH_TIME_PRORATION
               : STORE_REPLACEMENT_MODE.DEFERRED,
         }
       : null;

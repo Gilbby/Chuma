@@ -317,8 +317,8 @@ export default function PlanScreen() {
 
       <Text style={[styles.fine, { color: colors.textMuted }]}>
         Billed monthly through Google Play. Cancel anytime in Google Play. Your plan covers the groups you
-        founded, oldest first. Upgrades start now and you pay only the difference for this month. Switching
-        to a smaller plan starts at your next renewal.
+        founded, oldest first. Upgrades start now, and unused time on your current plan counts toward the new
+        one. Switching to a smaller plan starts at your next renewal.
       </Text>
 
       <View style={styles.links}>
