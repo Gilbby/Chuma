@@ -35,6 +35,7 @@ import {
   type PlanSummary,
   type PlanOption,
 } from "@/src/services/billing";
+import { getUsdToZmw, type FxRate } from "@/src/services/fxRate";
 
 function shortDate(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -75,10 +76,14 @@ export default function PlanScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState<"buy" | "restore" | null>(null);
+  // Today's USD->ZMW rate for the kwacha estimate. Loaded alongside the plans
+  // and never blocks them: no rate just means no "about K…" line.
+  const [fx, setFx] = useState<FxRate | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError("");
+    getUsdToZmw().then(setFx).catch(() => setFx(null));
     try {
       const s = await getPlanSummary();
       setSummary(s);
@@ -117,6 +122,9 @@ export default function PlanScreen() {
   };
 
   const option = options.find((o) => o.basePlanId === selected) ?? null;
+  // Live rate first; the API's optional fixed rate (BILLING_USD_ZMW_RATE) only
+  // if the live lookup failed.
+  const rate = fx?.rate ?? summary?.usdToZmwRate ?? null;
   const plan = summary?.plan;
   const isCurrent = !!(option && plan?.active && plan.basePlanId === option.basePlanId);
   const isUpgrade = !!(option && plan?.active && option.groupLimit > plan.groupLimit);
@@ -305,9 +313,9 @@ export default function PlanScreen() {
                 {o.priceString}
                 <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "400" }}>/mo</Text>
               </Text>
-              {approxKwacha(o, summary.usdToZmwRate) && (
+              {approxKwacha(o, rate) && (
                 <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                  {approxKwacha(o, summary.usdToZmwRate)}
+                  {approxKwacha(o, rate)}
                 </Text>
               )}
             </View>
@@ -327,13 +335,19 @@ export default function PlanScreen() {
 
       <Text style={[styles.fine, { color: colors.textMuted }]}>
         Billed monthly through Google Play
-        {options.some((o) => approxKwacha(o, summary.usdToZmwRate))
+        {options.some((o) => approxKwacha(o, rate))
           ? ", in US dollars. Kwacha amounts are estimates. Your bank's rate may differ"
           : ""}
         . Cancel anytime in Google Play. Your plan covers the groups you
         founded, oldest first. Upgrades start now, and unused time on your current plan counts toward the new
         one. Switching to a smaller plan starts at your next renewal.
       </Text>
+
+      {fx && options.some((o) => approxKwacha(o, rate)) && (
+        <Text style={[styles.fine, { color: colors.textMuted, marginTop: 6 }]}>
+          1 USD ≈ K{fx.rate.toFixed(2)} · rate by ExchangeRate-API, updated {shortDate(fx.updatedAt)}
+        </Text>
+      )}
 
       <View style={styles.links}>
         <Pressable onPress={onRestore} disabled={busy !== null} testID="plan-restore-btn" style={styles.link}>
