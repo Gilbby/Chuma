@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "com.chuma.zm",
-      "versionCode": 14,
+      "versionCode": 15,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A5C36"

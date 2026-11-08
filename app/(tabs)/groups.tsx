@@ -623,7 +623,13 @@ export default function Groups() {
                       <Text
                         style={[
                           styles.groupSub,
-                          { color: (GROUP_FEES_ENABLED || g.feeStatus?.billing === "play") && g.status === "pending-payment" ? colors.warning : colors.textMuted },
+                          {
+                            color:
+                              (GROUP_FEES_ENABLED || g.feeStatus?.billing === "play") &&
+                              (g.status === "pending-payment" || g.feeStatus?.locked)
+                                ? colors.warning
+                                : colors.textMuted,
+                          },
                         ]}
                         numberOfLines={1}
                       >
@@ -631,6 +637,10 @@ export default function Groups() {
                           ? g.youFounded
                             ? "Waiting for subscription. Tap to subscribe"
                             : "Waiting for the founder's subscription"
+                          : g.feeStatus?.billing === "play" && g.feeStatus?.locked
+                          ? g.youFounded
+                            ? "Locked: subscription ended. Tap to renew"
+                            : "Locked until the founder renews"
                           : GROUP_FEES_ENABLED && g.status === "pending-payment"
                           ? "Awaiting registration fee. Tap to finish"
                           : isProjectFundType(g.groupType)
