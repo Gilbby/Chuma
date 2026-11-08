@@ -338,7 +338,7 @@ export default function PlanScreen() {
 
       <Text style={[styles.fine, { color: colors.textMuted }]}>
         {kwacha
-          ? `Google Play bills ${offer?.priceString} a month in US dollars. The kwacha amount uses today's exchange rate, and your bank's rate may differ.`
+          ? "Billed monthly through Google Play, in US dollars. The kwacha amount is an estimate. Your bank's rate may differ."
           : "Billed monthly through Google Play."}{" "}
         Cancel anytime in Google Play.
       </Text>
