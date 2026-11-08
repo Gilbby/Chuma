@@ -913,7 +913,7 @@ export default function CreateGroup() {
             )}
           </View>
           <Text style={[styles.successTitle, { color: colors.textMain }]}>
-            {settled ? "Group created" : needsPlan ? "Choose a plan to open it" : "Confirm the payment"}
+            {settled ? "Group created" : needsPlan ? "Subscribe to open it" : "Confirm the payment"}
           </Text>
           <Text style={[styles.successSub, { color: colors.textMuted }]}>{groupName}</Text>
 
@@ -929,7 +929,7 @@ export default function CreateGroup() {
               }}
             >
               {needsPlan
-                ? `${groupName} is saved. It opens as soon as your Chuma Plan covers it.`
+                ? `${groupName} is saved. It opens as soon as you subscribe to the Chuma Plan.`
                 : feeState === "timeout"
                 ? `We haven't received the K100.00 registration fee yet. ${groupName} stays closed until it arrives. Open it from Groups to try the payment again.`
                 : `Enter your ${network} PIN on your phone to pay the K100.00 registration fee. ${groupName} opens as soon as it goes through.`}
@@ -954,7 +954,7 @@ export default function CreateGroup() {
                 <RRow label="Cycle" value={cycleDuration} colors={colors} />
               )}
               {needsPlan ? (
-                <RRow label="Status" value="Waiting for a plan" colors={colors} last />
+                <RRow label="Status" value="Waiting for subscription" colors={colors} last />
               ) : GROUP_FEES_ENABLED ? (
                 <RRow
                   label="Registration fee"
@@ -996,7 +996,7 @@ export default function CreateGroup() {
             ) : needsPlan ? (
               <>
                 <Button
-                  label="Choose a plan"
+                  label="Subscribe"
                   onPress={() => router.push(`/plan?groupId=${newGroupId}` as never)}
                   testID="create-group-plan-btn"
                 />

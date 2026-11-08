@@ -1,8 +1,9 @@
-// Chuma Plan - pick how many groups your Google Play subscription covers.
+// Chuma Plan - the one Google Play subscription. Subscribed founders can create
+// and run as many groups as they like; there's nothing to choose between.
 //
 // Google Play policy: on Android this is the ONLY way to pay for groups, and
-// the screen must not mention any other way or price. Prices come from Play
-// (already localised), never from our own constants.
+// the screen must not mention any other way or price. The price comes from
+// Play (already localised), never from our own constants.
 
 import React, { useCallback, useState } from "react";
 import {
@@ -17,7 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Check, Lock, Clock } from "lucide-react-native";
+import { Check, Lock, Clock, BadgeCheck } from "lucide-react-native";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { ScreenHeader } from "@/src/components/common/ScreenHeader";
 import { Card } from "@/src/components/ui/Card";
@@ -32,7 +33,6 @@ import {
   restorePlan,
   getManageUrl,
   approxKwacha,
-  preferGroup,
   UNLIMITED_GROUPS,
   type PlanSummary,
   type PlanOption,
@@ -44,50 +44,51 @@ function shortDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function tierLabel(n: number): string {
-  if (n >= UNLIMITED_GROUPS) return "Unlimited groups";
-  return n === 1 ? "1 group" : `Up to ${n} groups`;
+function groupsLine(n: number): string {
+  if (n >= UNLIMITED_GROUPS) return "Create and run unlimited groups";
+  return n === 1 ? "Run 1 group" : `Run up to ${n} groups`;
 }
 
 /**
  * RevenueCat usually knows about a purchase within a second or two, but the
- * API asks RevenueCat directly, so give it a few tries before saying it failed.
+ * API asks RevenueCat directly, so give it a few tries before giving up.
  */
-async function syncUntil(check: (s: PlanSummary) => boolean): Promise<PlanSummary> {
+async function syncUntilActive(): Promise<PlanSummary> {
   let last: PlanSummary | null = null;
   for (let i = 0; i < 5; i++) {
     try {
       last = await syncPlan();
-      if (check(last)) return last;
+      if (last.plan.active) return last;
     } catch {
       // Not confirmed yet - try again.
     }
     await new Promise((r) => setTimeout(r, 1500));
   }
   if (last) return last;
-  throw new Error("We couldn't confirm your plan yet. Pull down on Groups in a minute, or tap Restore purchases.");
+  throw new Error(
+    "We couldn't confirm your subscription yet. Open this screen again in a minute, or tap Restore purchases."
+  );
 }
 
 export default function PlanScreen() {
-  // groupId: opened from a group the plan should cover.
-  // next=create-group: opened from the Groups "+" because the plan is full -
-  // they want room for one more group, then to go on and create it.
+  // groupId: opened from a group that's waiting for a subscription.
+  // next=create-group: opened from the Groups "+" - subscribe, then go on to
+  // create the group.
   const { groupId, next } = useLocalSearchParams<{ groupId?: string; next?: string }>();
   const forNewGroup = next === "create-group";
   const { colors } = useTheme();
   const router = useRouter();
 
   const [summary, setSummary] = useState<PlanSummary | null>(null);
-  const [options, setOptions] = useState<PlanOption[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [offer, setOffer] = useState<PlanOption | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [busy, setBusy] = useState<"buy" | "restore" | "move" | null>(null);
-  // Today's USD->ZMW rate for the kwacha estimate. Loaded alongside the plans
-  // and never blocks them: no rate just means no "about K…" line.
+  const [busy, setBusy] = useState<"buy" | "restore" | null>(null);
+  // Today's USD->ZMW rate for the kwacha estimate. Never blocks the screen:
+  // no rate just means no "about K…" line.
   const [fx, setFx] = useState<FxRate | null>(null);
 
-  // Came here from a group waiting on a plan: once it's covered, go open it.
+  // Came here from a group waiting for a subscription: once it's open, go to it.
   const finishIfGroupOpen = useCallback(
     (s: PlanSummary): boolean => {
       if (!groupId) return false;
@@ -108,9 +109,8 @@ export default function PlanScreen() {
     setLoadError("");
     getUsdToZmw().then(setFx).catch(() => setFx(null));
     try {
-      // Re-check with RevenueCat on every open (not just read our copy): a
-      // webhook can arrive late - or a test plan can lapse - and this also
-      // re-applies coverage, e.g. after an old group was deleted.
+      // Re-check with RevenueCat on every open (not just our copy): a webhook
+      // can arrive late, and this also re-applies cover to the groups.
       let s: PlanSummary;
       try {
         s = await syncPlan();
@@ -119,102 +119,49 @@ export default function PlanScreen() {
       }
       setSummary(s);
       if (s.enabled && PLAY_BILLING_AVAILABLE) {
+        // The server offers exactly one plan; take whatever it names.
         const opts = await getPlanOptions(s.tiers);
-        setOptions(opts);
-        // Preselect: the current plan if it already fits, else the smallest
-        // tier that covers every group they run.
-        const need = Math.max(1, s.groupsFounded + (forNewGroup ? 1 : 0));
-        const fits = opts.find((o) => o.groupLimit >= need);
-        const current = opts.find((o) => o.basePlanId === s.plan.basePlanId && s.plan.active);
-        setSelected(
-          (current && current.groupLimit >= need ? current : fits ?? opts[opts.length - 1])
-            ?.basePlanId ?? null
-        );
+        setOffer(opts[0] ?? null);
       }
-      // Re-checking may already have opened the group they came from.
       finishIfGroupOpen(s);
     } catch (e: any) {
-      setLoadError(e?.message || "Couldn't load plans. Check your connection and try again.");
+      setLoadError(e?.message || "Couldn't load your subscription. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [forNewGroup, finishIfGroupOpen]);
+  }, [finishIfGroupOpen]);
 
   useAsyncEffect(load);
 
-
-  const option = options.find((o) => o.basePlanId === selected) ?? null;
-  // One plan on offer (the normal case now): no choosing, no switching.
-  const single = options.length === 1;
-  // Live rate first; the API's optional fixed rate (BILLING_USD_ZMW_RATE) only
-  // if the live lookup failed.
   const rate = fx?.rate ?? summary?.usdToZmwRate ?? null;
   const plan = summary?.plan;
-  // Already covered: the same plan, or any active plan at least this big (e.g.
-  // a retired groups-3/groups-5 subscription) - never try to switch those.
-  const isCurrent = !!(
-    option &&
-    plan?.active &&
-    (plan.basePlanId === option.basePlanId || plan.groupLimit >= option.groupLimit)
-  );
-  const isUpgrade = !!(option && plan?.active && option.groupLimit > plan.groupLimit);
-  const isDowngrade = !!(option && plan?.active && option.groupLimit < plan.groupLimit);
-
-  // Opened from a specific group that the plan doesn't cover (yet).
+  const active = !!plan?.active;
   const target = groupId ? summary?.groups.find((g) => g.id === groupId) ?? null : null;
-  const targetUncovered = !!(target && !target.coveredByPlan);
-  const coveredGroups = summary?.groups.filter((g) => g.coveredByPlan) ?? [];
-  // The groups list comes back in cover order, so the last covered one is the
-  // one that would give up its place.
-  const bumped = coveredGroups.length ? coveredGroups[coveredGroups.length - 1] : null;
 
-  /**
-   * The plan was bought or restored from this group's screen: that's the group
-   * they meant it for, so make sure it's the one covered.
-   */
-  const coverTarget = async (s: PlanSummary): Promise<PlanSummary> => {
-    if (!groupId || !s.plan.active) return s;
-    const g = s.groups.find((x) => x.id === groupId);
-    if (!g || g.coveredByPlan) return s;
-    const next = await preferGroup(groupId);
-    setSummary(next);
-    return next;
-  };
-
-  const onBuy = async () => {
-    if (!option || !summary || busy) return;
+  const onSubscribe = async () => {
+    if (!offer || busy || active) return;
     setBusy("buy");
     try {
-      const outcome = await buyPlan(option, {
-        basePlanId: summary.plan.active ? summary.plan.basePlanId : null,
-        groupLimit: summary.plan.active ? summary.plan.groupLimit : 0,
-      });
+      const outcome = await buyPlan(offer, { basePlanId: null, groupLimit: 0 });
       if (outcome === "cancelled") return;
-      // A downgrade only takes effect at renewal, so don't wait for it to show.
-      let s = await syncUntil((x) =>
-        isDowngrade ? true : x.plan.active && x.plan.groupLimit >= option.groupLimit
-      );
+      const s = await syncUntilActive();
       setSummary(s);
-      if (!isDowngrade) s = await coverTarget(s);
-      // Came from "+": there's room now, so carry on to creating the group.
-      if (forNewGroup && !isDowngrade && s.plan.active && s.groupsFounded < s.plan.groupLimit) {
-        Alert.alert(
-          "Plan updated",
-          `Your plan now covers ${tierLabel(s.plan.groupLimit).toLowerCase()}. Let's set up your new group.`,
-          [{ text: "Create group", onPress: () => router.replace("/(modals)/create-group") }]
-        );
+      if (forNewGroup && s.plan.active) {
+        Alert.alert("You're subscribed", "Your Chuma Plan is active. Let's set up your group.", [
+          { text: "Create group", onPress: () => router.replace("/(modals)/create-group") },
+        ]);
         return;
       }
       if (!finishIfGroupOpen(s)) {
         Alert.alert(
-          isDowngrade ? "Plan change scheduled" : "Plan updated",
-          isDowngrade
-            ? `You'll move to ${tierLabel(option.groupLimit).toLowerCase()} at your next renewal.`
-            : `Your plan now covers ${tierLabel(option.groupLimit).toLowerCase()}.`
+          s.plan.active ? "You're subscribed" : "Payment received",
+          s.plan.active
+            ? "Your Chuma Plan is active. You can create and run as many groups as you like."
+            : "Google Play is still confirming your subscription. It will show here shortly."
         );
       }
     } catch (e: any) {
-      Alert.alert("Purchase not completed", e?.message || "Please try again.");
+      Alert.alert("Subscription not completed", e?.message || "Please try again.");
     } finally {
       setBusy(null);
     }
@@ -225,15 +172,14 @@ export default function PlanScreen() {
     setBusy("restore");
     try {
       await restorePlan();
-      let s = await syncPlan();
+      const s = await syncPlan();
       setSummary(s);
-      s = await coverTarget(s);
       if (!finishIfGroupOpen(s)) {
         Alert.alert(
-          s.plan.active ? "Plan restored" : "No plan found",
+          s.plan.active ? "Subscription restored" : "No subscription found",
           s.plan.active
-            ? `Your plan covers ${tierLabel(s.plan.groupLimit).toLowerCase()}.`
-            : "There's no Chuma Plan on the Google account signed in to Play on this phone."
+            ? "Your Chuma Plan is active on this account."
+            : "There's no Chuma Plan subscription on the Google account signed in to Play on this phone."
         );
       }
     } catch (e: any) {
@@ -241,31 +187,6 @@ export default function PlanScreen() {
     } finally {
       setBusy(null);
     }
-  };
-
-  const onMove = () => {
-    if (!target || busy) return;
-    const doMove = async () => {
-      setBusy("move");
-      try {
-        const s = await preferGroup(target.id);
-        setSummary(s);
-        if (!finishIfGroupOpen(s)) Alert.alert("Plan moved", `${target.name} is now covered.`);
-      } catch (e: any) {
-        Alert.alert("Couldn't move your plan", e?.message || "Please try again.");
-      } finally {
-        setBusy(null);
-      }
-    };
-    if (!bumped) return void doMove();
-    Alert.alert(
-      `Move your plan to ${target.name}?`,
-      `${bumped.name} will no longer be covered. It stays open for a few days, then locks until you upgrade or move your plan back.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Move plan", style: "destructive", onPress: doMove },
-      ]
-    );
   };
 
   const onManage = async () => {
@@ -304,181 +225,116 @@ export default function PlanScreen() {
         <ActivityIndicator color={colors.primary} />
       </View>
     );
-  if (loadError) return message("Couldn't load plans", loadError, true);
-  if (!summary?.enabled)
-    return message("No plan needed", "Your groups are free to use right now.");
+  if (loadError) return message("Couldn't load your subscription", loadError, true);
+  if (!summary?.enabled) return message("No subscription needed", "Your groups are free to use right now.");
   if (!PLAY_BILLING_AVAILABLE)
-    return message("Not available here", "Your Chuma Plan can't be changed on this device.");
-  if (!options.length)
-    return message("Plans unavailable", "Plans couldn't be loaded from Google Play. Try again in a moment.", true);
+    return message("Not available here", "The Chuma Plan can't be bought or changed on this device.");
+  if (!offer && !active)
+    return message(
+      "Subscription unavailable",
+      "The Chuma Plan couldn't be loaded from Google Play. Try again in a moment.",
+      true
+    );
 
   // ─── Main ──────────────────────────────────────────────────────────────────
 
-  const buyLabel = !option
-    ? "Choose a plan"
-    : isCurrent
-      ? "Your current plan"
-      : isUpgrade
-        ? `Upgrade to ${tierLabel(option.groupLimit).toLowerCase()}`
-        : isDowngrade
-          ? "Switch at next renewal"
-          : `Subscribe · ${option.priceString}/month`;
+  const groupLimit = offer?.groupLimit ?? plan?.groupLimit ?? UNLIMITED_GROUPS;
+  const kwacha = offer ? approxKwacha(offer, rate) : null;
+  const benefits = [groupsLine(groupLimit), "Members, contributions and records", "Reports and statements"];
+
+  // Why they're here, in one line, when they came from somewhere specific.
+  const reason = active
+    ? null
+    : target
+      ? `Subscribe to open ${target.name}.`
+      : forNewGroup
+        ? "Subscribe to create your group."
+        : null;
 
   return shell(
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
-      {/* Came from "+" with a full plan. */}
-      {forNewGroup && !targetUncovered && (
-        <Card padding={16} style={{ marginBottom: 16, borderColor: colors.primary, borderWidth: 1 }}>
-          <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "700" }}>
-            Make room for another group
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
-            {plan?.active
-              ? `Your plan covers ${tierLabel(plan.groupLimit).toLowerCase()} and you run ${summary.groupsFounded}. Pick a bigger plan, then you'll go straight to creating your new group.`
-              : `New groups need a Chuma Plan. Pick one, then you'll go straight to creating your group.`}
-          </Text>
-        </Card>
-      )}
-
-      {/* Came from a group the plan doesn't cover: say why, offer both fixes. */}
-      {targetUncovered && target && (
-        <Card padding={16} style={{ marginBottom: 16, borderColor: colors.warning, borderWidth: 1 }}>
-          <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "700" }}>
-            {target.name} isn&apos;t covered yet
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
-            {plan?.active
-              ? `Your plan covers ${tierLabel(plan.groupLimit).toLowerCase()}${
-                  coveredGroups.length ? `, used by ${coveredGroups.map((g) => g.name).join(", ")}` : ""
-                }. Upgrade to cover ${target.name} too, or move your plan to it.`
-              : `Choose a plan below. It will cover ${target.name} first.`}
-          </Text>
-          {plan?.active && (
-            <View style={{ marginTop: 12 }}>
-              <Button
-                label={`Move my plan to ${target.name}`}
-                variant="outline"
-                size="md"
-                onPress={onMove}
-                loading={busy === "move"}
-                disabled={busy !== null}
-                testID="plan-move-btn"
-              />
-            </View>
-          )}
-        </Card>
-      )}
-
-      {/* Where they stand */}
-      <Card padding={18}>
-        <Text style={[styles.overline, { color: colors.textMuted }]}>YOUR PLAN</Text>
-        <Text style={[styles.planName, { color: colors.textMain }]}>
-          {plan?.active ? tierLabel(plan.groupLimit) : "No plan yet"}
-        </Text>
-        <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
-          {plan?.active
-            ? plan.willRenew
-              ? `Renews ${shortDate(plan.expiresAt)}`
-              : `Ends ${shortDate(plan.expiresAt)}. It won't renew.`
-            : "A plan keeps the groups you founded open."}
-        </Text>
-
-        {summary.groups.length > 0 && (
-          <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6 }}>
-            {summary.groups.map((g) => {
-              const free = !g.coveredByPlan && g.freeUntil && new Date(g.freeUntil) > new Date();
-              const tone = g.coveredByPlan ? colors.primary : free ? colors.warning : colors.danger;
-              const Icon = g.coveredByPlan ? Check : free ? Clock : Lock;
-              return (
-                <View key={g.id} style={styles.groupRow} testID={`plan-group-${g.id}`}>
-                  <Text style={{ color: colors.textBody, fontSize: 14, flex: 1 }} numberOfLines={1}>
-                    {g.name}
-                  </Text>
-                  <Icon size={14} color={tone} />
-                  <Text style={{ color: tone, fontSize: 12, fontWeight: "700", marginLeft: 4 }}>
-                    {g.coveredByPlan ? "Covered" : free ? `Free until ${shortDate(g.freeUntil)}` : "Needs a plan"}
-                  </Text>
-                </View>
-              );
-            })}
+      {active ? (
+        // ── Subscribed ──
+        <Card padding={20}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <BadgeCheck size={24} color={colors.primary} />
+            <Text style={[styles.title, { color: colors.textMain }]}>Your Chuma Plan is active</Text>
           </View>
-        )}
-      </Card>
-
-      {/* The plan (the server offers one; the list form still copes with more) */}
-      <Text style={[styles.overline, { color: colors.textMuted, marginTop: 24, marginBottom: 10 }]}>
-        {single ? "CHUMA PLAN" : "CHOOSE HOW MANY GROUPS"}
-      </Text>
-      {options.map((o) => {
-        const on = o.basePlanId === selected;
-        const current = plan?.active && plan.basePlanId === o.basePlanId;
-        const tooSmall = o.groupLimit < summary.groupsFounded;
-        return (
-          <Pressable
-            key={o.basePlanId}
-            onPress={() => setSelected(o.basePlanId)}
-            testID={`plan-option-${o.basePlanId}`}
-            style={[
-              styles.option,
-              {
-                backgroundColor: colors.surface,
-                borderColor: on ? colors.primary : colors.border,
-                borderWidth: on ? 2 : 1,
-              },
-            ]}
-          >
-            {!single && (
-              <View style={[styles.radio, { borderColor: on ? colors.primary : colors.borderStrong }]}>
-                {on && <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />}
+          <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 6 }}>
+            {plan?.willRenew
+              ? `Renews ${shortDate(plan.expiresAt)}`
+              : `Ends ${shortDate(plan?.expiresAt)}. It won't renew.`}
+          </Text>
+          <View style={{ marginTop: 14 }}>
+            {benefits.map((b) => (
+              <View key={b} style={styles.benefit}>
+                <Check size={16} color={colors.primary} />
+                <Text style={{ color: colors.textBody, fontSize: 14, marginLeft: 8, flex: 1 }}>{b}</Text>
               </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.textMain, fontSize: 16, fontWeight: "700" }}>{tierLabel(o.groupLimit)}</Text>
-              {(current || tooSmall) && (
-                <Text style={{ color: current ? colors.primary : colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                  {current ? "Current plan" : `You run ${summary.groupsFounded}, so your newest groups would lock`}
-                </Text>
-              )}
-            </View>
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={{ color: colors.textMain, fontSize: 16, fontWeight: "800" }}>
-                {o.priceString}
-                <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "400" }}>/mo</Text>
-              </Text>
-              {approxKwacha(o, rate) && (
-                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                  {approxKwacha(o, rate)}
-                </Text>
-              )}
-            </View>
-          </Pressable>
-        );
-      })}
+            ))}
+          </View>
+        </Card>
+      ) : (
+        // ── Not subscribed ──
+        <Card padding={20}>
+          {reason && (
+            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: "700", marginBottom: 10 }}>{reason}</Text>
+          )}
+          <Text style={[styles.overline, { color: colors.textMuted }]}>CHUMA PLAN</Text>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 6 }}>
+            <Text style={[styles.price, { color: colors.textMain }]}>{offer?.priceString}</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 14, marginLeft: 4, marginBottom: 5 }}>/month</Text>
+          </View>
+          {kwacha && <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>{kwacha}</Text>}
+          <View style={{ marginTop: 14 }}>
+            {benefits.map((b) => (
+              <View key={b} style={styles.benefit}>
+                <Check size={16} color={colors.primary} />
+                <Text style={{ color: colors.textBody, fontSize: 14, marginLeft: 8, flex: 1 }}>{b}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={{ marginTop: 18 }}>
+            <Button
+              label={`Subscribe · ${offer?.priceString}/month`}
+              onPress={onSubscribe}
+              loading={busy === "buy"}
+              disabled={busy !== null}
+              testID="plan-subscribe-btn"
+            />
+          </View>
+        </Card>
+      )}
 
-      <View style={{ marginTop: 16 }}>
-        <Button
-          label={buyLabel}
-          onPress={onBuy}
-          disabled={!option || isCurrent || busy !== null}
-          loading={busy === "buy"}
-          testID="plan-buy-btn"
-        />
-      </View>
+      {/* The groups this person founded and whether they're open. */}
+      {summary.groups.length > 0 && (
+        <Card padding={16} style={{ marginTop: 16 }}>
+          <Text style={[styles.overline, { color: colors.textMuted, marginBottom: 4 }]}>YOUR GROUPS</Text>
+          {summary.groups.map((g) => {
+            const free = !g.coveredByPlan && g.freeUntil && new Date(g.freeUntil) > new Date();
+            const tone = g.coveredByPlan ? colors.primary : free ? colors.warning : colors.danger;
+            const Icon = g.coveredByPlan ? Check : free ? Clock : Lock;
+            return (
+              <View key={g.id} style={styles.groupRow} testID={`plan-group-${g.id}`}>
+                <Text style={{ color: colors.textBody, fontSize: 14, flex: 1 }} numberOfLines={1}>
+                  {g.name}
+                </Text>
+                <Icon size={14} color={tone} />
+                <Text style={{ color: tone, fontSize: 12, fontWeight: "700", marginLeft: 4 }}>
+                  {g.coveredByPlan ? "Open" : free ? `Free until ${shortDate(g.freeUntil)}` : "Needs subscription"}
+                </Text>
+              </View>
+            );
+          })}
+        </Card>
+      )}
 
       <Text style={[styles.fine, { color: colors.textMuted }]}>
         Billed monthly through Google Play
-        {options.some((o) => approxKwacha(o, rate))
-          ? ", in US dollars. Kwacha amounts are estimates. Your bank's rate may differ"
-          : ""}
-        . Cancel anytime in Google Play.
-        {single
-          ? (options[0]?.groupLimit ?? 0) >= UNLIMITED_GROUPS
-            ? " One plan lets you create and run as many groups as you like."
-            : ` One plan lets you run up to ${options[0]?.groupLimit} groups that you found.`
-          : " Your plan covers the groups you founded, starting with any you moved it to, then oldest first. Upgrades start now, and unused time on your current plan counts toward the new one. Switching to a smaller plan starts at your next renewal."}
+        {kwacha ? ", in US dollars. The kwacha amount is an estimate. Your bank's rate may differ" : ""}. Cancel
+        anytime in Google Play.
       </Text>
-
-      {fx && options.some((o) => approxKwacha(o, rate)) && (
+      {fx && kwacha && (
         <Text style={[styles.fine, { color: colors.textMuted, marginTop: 6 }]}>
           1 USD ≈ K{fx.rate.toFixed(2)} · rate by ExchangeRate-API, updated {shortDate(fx.updatedAt)}
         </Text>
@@ -492,7 +348,7 @@ export default function PlanScreen() {
             <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 14 }}>Restore purchases</Text>
           )}
         </Pressable>
-        {plan?.active && (
+        {active && (
           <Pressable onPress={onManage} testID="plan-manage-btn" style={styles.link}>
             <Text style={{ color: colors.primary, fontWeight: "700", fontSize: 14 }}>Manage in Google Play</Text>
           </Pressable>
@@ -504,25 +360,10 @@ export default function PlanScreen() {
 
 const styles = StyleSheet.create({
   overline: { fontSize: 11, fontWeight: "700", letterSpacing: 1.2 },
-  planName: { fontSize: 24, fontWeight: "800", marginTop: 6, letterSpacing: -0.3 },
+  title: { fontSize: 18, fontWeight: "800", flex: 1 },
+  price: { fontSize: 34, fontWeight: "800", letterSpacing: -0.5 },
+  benefit: { flexDirection: "row", alignItems: "center", paddingVertical: 5 },
   groupRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
-  option: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 10,
-    gap: 12,
-  },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
   fine: { fontSize: 12, lineHeight: 18, marginTop: 16, textAlign: "center", paddingHorizontal: 4 },
   links: { flexDirection: "row", justifyContent: "center", gap: 24, marginTop: 20, flexWrap: "wrap" },
   link: { paddingVertical: 10, minHeight: 44, justifyContent: "center" },

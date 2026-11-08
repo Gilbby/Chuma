@@ -86,7 +86,7 @@ export default function DeleteAccount() {
             // a subscription billing them.
             ...(PLAY_BILLING_AVAILABLE
               ? [
-                  "Deleting your account doesn't cancel a Chuma Plan. Cancel it first in Google Play, under Payments & subscriptions, then Subscriptions.",
+                  "Deleting your account doesn't cancel your Chuma Plan subscription. Cancel it first in Google Play, under Payments & subscriptions, then Subscriptions.",
                 ]
               : []),
           ].map((line) => (

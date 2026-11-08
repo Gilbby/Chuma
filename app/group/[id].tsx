@@ -2582,11 +2582,11 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                 {playBilled
                   ? awaitingFirstPayment
                     ? canChoosePlan
-                      ? `${group.name} opens once your Chuma Plan covers it. Nothing can be added or contributed until then.`
-                      : "This group hasn't started yet. It opens once its founder chooses a Chuma Plan."
+                      ? `${group.name} opens once you subscribe to the Chuma Plan. Nothing can be added or contributed until then.`
+                      : "This group hasn't started yet. It opens once its founder subscribes to the Chuma Plan."
                     : canChoosePlan
-                      ? `${group.name} is locked because your Chuma Plan doesn't cover it. Choose or upgrade your plan to reopen it.`
-                      : "This group is locked until its founder renews their Chuma Plan. Please check back soon."
+                      ? `${group.name} is locked because your Chuma Plan subscription has ended. Renew it to reopen the group.`
+                      : "This group is locked until its founder renews their Chuma Plan subscription. Please check back soon."
                   : awaitingFirstPayment
                   ? canPayFee
                     ? `${group.name} opens once its ${formatZMW(amountOwed)} registration fee is received. Nothing can be added or contributed until then.`
@@ -2598,7 +2598,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               {canChoosePlan && (
                 <View style={{ marginTop: 24 }}>
                   <Button
-                    label={awaitingFirstPayment ? "Choose a plan" : "Choose or renew plan"}
+                    label={awaitingFirstPayment ? "Subscribe" : "Renew subscription"}
                     onPress={() => router.push(`/plan?groupId=${group.id}` as never)}
                     testID="group-choose-plan-btn"
                   />

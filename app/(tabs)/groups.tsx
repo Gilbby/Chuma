@@ -173,7 +173,8 @@ export default function Groups() {
         return;
       }
     }
-    // Chuma Plan (Play billing): if their plan is already full, say so before
+    // Chuma Plan (Play billing): with no active subscription (or a capped one
+    // that's full), say so before
     // they fill in the whole wizard only to land on a locked group. A failed
     // lookup never blocks creating - the API still decides at the end.
     if (PLAY_BILLING_AVAILABLE) {
@@ -191,15 +192,15 @@ export default function Groups() {
         if (s.groupsFounded >= slots) {
           const n = s.groupsFounded;
           Alert.alert(
-            s.plan.active ? "Upgrade to add a group" : "Choose a plan to add a group",
+            s.plan.active ? "Group limit reached" : "Subscribe to add a group",
             s.plan.active
-              ? `Your Chuma Plan covers ${slots === 1 ? "1 group" : `up to ${slots} groups`} and you already run ${n}. Upgrade to create another, or set it up now and it opens once your plan covers it.`
-              : `New groups need a Chuma Plan. Choose one now, or set the group up first and it opens once a plan covers it.`,
+              ? `Your Chuma Plan covers ${slots === 1 ? "1 group" : `up to ${slots} groups`} and you already run ${n}. You can set this one up now, but it stays closed until a slot frees up.`
+              : `New groups need a Chuma Plan subscription. Subscribe now, or set the group up first and it opens once you subscribe.`,
             [
               { text: "Cancel", style: "cancel" },
               { text: "Set up anyway", onPress: () => continueCreate() },
               {
-                text: s.plan.active ? "Upgrade plan" : "Choose plan",
+                text: s.plan.active ? "View subscription" : "Subscribe",
                 onPress: () => router.push("/plan?next=create-group" as never),
               },
             ]
@@ -628,8 +629,8 @@ export default function Groups() {
                       >
                         {g.feeStatus?.billing === "play" && g.status === "pending-payment"
                           ? g.youFounded
-                            ? "Needs a Chuma Plan. Tap to choose"
-                            : "Waiting for the founder's plan"
+                            ? "Waiting for subscription. Tap to subscribe"
+                            : "Waiting for the founder's subscription"
                           : GROUP_FEES_ENABLED && g.status === "pending-payment"
                           ? "Awaiting registration fee. Tap to finish"
                           : isProjectFundType(g.groupType)
