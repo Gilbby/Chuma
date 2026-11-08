@@ -4,7 +4,7 @@
 // the screen must not mention any other way or price. Prices come from Play
 // (already localised), never from our own constants.
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -67,7 +67,11 @@ async function syncUntil(check: (s: PlanSummary) => boolean): Promise<PlanSummar
 }
 
 export default function PlanScreen() {
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  // groupId: opened from a group the plan should cover.
+  // next=create-group: opened from the Groups "+" because the plan is full -
+  // they want room for one more group, then to go on and create it.
+  const { groupId, next } = useLocalSearchParams<{ groupId?: string; next?: string }>();
+  const forNewGroup = next === "create-group";
   const { colors } = useTheme();
   const router = useRouter();
 
@@ -81,7 +85,21 @@ export default function PlanScreen() {
   // and never blocks them: no rate just means no "about K…" line.
   const [fx, setFx] = useState<FxRate | null>(null);
 
-  const finishIfGroupOpenRef = useRef<(s: PlanSummary) => boolean>(() => false);
+  // Came here from a group waiting on a plan: once it's covered, go open it.
+  const finishIfGroupOpen = useCallback(
+    (s: PlanSummary): boolean => {
+      if (!groupId) return false;
+      const g = s.groups.find((x) => x.id === groupId);
+      if (g && g.status === "active" && g.coveredByPlan) {
+        Alert.alert("Group opened", `${g.name} is ready to use.`, [
+          { text: "Open group", onPress: () => router.replace(`/group/${groupId}`) },
+        ]);
+        return true;
+      }
+      return false;
+    },
+    [groupId, router]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,37 +121,25 @@ export default function PlanScreen() {
         setOptions(opts);
         // Preselect: the current plan if it already fits, else the smallest
         // tier that covers every group they run.
-        const fits = opts.find((o) => o.groupLimit >= Math.max(1, s.groupsFounded));
+        const need = Math.max(1, s.groupsFounded + (forNewGroup ? 1 : 0));
+        const fits = opts.find((o) => o.groupLimit >= need);
         const current = opts.find((o) => o.basePlanId === s.plan.basePlanId && s.plan.active);
         setSelected(
-          (current && current.groupLimit >= s.groupsFounded ? current : fits ?? opts[opts.length - 1])
+          (current && current.groupLimit >= need ? current : fits ?? opts[opts.length - 1])
             ?.basePlanId ?? null
         );
       }
       // Re-checking may already have opened the group they came from.
-      finishIfGroupOpenRef.current(s);
+      finishIfGroupOpen(s);
     } catch (e: any) {
       setLoadError(e?.message || "Couldn't load plans. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [forNewGroup, finishIfGroupOpen]);
 
   useAsyncEffect(load);
 
-  // Came here from a group waiting on a plan: once it's covered, go open it.
-  const finishIfGroupOpen = (s: PlanSummary): boolean => {
-    if (!groupId) return false;
-    const g = s.groups.find((x) => x.id === groupId);
-    if (g && g.status === "active" && g.coveredByPlan) {
-      Alert.alert("Group opened", `${g.name} is ready to use.`, [
-        { text: "Open group", onPress: () => router.replace(`/group/${groupId}`) },
-      ]);
-      return true;
-    }
-    return false;
-  };
-  finishIfGroupOpenRef.current = finishIfGroupOpen;
 
   const option = options.find((o) => o.basePlanId === selected) ?? null;
   // Live rate first; the API's optional fixed rate (BILLING_USD_ZMW_RATE) only
@@ -180,6 +186,15 @@ export default function PlanScreen() {
       );
       setSummary(s);
       if (!isDowngrade) s = await coverTarget(s);
+      // Came from "+": there's room now, so carry on to creating the group.
+      if (forNewGroup && !isDowngrade && s.plan.active && s.groupsFounded < s.plan.groupLimit) {
+        Alert.alert(
+          "Plan updated",
+          `Your plan now covers ${tierLabel(s.plan.groupLimit).toLowerCase()}. Let's set up your new group.`,
+          [{ text: "Create group", onPress: () => router.replace("/(modals)/create-group") }]
+        );
+        return;
+      }
       if (!finishIfGroupOpen(s)) {
         Alert.alert(
           isDowngrade ? "Plan change scheduled" : "Plan updated",
@@ -301,6 +316,20 @@ export default function PlanScreen() {
 
   return shell(
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+      {/* Came from "+" with a full plan. */}
+      {forNewGroup && !targetUncovered && (
+        <Card padding={16} style={{ marginBottom: 16, borderColor: colors.primary, borderWidth: 1 }}>
+          <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "700" }}>
+            Make room for another group
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
+            {plan?.active
+              ? `Your plan covers ${tierLabel(plan.groupLimit).toLowerCase()} and you run ${summary.groupsFounded}. Pick a bigger plan, then you'll go straight to creating your new group.`
+              : `New groups need a Chuma Plan. Pick one, then you'll go straight to creating your group.`}
+          </Text>
+        </Card>
+      )}
+
       {/* Came from a group the plan doesn't cover: say why, offer both fixes. */}
       {targetUncovered && target && (
         <Card padding={16} style={{ marginBottom: 16, borderColor: colors.warning, borderWidth: 1 }}>

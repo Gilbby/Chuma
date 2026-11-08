@@ -31,6 +31,7 @@ import {
   type GroupSearchResult,
 } from "@/src/services/groups";
 import { getCurrentUser } from "@/src/utils/currentUser";
+import { PLAY_BILLING_AVAILABLE, getPlanSummary } from "@/src/services/billing";
 import { Group, Member, isProjectFundType } from "@/src/types";
 import { formatZMW } from "@/src/utils/currency";
 import { formatDate } from "@/src/utils/date";
@@ -133,17 +134,8 @@ export default function Groups() {
     setSearchOpen(!searchOpen);
   }, [searchOpen]);
 
-  // Founding a group needs no identity check in the tracker build (KYC off).
-  // When KYC is re-enabled for the org-account build, this asks for it here -
-  // at Create group - rather than at signup, so the user knows why.
-  const openCreateGroup = useCallback(async () => {
-    if (KYC_ENABLED) {
-      const user = await getCurrentUser<{ kyc?: { status?: string } }>();
-      if (user?.kyc?.status !== "verified") {
-        router.push("/kyc?return=create-group" as never);
-        return;
-      }
-    }
+  // Past the KYC and plan checks: open the wizard (asking about a saved draft).
+  const continueCreate = useCallback(() => {
     // The wizard always reopens on the saved draft, so someone who meant to
     // found a different group needs to be asked rather than dropped back into
     // the old one.
@@ -169,6 +161,54 @@ export default function Groups() {
     }
     router.push("/(modals)/create-group");
   }, [router, draft]);
+
+  // Founding a group needs no identity check in the tracker build (KYC off).
+  // When KYC is re-enabled for the org-account build, this asks for it here -
+  // at Create group - rather than at signup, so the user knows why.
+  const openCreateGroup = useCallback(async () => {
+    if (KYC_ENABLED) {
+      const user = await getCurrentUser<{ kyc?: { status?: string } }>();
+      if (user?.kyc?.status !== "verified") {
+        router.push("/kyc?return=create-group" as never);
+        return;
+      }
+    }
+    // Chuma Plan (Play billing): if their plan is already full, say so before
+    // they fill in the whole wizard only to land on a locked group. A failed
+    // lookup never blocks creating - the API still decides at the end.
+    if (PLAY_BILLING_AVAILABLE) {
+      const s = await getPlanSummary().catch(() => null);
+      if (s?.enabled && s.groupsFounded > 0) {
+        if (s.groupsFounded >= s.maxGroupsFounded) {
+          Alert.alert(
+            "Group limit reached",
+            `You already run ${s.groupsFounded} groups, the most one person can found. Close one to create another.`
+          );
+          return;
+        }
+        const slots = s.plan.active ? s.plan.groupLimit : 0;
+        if (s.groupsFounded >= slots) {
+          const n = s.groupsFounded;
+          Alert.alert(
+            s.plan.active ? "Upgrade to add a group" : "Choose a plan to add a group",
+            s.plan.active
+              ? `Your Chuma Plan covers ${slots === 1 ? "1 group" : `up to ${slots} groups`} and you already run ${n}. Upgrade to create another, or set it up now and it opens once your plan covers it.`
+              : `New groups need a Chuma Plan. Choose one now, or set the group up first and it opens once a plan covers it.`,
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Set up anyway", onPress: () => continueCreate() },
+              {
+                text: s.plan.active ? "Upgrade plan" : "Choose plan",
+                onPress: () => router.push("/plan?next=create-group" as never),
+              },
+            ]
+          );
+          return;
+        }
+      }
+    }
+    continueCreate();
+  }, [router, continueCreate]);
 
   // Invites this user's groups are still waiting on. Derived from the groups
   // themselves on every load, so it cannot be dismissed or swiped away - it
