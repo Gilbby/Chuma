@@ -32,6 +32,7 @@ import {
   restorePlan,
   getManageUrl,
   approxKwacha,
+  preferGroup,
   type PlanSummary,
   type PlanOption,
 } from "@/src/services/billing";
@@ -75,7 +76,7 @@ export default function PlanScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [busy, setBusy] = useState<"buy" | "restore" | null>(null);
+  const [busy, setBusy] = useState<"buy" | "restore" | "move" | null>(null);
   // Today's USD->ZMW rate for the kwacha estimate. Loaded alongside the plans
   // and never blocks them: no rate just means no "about K…" line.
   const [fx, setFx] = useState<FxRate | null>(null);
@@ -130,6 +131,27 @@ export default function PlanScreen() {
   const isUpgrade = !!(option && plan?.active && option.groupLimit > plan.groupLimit);
   const isDowngrade = !!(option && plan?.active && option.groupLimit < plan.groupLimit);
 
+  // Opened from a specific group that the plan doesn't cover (yet).
+  const target = groupId ? summary?.groups.find((g) => g.id === groupId) ?? null : null;
+  const targetUncovered = !!(target && !target.coveredByPlan);
+  const coveredGroups = summary?.groups.filter((g) => g.coveredByPlan) ?? [];
+  // The groups list comes back in cover order, so the last covered one is the
+  // one that would give up its place.
+  const bumped = coveredGroups.length ? coveredGroups[coveredGroups.length - 1] : null;
+
+  /**
+   * The plan was bought or restored from this group's screen: that's the group
+   * they meant it for, so make sure it's the one covered.
+   */
+  const coverTarget = async (s: PlanSummary): Promise<PlanSummary> => {
+    if (!groupId || !s.plan.active) return s;
+    const g = s.groups.find((x) => x.id === groupId);
+    if (!g || g.coveredByPlan) return s;
+    const next = await preferGroup(groupId);
+    setSummary(next);
+    return next;
+  };
+
   const onBuy = async () => {
     if (!option || !summary || busy) return;
     setBusy("buy");
@@ -140,10 +162,11 @@ export default function PlanScreen() {
       });
       if (outcome === "cancelled") return;
       // A downgrade only takes effect at renewal, so don't wait for it to show.
-      const s = await syncUntil((x) =>
+      let s = await syncUntil((x) =>
         isDowngrade ? true : x.plan.active && x.plan.groupLimit >= option.groupLimit
       );
       setSummary(s);
+      if (!isDowngrade) s = await coverTarget(s);
       if (!finishIfGroupOpen(s)) {
         Alert.alert(
           isDowngrade ? "Plan change scheduled" : "Plan updated",
@@ -164,8 +187,9 @@ export default function PlanScreen() {
     setBusy("restore");
     try {
       await restorePlan();
-      const s = await syncPlan();
+      let s = await syncPlan();
       setSummary(s);
+      s = await coverTarget(s);
       if (!finishIfGroupOpen(s)) {
         Alert.alert(
           s.plan.active ? "Plan restored" : "No plan found",
@@ -179,6 +203,31 @@ export default function PlanScreen() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const onMove = () => {
+    if (!target || busy) return;
+    const doMove = async () => {
+      setBusy("move");
+      try {
+        const s = await preferGroup(target.id);
+        setSummary(s);
+        if (!finishIfGroupOpen(s)) Alert.alert("Plan moved", `${target.name} is now covered.`);
+      } catch (e: any) {
+        Alert.alert("Couldn't move your plan", e?.message || "Please try again.");
+      } finally {
+        setBusy(null);
+      }
+    };
+    if (!bumped) return void doMove();
+    Alert.alert(
+      `Move your plan to ${target.name}?`,
+      `${bumped.name} will no longer be covered. It stays open for a few days, then locks until you upgrade or move your plan back.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Move plan", style: "destructive", onPress: doMove },
+      ]
+    );
   };
 
   const onManage = async () => {
@@ -239,6 +288,35 @@ export default function PlanScreen() {
 
   return shell(
     <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+      {/* Came from a group the plan doesn't cover: say why, offer both fixes. */}
+      {targetUncovered && target && (
+        <Card padding={16} style={{ marginBottom: 16, borderColor: colors.warning, borderWidth: 1 }}>
+          <Text style={{ color: colors.textMain, fontSize: 15, fontWeight: "700" }}>
+            {target.name} isn&apos;t covered yet
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 4 }}>
+            {plan?.active
+              ? `Your plan covers ${tierLabel(plan.groupLimit).toLowerCase()}${
+                  coveredGroups.length ? `, used by ${coveredGroups.map((g) => g.name).join(", ")}` : ""
+                }. Upgrade to cover ${target.name} too, or move your plan to it.`
+              : `Choose a plan below. It will cover ${target.name} first.`}
+          </Text>
+          {plan?.active && (
+            <View style={{ marginTop: 12 }}>
+              <Button
+                label={`Move my plan to ${target.name}`}
+                variant="outline"
+                size="md"
+                onPress={onMove}
+                loading={busy === "move"}
+                disabled={busy !== null}
+                testID="plan-move-btn"
+              />
+            </View>
+          )}
+        </Card>
+      )}
+
       {/* Where they stand */}
       <Card padding={18}>
         <Text style={[styles.overline, { color: colors.textMuted }]}>YOUR PLAN</Text>
@@ -339,7 +417,7 @@ export default function PlanScreen() {
           ? ", in US dollars. Kwacha amounts are estimates. Your bank's rate may differ"
           : ""}
         . Cancel anytime in Google Play. Your plan covers the groups you
-        founded, oldest first. Upgrades start now, and unused time on your current plan counts toward the new
+        founded, starting with any you moved it to, then oldest first. Upgrades start now, and unused time on your current plan counts toward the new
         one. Switching to a smaller plan starts at your next renewal.
       </Text>
 

@@ -102,6 +102,14 @@ export function syncPlan(): Promise<PlanSummary> {
   return api<PlanSummary>("/billing/sync", { method: "POST" });
 }
 
+/**
+ * Put the plan on this group first (the founder's pick). If the plan is full,
+ * the group last in line loses cover and gets the normal grace period.
+ */
+export function preferGroup(groupId: string): Promise<PlanSummary> {
+  return api<PlanSummary>("/billing/prefer", { method: "POST", body: { groupId } });
+}
+
 function basePlanOf(identifier: string | undefined | null): string | null {
   if (!identifier) return null;
   const parts = identifier.split(":");
