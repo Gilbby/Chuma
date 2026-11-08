@@ -4,7 +4,7 @@
 // the screen must not mention any other way or price. Prices come from Play
 // (already localised), never from our own constants.
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -81,12 +81,22 @@ export default function PlanScreen() {
   // and never blocks them: no rate just means no "about K…" line.
   const [fx, setFx] = useState<FxRate | null>(null);
 
+  const finishIfGroupOpenRef = useRef<(s: PlanSummary) => boolean>(() => false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError("");
     getUsdToZmw().then(setFx).catch(() => setFx(null));
     try {
-      const s = await getPlanSummary();
+      // Re-check with RevenueCat on every open (not just read our copy): a
+      // webhook can arrive late - or a test plan can lapse - and this also
+      // re-applies coverage, e.g. after an old group was deleted.
+      let s: PlanSummary;
+      try {
+        s = await syncPlan();
+      } catch {
+        s = await getPlanSummary();
+      }
       setSummary(s);
       if (s.enabled && PLAY_BILLING_AVAILABLE) {
         const opts = await getPlanOptions(s.tiers);
@@ -100,6 +110,8 @@ export default function PlanScreen() {
             ?.basePlanId ?? null
         );
       }
+      // Re-checking may already have opened the group they came from.
+      finishIfGroupOpenRef.current(s);
     } catch (e: any) {
       setLoadError(e?.message || "Couldn't load plans. Check your connection and try again.");
     } finally {
@@ -121,6 +133,7 @@ export default function PlanScreen() {
     }
     return false;
   };
+  finishIfGroupOpenRef.current = finishIfGroupOpen;
 
   const option = options.find((o) => o.basePlanId === selected) ?? null;
   // Live rate first; the API's optional fixed rate (BILLING_USD_ZMW_RATE) only
