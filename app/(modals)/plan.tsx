@@ -33,6 +33,7 @@ import {
   getManageUrl,
   approxKwacha,
   preferGroup,
+  UNLIMITED_GROUPS,
   type PlanSummary,
   type PlanOption,
 } from "@/src/services/billing";
@@ -44,6 +45,7 @@ function shortDate(iso: string | null | undefined): string {
 }
 
 function tierLabel(n: number): string {
+  if (n >= UNLIMITED_GROUPS) return "Unlimited groups";
   return n === 1 ? "1 group" : `Up to ${n} groups`;
 }
 
@@ -470,7 +472,9 @@ export default function PlanScreen() {
           : ""}
         . Cancel anytime in Google Play.
         {single
-          ? ` One plan lets you run up to ${options[0]?.groupLimit ?? 5} groups that you found.`
+          ? (options[0]?.groupLimit ?? 0) >= UNLIMITED_GROUPS
+            ? " One plan lets you create and run as many groups as you like."
+            : ` One plan lets you run up to ${options[0]?.groupLimit} groups that you found.`
           : " Your plan covers the groups you founded, starting with any you moved it to, then oldest first. Upgrades start now, and unused time on your current plan counts toward the new one. Switching to a smaller plan starts at your next renewal."}
       </Text>
 

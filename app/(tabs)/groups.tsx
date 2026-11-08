@@ -179,7 +179,8 @@ export default function Groups() {
     if (PLAY_BILLING_AVAILABLE) {
       const s = await getPlanSummary().catch(() => null);
       if (s?.enabled && s.groupsFounded > 0) {
-        if (s.groupsFounded >= s.maxGroupsFounded) {
+        // maxGroupsFounded is 9999 ("no limit") unless the server sets a cap.
+        if (s.maxGroupsFounded > 0 && s.groupsFounded >= s.maxGroupsFounded) {
           Alert.alert(
             "Group limit reached",
             `You already run ${s.groupsFounded} groups, the most one person can found. Close one to create another.`

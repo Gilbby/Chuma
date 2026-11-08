@@ -19,6 +19,8 @@ import { api } from "./apiClient";
 import { getCurrentUser } from "@/src/utils/currentUser";
 
 export const PLAN_ENTITLEMENT = "group";
+/** The API's "no limit" number of groups (shown as "Unlimited groups"). */
+export const UNLIMITED_GROUPS = 9999;
 const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? "";
 
 /** Can this device buy a plan? (Android build with a RevenueCat key.) */
