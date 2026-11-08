@@ -31,6 +31,7 @@ import {
   buyPlan,
   restorePlan,
   getManageUrl,
+  approxKwacha,
   type PlanSummary,
   type PlanOption,
 } from "@/src/services/billing";
@@ -299,8 +300,17 @@ export default function PlanScreen() {
                 </Text>
               )}
             </View>
-            <Text style={{ color: colors.textMain, fontSize: 16, fontWeight: "800" }}>{o.priceString}</Text>
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>/mo</Text>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ color: colors.textMain, fontSize: 16, fontWeight: "800" }}>
+                {o.priceString}
+                <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "400" }}>/mo</Text>
+              </Text>
+              {approxKwacha(o, summary.usdToZmwRate) && (
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                  {approxKwacha(o, summary.usdToZmwRate)}
+                </Text>
+              )}
+            </View>
           </Pressable>
         );
       })}
@@ -316,7 +326,11 @@ export default function PlanScreen() {
       </View>
 
       <Text style={[styles.fine, { color: colors.textMuted }]}>
-        Billed monthly through Google Play. Cancel anytime in Google Play. Your plan covers the groups you
+        Billed monthly through Google Play
+        {options.some((o) => approxKwacha(o, summary.usdToZmwRate))
+          ? ", in US dollars. Kwacha amounts are estimates. Your bank's rate may differ"
+          : ""}
+        . Cancel anytime in Google Play. Your plan covers the groups you
         founded, oldest first. Upgrades start now, and unused time on your current plan counts toward the new
         one. Switching to a smaller plan starts at your next renewal.
       </Text>

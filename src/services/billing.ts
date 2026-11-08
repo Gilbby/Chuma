@@ -45,6 +45,8 @@ export interface PlanSummary {
     coveredUntil: string | null;
   }[];
   tiers: Record<string, number>;
+  /** Kwacha per 1 USD for an "about K…" estimate; null = show none. */
+  usdToZmwRate: number | null;
   maxGroupsFounded: number;
 }
 
@@ -53,6 +55,8 @@ export interface PlanOption {
   basePlanId: string; // "groups-3"
   groupLimit: number; // 3
   priceString: string; // "$4.99", as Play formats it for this user
+  price: number; // 4.99
+  currencyCode: string; // "USD" in Zambia (Play has no ZMW)
   pkg: PurchasesPackage;
 }
 
@@ -118,6 +122,8 @@ export async function getPlanOptions(tiers: Record<string, number>): Promise<Pla
         basePlanId,
         groupLimit: tiers[basePlanId] ?? 0,
         priceString: pkg.product.priceString,
+        price: pkg.product.price,
+        currencyCode: pkg.product.currencyCode,
         pkg,
       };
     })
@@ -162,6 +168,15 @@ export async function buyPlan(
       return "cancelled";
     throw new Error(e?.message || "The purchase didn't go through. Please try again.");
   }
+}
+
+/**
+ * "about K79" under a USD price. Only an estimate: Google charges dollars and
+ * the customer's bank converts at its own rate, so it's never shown alone.
+ */
+export function approxKwacha(option: PlanOption, rate: number | null): string | null {
+  if (!rate || option.currencyCode !== "USD") return null;
+  return `about K${Math.round(option.price * rate).toLocaleString("en-US")}`;
 }
 
 /** Re-attach a plan bought earlier on this Google account (new phone, reinstall). */
