@@ -189,6 +189,17 @@ export function approxKwacha(option: PlanOption, rate: number | null): string | 
   return `about K${Math.round(option.price * rate).toLocaleString("en-US")}`;
 }
 
+/**
+ * The plan's price in kwacha at today's rate, e.g. "K61". The app shows this as
+ * the headline price, always with the real USD charge right next to it -
+ * Google bills dollars and the bank converts, so the kwacha figure is an
+ * estimate. null when there's no rate (then show Play's own price).
+ */
+export function kwachaPrice(option: PlanOption, rate: number | null): string | null {
+  if (!rate || option.currencyCode !== "USD") return null;
+  return `K${Math.round(option.price * rate).toLocaleString("en-US")}`;
+}
+
 /** Re-attach a plan bought earlier on this Google account (new phone, reinstall). */
 export async function restorePlan(): Promise<void> {
   await ensureConfigured();

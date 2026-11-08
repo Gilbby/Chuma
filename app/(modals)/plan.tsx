@@ -32,7 +32,7 @@ import {
   buyPlan,
   restorePlan,
   getManageUrl,
-  approxKwacha,
+  kwachaPrice,
   UNLIMITED_GROUPS,
   type PlanSummary,
   type PlanOption,
@@ -239,7 +239,10 @@ export default function PlanScreen() {
   // ─── Main ──────────────────────────────────────────────────────────────────
 
   const groupLimit = offer?.groupLimit ?? plan?.groupLimit ?? UNLIMITED_GROUPS;
-  const kwacha = offer ? approxKwacha(offer, rate) : null;
+  // Headline price in kwacha at today's rate; Play's USD price (the real
+  // charge) sits right under it. No rate -> show Play's price as before.
+  const kwacha = offer ? kwachaPrice(offer, rate) : null;
+  const headline = kwacha ?? offer?.priceString ?? "";
   const benefits = [groupsLine(groupLimit), "Members, contributions and records", "Reports and statements"];
 
   // Why they're here, in one line, when they came from somewhere specific.
@@ -282,10 +285,14 @@ export default function PlanScreen() {
           )}
           <Text style={[styles.overline, { color: colors.textMuted }]}>CHUMA PLAN</Text>
           <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 6 }}>
-            <Text style={[styles.price, { color: colors.textMain }]}>{offer?.priceString}</Text>
+            <Text style={[styles.price, { color: colors.textMain }]}>{headline}</Text>
             <Text style={{ color: colors.textMuted, fontSize: 14, marginLeft: 4, marginBottom: 5 }}>/month</Text>
           </View>
-          {kwacha && <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>{kwacha}</Text>}
+          {kwacha && (
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>
+              {offer?.priceString} charged by Google Play
+            </Text>
+          )}
           <View style={{ marginTop: 14 }}>
             {benefits.map((b) => (
               <View key={b} style={styles.benefit}>
@@ -296,7 +303,7 @@ export default function PlanScreen() {
           </View>
           <View style={{ marginTop: 18 }}>
             <Button
-              label={`Subscribe · ${offer?.priceString}/month`}
+              label={`Subscribe · ${headline}/month`}
               onPress={onSubscribe}
               loading={busy === "buy"}
               disabled={busy !== null}
@@ -330,9 +337,10 @@ export default function PlanScreen() {
       )}
 
       <Text style={[styles.fine, { color: colors.textMuted }]}>
-        Billed monthly through Google Play
-        {kwacha ? ", in US dollars. The kwacha amount is an estimate. Your bank's rate may differ" : ""}. Cancel
-        anytime in Google Play.
+        {kwacha
+          ? `Google Play bills ${offer?.priceString} a month in US dollars. The kwacha amount uses today's exchange rate, and your bank's rate may differ.`
+          : "Billed monthly through Google Play."}{" "}
+        Cancel anytime in Google Play.
       </Text>
       {fx && kwacha && (
         <Text style={[styles.fine, { color: colors.textMuted, marginTop: 6 }]}>
