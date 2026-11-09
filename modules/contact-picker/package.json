@@ -1,0 +1,7 @@
+{
+  "name": "contact-picker",
+  "version": "1.0.0",
+  "description": "System contact picker for a single phone number. Needs no contacts permission on Android or iOS.",
+  "main": "index.ts",
+  "private": true
+}

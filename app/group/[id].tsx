@@ -24,7 +24,7 @@ import { Avatar } from "@/src/components/ui/Avatar";
 import { ProgressBar } from "@/src/components/ui/ProgressBar";
 import { Button } from "@/src/components/ui/Button";
 import { SkeletonGroup } from "@/src/components/ui";
-import { ErrorState } from "@/src/components/common";
+import { ErrorState, PhoneNumberField } from "@/src/components/common";
 import {
   getGroupById,
   inviteMember,
@@ -49,6 +49,7 @@ import {
   inviteDisplayName,
   pendingInvites,
 } from "@/src/utils/invites";
+import { isValidPhone, phoneLengthError, toE164, EMPTY_PHONE, type PhoneValue } from "@/src/utils/phone";
 import { isGroupLocked, getMonthsOwed, getAmountOwed } from "@/src/services/groupFees";
 import { GENERAL_GIVING_LABEL, GROUP_FEES_ENABLED } from "@/src/constants";
 import { findPile, getGroupFunds, handlesCash, paidOutTotal } from "@/src/services/funds";
@@ -184,7 +185,7 @@ export default function GroupDetails() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [invitePhone, setInvitePhone] = useState("");
+  const [invitePhone, setInvitePhone] = useState<PhoneValue>(EMPTY_PHONE);
   const [inviteRole, setInviteRole] = useState<Role>("Member");
   const [inviteError, setInviteError] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -2343,7 +2344,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
         visible={isAdmin && inviteOpen}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => { setInviteOpen(false); setInvitePhone(""); setInviteRole("Member"); setInviteError(""); }}
+        onRequestClose={() => { setInviteOpen(false); setInvitePhone(EMPTY_PHONE); setInviteRole("Member"); setInviteError(""); }}
       >
         <KeyboardAvoidingView
           style={{ flex: 1, justifyContent: "flex-end" }}
@@ -2351,7 +2352,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
         >
           <Pressable
             style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
-            onPress={() => { setInviteOpen(false); setInvitePhone(""); setInviteRole("Member"); setInviteError(""); }}
+            onPress={() => { setInviteOpen(false); setInvitePhone(EMPTY_PHONE); setInviteRole("Member"); setInviteError(""); }}
           />
           <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}>
             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginBottom: 20 }} />
@@ -2359,40 +2360,24 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               Invite a member
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 24, lineHeight: 18 }}>
-              Enter their Zambian phone number and we&apos;ll send them an SMS invitation to join {group.name}.
+              Enter their phone number and we&apos;ll send them an SMS invitation to join {group.name}.
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginBottom: 12 }}>
               PHONE NUMBER
             </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: inviteError ? colors.danger : colors.border,
-                paddingHorizontal: 14,
-                backgroundColor: colors.surface,
-                marginBottom: 6,
-              }}
-            >
-              <Text style={{ color: colors.textMuted, fontSize: 16, fontWeight: "600", marginRight: 8 }}>+260</Text>
-              <TextInput
-                placeholder="97X XXX XXX"
-                keyboardType="phone-pad"
-                maxLength={9}
-                value={invitePhone}
-                onChangeText={(t) => { setInvitePhone(t.replace(/\D/g, "").slice(0, 9)); setInviteError(""); }}
-                style={{
-                  flex: 1,
-                  paddingVertical: 14,
-                  color: colors.textMain,
-                  fontSize: 16,
-                }}
-                placeholderTextColor={colors.textMuted}
-                autoFocus
-              />
-            </View>
+            <PhoneNumberField
+              value={invitePhone}
+              onChange={(v) => { setInvitePhone(v); setInviteError(""); }}
+              error={inviteError}
+              showErrorText={false}
+              onContactError={setInviteError}
+              autoFocus
+              style={{ marginBottom: 6 }}
+              rowStyle={{ borderRadius: 12 }}
+              inputStyle={{ fontSize: 16 }}
+              contactsLabel="Choose from contacts"
+              testID="group-invite-phone"
+            />
 
             <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.2, marginTop: 18, marginBottom: 12 }}>
               ROLE IN THIS GROUP
@@ -2453,15 +2438,16 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
               loading={inviting}
               disabled={inviting}
               onPress={async () => {
-                if (invitePhone.length < 9) {
-                  setInviteError("Enter a 9-digit number after +260");
+                if (!isValidPhone(invitePhone)) {
+                  setInviteError(phoneLengthError(invitePhone));
                   return;
                 }
+                const full = toE164(invitePhone);
                 // Catch it here as well as on the server, so the admin sees the
                 // problem without waiting on a round trip.
                 const existing = (group.members ?? []).find(
                   (m: any) =>
-                    m.status !== "removed" && phoneKey(m.phone) === phoneKey(invitePhone)
+                    m.status !== "removed" && phoneKey(m.phone) === phoneKey(full)
                 ) as any;
                 if (existing) {
                   if (existing.status === "pending") {
@@ -2475,7 +2461,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                         {
                           text: "Resend",
                           onPress: async () => {
-                            setInvitePhone("");
+                            setInvitePhone(EMPTY_PHONE);
                             setInviteRole("Member");
                             setInviteError("");
                             setInviteOpen(false);
@@ -2491,7 +2477,6 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   );
                   return;
                 }
-                const full = `+260${invitePhone}`;
                 setInviting(true);
                 setInviteError("");
                 try {
@@ -2501,7 +2486,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                     "Invite sent",
                     `${full} has been invited as ${inviteRole === "Member" ? "a member" : `${inviteRole.toLowerCase()}`}. They'll see the invitation after signing up with this number.`
                   );
-                  setInvitePhone("");
+                  setInvitePhone(EMPTY_PHONE);
                   setInviteRole("Member");
                   setInviteOpen(false);
                   await load(); // refresh so the pending member shows in the members list
