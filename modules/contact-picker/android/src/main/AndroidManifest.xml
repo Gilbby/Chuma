@@ -1,0 +1,8 @@
+<!--
+  Deliberately empty. This module uses the system contact picker
+  (ACTION_PICK on Phone.CONTENT_TYPE). The picker grants temporary read
+  access to the single row the user chose, so NO contacts permission is
+  declared here. Do not add READ_CONTACTS / WRITE_CONTACTS: Google Play
+  restricts them to apps the system picker can't serve.
+-->
+<manifest />

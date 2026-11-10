@@ -34,6 +34,9 @@ import {
 import { detectNetwork } from "@/src/services/mobileMoney";
 import { formatZMW } from "@/src/utils/currency";
 import { Check, Camera, X, CreditCard, Plus, Calendar, Lock } from "lucide-react-native";
+import { PhoneNumberField } from "@/src/components/common/PhoneNumberField";
+import { parsePhoneInput, isValidPhone, phoneLengthError, toE164, EMPTY_PHONE, type PhoneValue } from "@/src/utils/phone";
+import { DEFAULT_COUNTRY } from "@/src/constants/countries";
 import Slider from "@react-native-community/slider";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { isProjectFundType, isChilimbaType } from "@/src/types";
@@ -116,6 +119,8 @@ interface Permissions {
 interface Invite {
   id: string;
   contact: string;
+  /** Contact name, when the number was picked from the phone book. */
+  name?: string;
   status: "Pending" | "Accepted";
 }
 
@@ -190,8 +195,8 @@ export default function CreateGroup() {
   const [lateRepayFlatAmount, setLateRepayFlatAmount] = useState("100");
 
   // Step 4 - Governance
-  const [treasurerPhone, setTreasurerPhone] = useState("");
-  const [secretaryPhone, setSecretaryPhone] = useState("");
+  const [treasurer, setTreasurer] = useState<PhoneValue>(EMPTY_PHONE);
+  const [secretary, setSecretary] = useState<PhoneValue>(EMPTY_PHONE);
   const [approvalThreshold, setApprovalThreshold] = useState<GroupConstitution["approvalThreshold"]>("majority");
   const [permissions, setPermissions] = useState<Permissions>({
     loanApprovals: true,
@@ -202,7 +207,9 @@ export default function CreateGroup() {
   });
 
   // Post-creation invite state (used on invite screen after success)
-  const [phoneInput, setPhoneInput] = useState("");
+  const [invitePhone, setInvitePhone] = useState<PhoneValue>(EMPTY_PHONE);
+  // Contact name for the number in the field, if it was picked from the phone book.
+  const [invitePicked, setInvitePicked] = useState<{ e164: string; name: string } | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [showInvite, setShowInvite] = useState(false);
   const [inviting, setInviting] = useState(false);
@@ -366,8 +373,9 @@ export default function CreateGroup() {
         setLateRepayPenaltyType(f.lateRepayPenaltyType ?? "percent");
         setLateRepayFlatAmount(f.lateRepayFlatAmount ?? "100");
 
-        setTreasurerPhone(f.treasurerPhone ?? "");
-        setSecretaryPhone(f.secretaryPhone ?? "");
+        // Drafts hold E.164 ("+254…"); older drafts hold the bare Zambian 9 digits - both parse.
+        setTreasurer(parsePhoneInput(f.treasurerPhone ?? "", DEFAULT_COUNTRY));
+        setSecretary(parsePhoneInput(f.secretaryPhone ?? "", DEFAULT_COUNTRY));
         setApprovalThreshold(f.approvalThreshold ?? "majority");
         if (f.permissions) setPermissions(f.permissions);
         setTermsAccepted(!!f.termsAccepted);
@@ -406,10 +414,6 @@ export default function CreateGroup() {
   };
 
 
-  const isValidZambianPhone = (s: string) => /^\d{9}$/.test(s.replace(/\s/g, ""));
-
-  const handlePhoneInput = (text: string, setter: (v: string) => void) =>
-    setter(text.replace(/\D/g, "").slice(0, 9));
 
   const clearErr = (key: string) =>
     setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
@@ -516,8 +520,8 @@ export default function CreateGroup() {
       }
     }
     if (step === 4) {
-      if (treasurerPhone.trim() && !isValidZambianPhone(treasurerPhone.trim())) e.treasurerPhone = "Enter a valid Zambian phone number";
-      if (secretaryPhone.trim() && !isValidZambianPhone(secretaryPhone.trim())) e.secretaryPhone = "Enter a valid Zambian phone number";
+      if (treasurer.national && !isValidPhone(treasurer)) e.treasurerPhone = phoneLengthError(treasurer);
+      if (secretary.national && !isValidPhone(secretary)) e.secretaryPhone = phoneLengthError(secretary);
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -534,15 +538,17 @@ export default function CreateGroup() {
   };
 
   const addPhoneInvite = async () => {
-    if (!phoneInput) return;
+    if (!invitePhone.national) return;
     if (!newGroupId) { setInviteError("Group not ready yet, please wait a moment."); return; }
-    if (phoneInput.length < 9) { setInviteError("Enter a 9-digit number after +260"); return; }
-    const full = `+260${phoneInput}`;
+    if (!isValidPhone(invitePhone)) { setInviteError(phoneLengthError(invitePhone)); return; }
+    const full = toE164(invitePhone);
     setInviting(true); setInviteError("");
     try {
       await inviteMember(newGroupId, full);
-      setInvites((prev) => [...prev, { id: `${Date.now()}`, contact: full, status: "Pending" }]);
-      setPhoneInput("");
+      const name = invitePicked?.e164 === full ? invitePicked.name : undefined;
+      setInvites((prev) => [...prev, { id: `${Date.now()}`, contact: full, name, status: "Pending" }]);
+      // Keep the chosen country for the next invite; clear the number.
+      setInvitePhone((prev) => ({ country: prev.country, national: "" }));
     } catch (e: any) {
       setInviteError(e?.message || "Could not send invite. Please try again.");
     } finally {
@@ -618,8 +624,8 @@ export default function CreateGroup() {
     lateRepaymentPenaltyRate,
     lateRepayPenaltyType,
     lateRepayFlatAmount,
-    treasurerPhone,
-    secretaryPhone,
+    treasurerPhone: treasurer.national ? toE164(treasurer) : "",
+    secretaryPhone: secretary.national ? toE164(secretary) : "",
     approvalThreshold,
     permissions,
     termsAccepted,
@@ -771,8 +777,8 @@ export default function CreateGroup() {
             }))
           : undefined,
         constitution,
-        treasurerPhone: treasurerPhone ? `+260${treasurerPhone}` : undefined,
-        secretaryPhone: secretaryPhone ? `+260${secretaryPhone}` : undefined,
+        treasurerPhone: treasurer.national ? toE164(treasurer) : undefined,
+        secretaryPhone: secretary.national ? toE164(secretary) : undefined,
         payerPhone: user?.phone,
       };
 
@@ -814,19 +820,17 @@ export default function CreateGroup() {
 
               <FL text="Invite by phone" colors={colors} />
               <View style={styles.inputActionRow}>
-                <View style={[styles.inputRow, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>+260</Text>
-                  <TextInput
-                    style={[styles.inlineInput, { color: colors.textMain, flex: 1 }]}
-                    value={phoneInput}
-                    onChangeText={(t) => setPhoneInput(t.replace(/\D/g, "").slice(0, 9))}
-                    placeholder="97X XXX XXX"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="phone-pad"
-                    maxLength={9}
-                    testID="invite-phone-input"
-                  />
-                </View>
+                <PhoneNumberField
+                  style={{ flex: 1 }}
+                  value={invitePhone}
+                  onChange={(v) => { setInvitePhone(v); setInviteError(""); }}
+                  error={inviteError}
+                  showErrorText={false}
+                  onContactPicked={(e164, name) => setInvitePicked(name ? { e164, name } : null)}
+                  onContactError={setInviteError}
+                  contactsLabel="Choose member from contacts"
+                  testID="invite-phone-input"
+                />
                 <Pressable
                   onPress={addPhoneInvite}
                   disabled={inviting}
@@ -850,7 +854,10 @@ export default function CreateGroup() {
                           i < invites.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                         ]}
                       >
-                        <Text style={{ color: colors.textMain, fontWeight: "500", flex: 1 }}>{inv.contact}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.textMain, fontWeight: "500" }}>{inv.name ?? inv.contact}</Text>
+                          {inv.name ? <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>{inv.contact}</Text> : null}
+                        </View>
                         <View style={[styles.statusPill, { backgroundColor: colors.primarySoft }]}>
                           <Text style={{ color: colors.primary, fontSize: 11, fontWeight: "700" }}>{inv.status}</Text>
                         </View>
@@ -1676,36 +1683,24 @@ export default function CreateGroup() {
                 </View>
 
                 <FL text="Treasurer (optional)" colors={colors} />
-                <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: errors.treasurerPhone ? colors.danger : colors.border }]}>
-                  <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>+260</Text>
-                  <TextInput
-                    style={[styles.inlineInput, { color: colors.textMain, flex: 1 }]}
-                    value={treasurerPhone}
-                    onChangeText={(t) => { handlePhoneInput(t, setTreasurerPhone); clearErr("treasurerPhone"); }}
-                    placeholder="9XX XXX XXX"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="phone-pad"
-                    maxLength={9}
-                    testID="create-group-treasurer"
-                  />
-                </View>
-                {errors.treasurerPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.treasurerPhone}</Text> : null}
+                <PhoneNumberField
+                  value={treasurer}
+                  onChange={(v) => { setTreasurer(v); clearErr("treasurerPhone"); }}
+                  error={errors.treasurerPhone}
+                  onContactError={(msg) => setErrors((prev) => ({ ...prev, treasurerPhone: msg }))}
+                  contactsLabel="Choose treasurer from contacts"
+                  testID="create-group-treasurer"
+                />
 
                 <FL text="Secretary (optional)" colors={colors} style={{ marginTop: 20 }} />
-                <View style={[styles.inputRow, { backgroundColor: colors.surface, borderColor: errors.secretaryPhone ? colors.danger : colors.border }]}>
-                  <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>+260</Text>
-                  <TextInput
-                    style={[styles.inlineInput, { color: colors.textMain, flex: 1 }]}
-                    value={secretaryPhone}
-                    onChangeText={(t) => { handlePhoneInput(t, setSecretaryPhone); clearErr("secretaryPhone"); }}
-                    placeholder="9XX XXX XXX"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="phone-pad"
-                    maxLength={9}
-                    testID="create-group-secretary"
-                  />
-                </View>
-                {errors.secretaryPhone ? <Text style={[styles.errText, { color: colors.danger }]}>{errors.secretaryPhone}</Text> : null}
+                <PhoneNumberField
+                  value={secretary}
+                  onChange={(v) => { setSecretary(v); clearErr("secretaryPhone"); }}
+                  error={errors.secretaryPhone}
+                  onContactError={(msg) => setErrors((prev) => ({ ...prev, secretaryPhone: msg }))}
+                  contactsLabel="Choose secretary from contacts"
+                  testID="create-group-secretary"
+                />
 
                 <FL text="Approval threshold" colors={colors} style={{ marginTop: 20 }} />
                 <View style={styles.chipsRow}>
@@ -1832,8 +1827,8 @@ export default function CreateGroup() {
 
                 <RC title="Governance" onEdit={() => goToStep(4)} colors={colors} style={{ marginTop: 14 }}>
                   <RRow label="Chairperson" value="You (group founder)" colors={colors} />
-                  <RRow label="Treasurer" value={treasurerPhone ? `+260 ${treasurerPhone}` : "Not assigned"} colors={colors} />
-                  <RRow label="Secretary" value={secretaryPhone ? `+260 ${secretaryPhone}` : "Not assigned"} colors={colors} />
+                  <RRow label="Treasurer" value={treasurer.national ? `${treasurer.country.dial} ${treasurer.national}` : "Not assigned"} colors={colors} />
+                  <RRow label="Secretary" value={secretary.national ? `${secretary.country.dial} ${secretary.national}` : "Not assigned"} colors={colors} />
                   <RRow label="Threshold" value={thresholdLabel} colors={colors} />
                   <RRow label="Permissions" value={`${activePermCount} active`} colors={colors} last />
                 </RC>
