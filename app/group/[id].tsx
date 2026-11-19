@@ -839,7 +839,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
           // (requireGroupAdmin), so it is not offered to them here either.
           tab === "members" && isAdmin ? (
             <Pressable
-              style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}
+              style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}
               onPress={() => setInviteOpen((v) => !v)}
               testID="members-invite-btn"
             >
@@ -856,7 +856,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
       >
         {/* Financial overview */}
         <View style={{ paddingHorizontal: 20 }}>
-          <Card padding={20} style={{ backgroundColor: colors.primary, borderColor: colors.primary }}>
+          <Card padding={20} style={{ backgroundColor: colors.brand, borderColor: colors.brand }}>
             {/* Their own figure leads: "where do I stand in this group" is what
                 most people open it to find out. The group's total sits under it
                 as context, not as the headline. */}
@@ -1085,7 +1085,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                   styles.tab,
                   {
                     borderColor: active ? colors.primary : colors.border,
-                    backgroundColor: active ? colors.primary : colors.surface,
+                    backgroundColor: active ? colors.brand : colors.surface,
                   },
                 ]}
                 testID={`group-tab-${t.k}`}
@@ -2069,7 +2069,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
           style={({ pressed }) => [
             styles.giveFab,
             {
-              backgroundColor: colors.primary,
+              backgroundColor: colors.brand,
               bottom: insets.bottom + 20,
               opacity: pressed ? 0.9 : 1,
               transform: [{ scale: pressed ? 0.97 : 1 }],
@@ -2078,7 +2078,7 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
           testID="group-give-fab"
           accessibilityLabel="Give toward a project"
         >
-          <Coins size={24} color={colors.textInverse} strokeWidth={2.2} />
+          <Coins size={24} color={colors.onBrand} strokeWidth={2.2} />
         </Pressable>
       )}
       </View>
@@ -2408,8 +2408,8 @@ Its records are kept: every contribution, receipt, penalty and statement stays i
                       borderRadius: 12,
                       borderWidth: 1,
                       opacity: taken ? 0.45 : 1,
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.brand : colors.surface,
+                      borderColor: active ? colors.brand : colors.border,
                     }}
                     testID={`invite-role-${r.toLowerCase()}`}
                   >

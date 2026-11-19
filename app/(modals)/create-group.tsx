@@ -834,7 +834,7 @@ export default function CreateGroup() {
                 <Pressable
                   onPress={addPhoneInvite}
                   disabled={inviting}
-                  style={[styles.actionBtn, { backgroundColor: colors.primary, opacity: inviting ? 0.6 : 1 }]}
+                  style={[styles.actionBtn, { backgroundColor: colors.brand, opacity: inviting ? 0.6 : 1 }]}
                   testID="invite-phone-send"
                 >
                   <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>{inviting ? "Sending..." : "Send"}</Text>
@@ -908,7 +908,7 @@ export default function CreateGroup() {
           <View
             style={[
               styles.successCircle,
-              { backgroundColor: settled ? colors.primary : colors.primarySoft },
+              { backgroundColor: settled ? colors.brand : colors.primarySoft },
             ]}
           >
             {settled ? (
@@ -1087,7 +1087,7 @@ export default function CreateGroup() {
                       <Pressable
                         key={t.value}
                         onPress={() => { setGroupType(t.value); clearErr("groupType"); }}
-                        style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                        style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                         testID={`group-type-${t.value}`}
                       >
                         <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{t.label}</Text>
@@ -1330,7 +1330,7 @@ export default function CreateGroup() {
                       <Pressable
                         key={f}
                         onPress={() => setContribFreq(f)}
-                        style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                        style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                         testID={`contrib-freq-${f}`}
                       >
                         <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{f}</Text>
@@ -1362,7 +1362,7 @@ export default function CreateGroup() {
                       <Pressable
                         key={d}
                         onPress={() => setCycleDuration(d)}
-                        style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                        style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                       >
                         <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{d}</Text>
                       </Pressable>
@@ -1396,7 +1396,7 @@ export default function CreateGroup() {
                         <Pressable
                           key={d}
                           onPress={() => setDeadlineDow(d)}
-                          style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                          style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                         >
                           <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{d}</Text>
                         </Pressable>
@@ -1416,7 +1416,7 @@ export default function CreateGroup() {
                           <Pressable
                             key={opt}
                             onPress={() => setLateContribPenaltyType(t)}
-                            style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                            style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                           >
                             <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{opt}</Text>
                           </Pressable>
@@ -1493,7 +1493,7 @@ export default function CreateGroup() {
                           <Pressable
                             key={m.value}
                             onPress={() => setLoanMultiplier(m.value)}
-                            style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                            style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                             testID={`loan-multiplier-${m.value}`}
                           >
                             <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{m.label}</Text>
@@ -1577,7 +1577,7 @@ export default function CreateGroup() {
                           <Pressable
                             key={m}
                             onPress={() => setLoanFreeWindow(m)}
-                            style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                            style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                             testID={`loan-free-window-${m}`}
                           >
                             <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>
@@ -1613,7 +1613,7 @@ export default function CreateGroup() {
                               <Pressable
                                 key={opt}
                                 onPress={() => setLateRepayPenaltyType(t)}
-                                style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                                style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                               >
                                 <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{opt}</Text>
                               </Pressable>
@@ -1710,7 +1710,7 @@ export default function CreateGroup() {
                       <Pressable
                         key={t.value}
                         onPress={() => setApprovalThreshold(t.value)}
-                        style={[styles.chip, { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border }]}
+                        style={[styles.chip, { backgroundColor: active ? colors.brand : colors.surface, borderColor: active ? colors.brand : colors.border }]}
                         testID={`approval-threshold-${t.value}`}
                       >
                         <Text style={{ color: active ? "#fff" : colors.textMain, fontWeight: "600", fontSize: 13 }}>{t.label}</Text>
@@ -1732,7 +1732,7 @@ export default function CreateGroup() {
                       testID={`permission-${p.key}`}
                     >
                       <Text style={{ color: colors.textMain, fontWeight: "500", flex: 1 }}>{p.label}</Text>
-                      <View style={[styles.checkbox, { borderColor: permissions[p.key] ? colors.primary : colors.borderStrong, backgroundColor: permissions[p.key] ? colors.primary : "transparent" }]}>
+                      <View style={[styles.checkbox, { borderColor: permissions[p.key] ? colors.brand : colors.borderStrong, backgroundColor: permissions[p.key] ? colors.brand : "transparent" }]}>
                         {permissions[p.key] && <Check size={12} color="#fff" strokeWidth={3} />}
                       </View>
                     </Pressable>
@@ -1838,7 +1838,7 @@ export default function CreateGroup() {
                   style={[styles.termsRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   testID="create-group-terms"
                 >
-                  <View style={[styles.checkbox, { borderColor: termsAccepted ? colors.primary : colors.borderStrong, backgroundColor: termsAccepted ? colors.primary : "transparent" }]}>
+                  <View style={[styles.checkbox, { borderColor: termsAccepted ? colors.brand : colors.borderStrong, backgroundColor: termsAccepted ? colors.brand : "transparent" }]}>
                     {termsAccepted && <Check size={12} color="#fff" strokeWidth={3} />}
                   </View>
                   <Text style={{ color: colors.textMain, fontSize: 13, lineHeight: 20, flex: 1, marginLeft: 12 }}>

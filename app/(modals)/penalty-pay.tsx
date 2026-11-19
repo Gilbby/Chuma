@@ -227,7 +227,7 @@ const SuccessScreen = ({
     testID="penalty-pay-success"
   >
     <View style={styles.successWrap}>
-      <View style={[styles.successCircle, { backgroundColor: pending ? colors.warning : colors.primary }]}>
+      <View style={[styles.successCircle, { backgroundColor: pending ? colors.warning : colors.brand }]}>
         {pending ? (
           <Clock size={56} color="#fff" strokeWidth={2.5} />
         ) : (

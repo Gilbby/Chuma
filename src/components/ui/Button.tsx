@@ -51,7 +51,7 @@ export const Button: React.FC<Props> = ({
   const s = sizeMap[size];
 
   const palette: Record<Variant, { bg: string; fg: string; border?: string }> = {
-    primary: { bg: colors.primary, fg: colors.textInverse },
+    primary: { bg: colors.brand, fg: colors.onBrand },
     secondary: { bg: colors.surfaceSecondary, fg: colors.textMain },
     ghost: { bg: "transparent", fg: colors.primary },
     danger: { bg: colors.danger, fg: "#fff" },

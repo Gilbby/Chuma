@@ -232,7 +232,7 @@ export default function Loan() {
         testID="loan-success"
       >
         <View style={styles.successWrap}>
-          <View style={[styles.successCircle, { backgroundColor: colors.primary }]}>
+          <View style={[styles.successCircle, { backgroundColor: colors.brand }]}>
             <Check size={56} color="#fff" strokeWidth={3} />
           </View>
           <Text style={{ color: colors.textMain, fontSize: 24, fontWeight: "700", letterSpacing: -0.4 }}>
@@ -430,8 +430,8 @@ export default function Loan() {
                       style={[
                         styles.durChip,
                         {
-                          backgroundColor: active ? colors.primary : colors.surface,
-                          borderColor: active ? colors.primary : colors.border,
+                          backgroundColor: active ? colors.brand : colors.surface,
+                          borderColor: active ? colors.brand : colors.border,
                         },
                       ]}
                       testID={`loan-duration-${d.months}`}

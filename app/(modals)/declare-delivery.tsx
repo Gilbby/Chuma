@@ -228,7 +228,7 @@ export default function DeclareDelivery() {
           : "deposited to the church mobile money";
     return shell(
       <View style={[styles.content, { flex: 1, alignItems: "center", paddingTop: 48 }]}>
-        <View style={[styles.doneCircle, { backgroundColor: colors.primary }]}>
+        <View style={[styles.doneCircle, { backgroundColor: colors.brand }]}>
           <Check size={48} color="#fff" strokeWidth={3} />
         </View>
         <Text style={[styles.doneTitle, { color: colors.textMain }]}>Payout recorded</Text>
@@ -508,8 +508,8 @@ const RadioRow = ({
       style={[
         styles.radio,
         {
-          borderColor: active ? colors.primary : colors.borderStrong,
-          backgroundColor: active ? colors.primary : "transparent",
+          borderColor: active ? colors.brand : colors.borderStrong,
+          backgroundColor: active ? colors.brand : "transparent",
         },
       ]}
     >

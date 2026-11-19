@@ -9,6 +9,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTabBarSpace } from "@/src/components/navigation/FloatingTabBar";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { Card } from "@/src/components/ui/Card";
@@ -38,6 +39,7 @@ const FILTERS: { key: TxnItem["type"] | "all"; label: string }[] = [
 
 export default function TransactionsScreen() {
   const { colors } = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -147,7 +149,7 @@ export default function TransactionsScreen() {
           />
         </View>
         <Pressable
-          style={[styles.filterBtn, { backgroundColor: filterOpen || dateRange !== "all" ? colors.primary : colors.surfaceSecondary }]}
+          style={[styles.filterBtn, { backgroundColor: filterOpen || dateRange !== "all" ? colors.brand : colors.surfaceSecondary }]}
           onPress={() => setFilterOpen((o) => !o)}
           testID="transactions-filter-btn"
         >
@@ -171,8 +173,8 @@ export default function TransactionsScreen() {
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.brand : colors.surface,
+                      borderColor: active ? colors.brand : colors.border,
                     },
                   ]}
                   testID={`txn-date-${item.key}`}
@@ -210,8 +212,8 @@ export default function TransactionsScreen() {
                 style={[
                   styles.chip,
                   {
-                    backgroundColor: active ? colors.primary : colors.surface,
-                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.brand : colors.surface,
+                    borderColor: active ? colors.brand : colors.border,
                   },
                 ]}
                 testID={`txn-filter-${item.key}`}
@@ -240,7 +242,7 @@ export default function TransactionsScreen() {
       <FlatList
         data={data}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: tabBarSpace }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={

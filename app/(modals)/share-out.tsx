@@ -496,7 +496,7 @@ export default function ShareOutScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <Card
             padding={24}
-            style={{ backgroundColor: colors.primary, borderColor: colors.primary }}
+            style={{ backgroundColor: colors.brand, borderColor: colors.brand }}
             testID="shareout-complete"
           >
             <View style={styles.completeCheck}>
@@ -554,7 +554,7 @@ export default function ShareOutScreen() {
         {/* Hero */}
         <Card
           padding={22}
-          style={{ backgroundColor: colors.primary, borderColor: colors.primary }}
+          style={{ backgroundColor: colors.brand, borderColor: colors.brand }}
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Sparkles size={20} color="#fff" />
@@ -782,7 +782,7 @@ export default function ShareOutScreen() {
                       testID={`shareout-mark-paid-${row.key}`}
                       style={({ pressed }) => [
                         styles.markPaid,
-                        { backgroundColor: colors.primary, opacity: pressed || busy ? 0.6 : 1 },
+                        { backgroundColor: colors.brand, opacity: pressed || busy ? 0.6 : 1 },
                       ]}
                     >
                       {busy ? (
@@ -813,8 +813,8 @@ export default function ShareOutScreen() {
                   style={[
                     styles.timelineDot,
                     {
-                      backgroundColor: t.done ? colors.primary : colors.surface,
-                      borderColor: t.done ? colors.primary : colors.borderStrong,
+                      backgroundColor: t.done ? colors.brand : colors.surface,
+                      borderColor: t.done ? colors.brand : colors.borderStrong,
                     },
                   ]}
                 >
