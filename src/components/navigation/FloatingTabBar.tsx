@@ -14,7 +14,9 @@ import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { BlurView, BlurTargetView } from "expo-blur";
+import { useRouter } from "expo-router";
 import type { BottomTabBarProps } from "expo-router/tabs";
+import { Plus } from "lucide-react-native";
 import { useTheme } from "@/src/theme/ThemeContext";
 
 /** Height of the pill itself (8pt grid). */
@@ -122,6 +124,30 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: B
   const insets = useSafeAreaInsets();
   const dark = mode === "dark";
   const blurTarget = useContext(BlurTargetsContext)?.targets[state.routes[state.index].key];
+  const router = useRouter();
+
+  // "+" right after Home, styled exactly like an inactive tab icon. It isn't a
+  // tab (it opens the contribute modal), so it never shows active.
+  const plusBefore = 1; // index of the tab the "+" sits in front of
+  const plusItem = (
+    <Animated.View layout={layout} style={styles.slot}>
+      <Pressable
+        onPress={() => {
+          if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+          router.push("/contribute");
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Make a contribution"
+        testID="tab-contribute"
+        style={({ pressed }) => [styles.press, { opacity: pressed ? 0.6 : 1 }]}
+        hitSlop={4}
+      >
+        <View style={styles.item}>
+          <Plus size={22} color={colors.textMuted} strokeWidth={2} />
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
 
   return (
     <View
@@ -180,8 +206,9 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: B
             };
 
             return (
+              <React.Fragment key={route.key}>
+              {index === plusBefore ? plusItem : null}
               <Animated.View
-                key={route.key}
                 layout={layout}
                 style={[styles.slot, focused && styles.slotActive]}
               >
@@ -215,6 +242,7 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: B
                   </Animated.View>
                 </Pressable>
               </Animated.View>
+              </React.Fragment>
             );
           })}
         </View>
@@ -257,8 +285,8 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   // The active tab gets more room so icon + label ("Transactions" is the
-  // longest) fit on a 360dp-wide phone without squeezing the other tabs.
-  slotActive: { flex: 2.4 },
+  // longest) fit alongside four icon-only slots (incl. the "+").
+  slotActive: { flex: 2.8 },
   press: {
     flex: 1,
     alignItems: "center",
