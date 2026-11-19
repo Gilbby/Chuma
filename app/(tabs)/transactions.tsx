@@ -149,7 +149,7 @@ export default function TransactionsScreen() {
           />
         </View>
         <Pressable
-          style={[styles.filterBtn, { backgroundColor: filterOpen || dateRange !== "all" ? colors.primary : colors.surfaceSecondary }]}
+          style={[styles.filterBtn, { backgroundColor: filterOpen || dateRange !== "all" ? colors.brand : colors.surfaceSecondary }]}
           onPress={() => setFilterOpen((o) => !o)}
           testID="transactions-filter-btn"
         >
@@ -173,8 +173,8 @@ export default function TransactionsScreen() {
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: active ? colors.primary : colors.surface,
-                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.brand : colors.surface,
+                      borderColor: active ? colors.brand : colors.border,
                     },
                   ]}
                   testID={`txn-date-${item.key}`}
@@ -212,8 +212,8 @@ export default function TransactionsScreen() {
                 style={[
                   styles.chip,
                   {
-                    backgroundColor: active ? colors.primary : colors.surface,
-                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.brand : colors.surface,
+                    borderColor: active ? colors.brand : colors.border,
                   },
                 ]}
                 testID={`txn-filter-${item.key}`}

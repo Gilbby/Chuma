@@ -25,47 +25,57 @@
   },
   "colors": {
     "light": {
-      "background": "#F9FAF9",
+      "background": "#F8FAF9",
       "surface": "#FFFFFF",
       "surface_secondary": "#F3F5F4",
-      "primary": "#0A5C36",
+      "primary": "#075C3D",
+      "primary_soft": "#E6F3ED",
       "primary_accent": "#10B981",
-      "text_main": "#064E3B",
-      "text_muted": "#6B7280",
+      "text_main": "#123D30",
+      "text_muted": "#6A7470",
       "border": "#E5E7EB",
       "success": "#059669",
       "warning": "#F59E0B",
       "danger": "#EF4444"
     },
     "dark": {
-      "background": "#050A07",
-      "surface": "#0C1410",
-      "surface_secondary": "#15241C",
-      "primary": "#10B981",
+      "background": "#0B1210",
+      "surface": "#141F1B",
+      "surface_secondary": "#1C2923",
+      "primary": "#35C58A",
+      "primary_soft": "#183D2E",
       "primary_accent": "#34D399",
-      "text_main": "#F9FAF9",
-      "text_muted": "#A3A3A3",
-      "border": "#1E3328",
-      "success": "#10B981",
-      "warning": "#FBBF24",
-      "danger": "#F87171"
+      "text_main": "#F1F5F2",
+      "text_muted": "#9AA9A1",
+      "border": "#293831",
+      "success": "#35C58A",
+      "warning": "#F2B84B",
+      "danger": "#F07171"
     }
+  },
+  "color_roles": {
+    "brand": "#075C3D in BOTH themes (theme key `brand`, text on it `onBrand` #FFFFFF). Use for every filled surface: primary buttons, balance/hero cards, active nav pill, selected chips and segments, radios, checkboxes, success circles, FABs.",
+    "primary": "Light #075C3D / Dark #35C58A (theme key `primary`). In dark mode this is an accent only: icons, indicators, progress bars, switches, unread/pin/page dots, links and small highlights. Never a large fill.",
+    "primary_soft": "Light #E6F3ED / Dark #183D2E. Tinted tiles behind accent icons (e.g. quick actions).",
+    "principle": "Dark mode is the dark version of Chuma, not a different app: same green hierarchy, component styling, spacing and identity in both themes."
   },
   "spacing_and_layout": {
     "grid": "8pt base grid",
     "padding_standard": "p-4 (16px) or p-6 (24px) for screens",
-    "card_padding": "p-4 to p-6 (16px to 24px) depending on hierarchy",
+    "card_padding": "16px default; 24px for hero cards",
+    "card_gap": "16px between cards",
     "gap_standard": "gap-4 (16px)",
     "border_radius": {
-      "sm": "rounded-sm (4px)",
-      "md": "rounded-md (8px)",
-      "lg": "rounded-xl (12px)",
-      "xl": "rounded-2xl (16px)",
+      "sm": "6px",
+      "md": "10px",
+      "lg": "16px (inputs, list rows)",
+      "xl": "20px (cards, buttons)",
+      "xxl": "24px (hero cards, sheets)",
       "full": "rounded-full (9999px)"
     }
   },
   "components": {
-    "cards": "Premium feel. Light mode: subtle shadow or flat with 1px border. Dark mode: flat with 1px border (#1E3328).",
+    "cards": "Premium feel. Light mode: subtle shadow or flat with 1px border. Dark mode: flat with 1px border (#293831); elevated surfaces #1C2923.",
     "buttons": "Primary buttons use Primary color. Full width for main actions. Rounded-xl. Height 56px (h-14). Font semibold. Use reduced opacity for disabled states.",
     "inputs": "Height 56px (h-14). Subtle background fill or clear 1px border. Label text-sm above input. Focus state changes border to Primary.",
     "transaction_rows": "Avatar/Icon left, Title & Date center, Amount right. Amount color reflects transaction type (green for in, text_main for out).",

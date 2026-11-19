@@ -81,7 +81,7 @@ function formatPayoutDate(iso: string): string {
 }
 
 export default function Home() {
-  const { colors, mode } = useTheme();
+  const { colors } = useTheme();
   const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const { role, can } = useRole();
@@ -425,7 +425,7 @@ export default function Home() {
         <View
           style={[
             styles.heroCard,
-            { backgroundColor: colors.primary },
+            { backgroundColor: colors.brand },
           ]}
         >
           <View style={styles.heroLabelRow}>
@@ -526,7 +526,6 @@ export default function Home() {
                 : `In ${daysUntilDue} days`
             }
             tint={colors.warning}
-            mode={mode}
             testID="home-contribution-due"
           />
           <OverviewCard
@@ -534,21 +533,18 @@ export default function Home() {
             value={myLoanCount > 0 ? formatZMW(myActiveLoans) : formatZMW(0)}
             sub={myLoanCount > 0 ? `${myLoanCount} ${myLoanCount === 1 ? "loan" : "loans"}` : "No active loans"}
             tint={colors.warning}
-            mode={mode}
           />
           <OverviewCard
             label="Next repayment"
             value={myLoanCount > 0 ? formatZMW(upcomingRepayment) : "-"}
             sub={myLoanCount > 0 ? upcomingRepaymentDate : "Nothing due"}
             tint={colors.info}
-            mode={mode}
           />
           <OverviewCard
             label="Group savings"
             value={formatZMW(groupPoolTotal, { compact: true })}
             sub={`${groups.length} groups`}
             tint={colors.success}
-            mode={mode}
           />
         </ScrollView>
 
@@ -706,32 +702,34 @@ const OverviewCard = ({
   value,
   sub,
   tint,
-  mode,
   testID,
 }: {
   label: string;
   value: string;
   sub: string;
   tint: string;
-  mode: "light" | "dark";
   testID?: string;
 }) => {
-  const surface = mode === "light" ? "#FFFFFF" : "#0C1410";
-  const border = mode === "light" ? "#E5E7EB" : "#1E3328";
+  const { colors, mode } = useTheme();
   return (
     <View
       style={[
         styles.overviewCard,
-        { backgroundColor: surface, borderColor: border },
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          // Borderless in dark mode, matching <Card>.
+          borderWidth: mode === "dark" ? 0 : 1,
+        },
       ]}
       testID={testID}
     >
       <View style={[styles.overviewDot, { backgroundColor: tint }]} />
-      <Text style={[styles.overviewLabel, { color: "#6B7280" }]}>{label}</Text>
-      <Text style={[styles.overviewValue, { color: mode === "light" ? "#064E3B" : "#F9FAF9" }]}>
+      <Text style={[styles.overviewLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[styles.overviewValue, { color: colors.textMain }]}>
         {value}
       </Text>
-      <Text style={[styles.overviewSub, { color: "#9CA3AF" }]}>{sub}</Text>
+      <Text style={[styles.overviewSub, { color: colors.textMuted }]}>{sub}</Text>
     </View>
   );
 };

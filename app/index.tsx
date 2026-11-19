@@ -53,7 +53,7 @@ export default function Splash() {
   }));
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.primary }]} testID="splash-screen">
+    <View style={[styles.container, { backgroundColor: colors.brand }]} testID="splash-screen">
       <Image source={{ uri: SPLASH_BG }} style={styles.bg} blurRadius={0} resizeMode="cover" />
       <View style={styles.overlay} />
       <Animated.View style={[styles.content, animatedStyle]}>

@@ -280,10 +280,10 @@ export async function exportTransactionsPdf(data: TxnItem[]) {
   const html = `
     <html><head><meta charset="utf-8" /><style>
       body { font-family: ${BODY_FONT}; padding: 32px; color: #111; }
-      h1 { font-size: 22px; color: #0A5C36; margin-bottom: 4px; }
+      h1 { font-size: 22px; color: #075C3D; margin-bottom: 4px; }
       p { font-size: 12px; color: #666; margin: 0 0 24px; }
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      th { background: #0A5C36; color: white; padding: 10px 12px; text-align: left; }
+      th { background: #075C3D; color: white; padding: 10px 12px; text-align: left; }
       td { padding: 9px 12px; border-bottom: 1px solid #eee; }
       tr:nth-child(even) td { background: #f9f9f9; }
       .footer { margin-top: 24px; font-size: 11px; color: #999; }
@@ -412,7 +412,7 @@ function statementHtml(
   @page { margin: 22px; }
   body { font-family: ${BODY_FONT}; color: #111827; background: #fff; }
   .wrap { max-width: 720px; margin: 0 auto; }
-  .header { background: #0A5C36; color: #fff; padding: 24px 26px; border-radius: 16px 16px 0 0; }
+  .header { background: #075C3D; color: #fff; padding: 24px 26px; border-radius: 16px 16px 0 0; }
   .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
   .logo { width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.45); display: inline-flex; align-items: center; justify-content: center; }
   .brand-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
@@ -420,7 +420,7 @@ function statementHtml(
   .period { font-size: 20px; font-weight: 700; margin-top: 4px; }
   .who { margin-top: 14px; font-size: 12px; color: rgba(255,255,255,0.85); line-height: 18px; }
   .body { border: 1px solid #E5E7EB; border-top: 0; border-radius: 0 0 16px 16px; padding: 22px 26px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #6B7280; margin: 24px 0 8px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #6A7470; margin: 24px 0 8px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { background: #F3F5F4; color: #374151; padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
   td { padding: 8px 10px; border-bottom: 1px solid #F3F4F6; vertical-align: top; }
@@ -428,7 +428,7 @@ function statementHtml(
   .pos { color: #059669; }
   .neg { color: #B91C1C; }
   .muted { color: #9CA3AF; }
-  tfoot td { font-weight: 700; border-top: 2px solid #E5E7EB; border-bottom: 0; color: #064E3B; }
+  tfoot td { font-weight: 700; border-top: 2px solid #E5E7EB; border-bottom: 0; color: #123D30; }
   .empty { padding: 14px 10px; color: #9CA3AF; font-size: 12px; }
   .foot { margin-top: 26px; text-align: center; color: #9CA3AF; font-size: 10px; line-height: 16px; }
 </style></head>

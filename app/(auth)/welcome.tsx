@@ -57,7 +57,7 @@ export default function Welcome() {
       testID="welcome-screen"
     >
       <View style={styles.header}>
-        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
+        <View style={[styles.logo, { backgroundColor: colors.brand }]}>
           <Image
             source={require("@/assets/images/logo-mark.png")}
             style={styles.logoImg}

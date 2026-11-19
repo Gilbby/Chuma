@@ -323,8 +323,8 @@ export default function StatementScreen() {
               style={[
                 styles.chip,
                 {
-                  backgroundColor: active ? colors.primary : colors.surface,
-                  borderColor: active ? colors.primary : colors.border,
+                  backgroundColor: active ? colors.brand : colors.surface,
+                  borderColor: active ? colors.brand : colors.border,
                 },
               ]}
               testID={`statement-preset-${item.key}`}

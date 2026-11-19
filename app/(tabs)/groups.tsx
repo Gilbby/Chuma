@@ -462,7 +462,7 @@ export default function Groups() {
             style={[
               styles.addBtn,
               searchOpen
-                ? { backgroundColor: colors.primary }
+                ? { backgroundColor: colors.brand }
                 : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
             ]}
             onPress={toggleSearch}
@@ -476,7 +476,7 @@ export default function Groups() {
             )}
           </Pressable>
           <Pressable
-            style={[styles.addBtn, { backgroundColor: colors.primary }]}
+            style={[styles.addBtn, { backgroundColor: colors.brand }]}
             onPress={openCreateGroup}
             testID="groups-add-btn"
           >

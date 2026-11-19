@@ -274,8 +274,8 @@ export default function Profile() {
                           justifyContent: "center",
                           marginRight: 6,
                           marginBottom: 6,
-                          backgroundColor: active ? colors.primary : colors.surface,
-                          borderColor: active ? colors.primary : colors.border,
+                          backgroundColor: active ? colors.brand : colors.surface,
+                          borderColor: active ? colors.brand : colors.border,
                         },
                       ]}
                     >

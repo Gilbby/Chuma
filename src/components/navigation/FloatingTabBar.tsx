@@ -3,6 +3,7 @@ import { View, Pressable, StyleSheet, Platform } from "react-native";
 import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { useTheme } from "@/src/theme/ThemeContext";
 
@@ -10,6 +11,8 @@ import { useTheme } from "@/src/theme/ThemeContext";
 export const TAB_BAR_HEIGHT = 64;
 /** Gap between the pill and the bottom safe-area edge. */
 const BAR_GAP = 12;
+/** How far above the pill the background fade starts. */
+const FADE_HEIGHT = 32;
 
 const layout = LinearTransition.springify().damping(18).stiffness(180);
 
@@ -18,7 +21,7 @@ const layout = LinearTransition.springify().damping(18).stiffness(180);
  * screen. Tab screens add this to their scroll content's bottom padding so the
  * last item can scroll clear of the bar.
  */
-export function useTabBarSpace(extra = 16) {
+export function useTabBarSpace(extra = 24) {
   const insets = useSafeAreaInsets();
   return TAB_BAR_HEIGHT + Math.max(insets.bottom, BAR_GAP) + extra;
 }
@@ -26,20 +29,39 @@ export function useTabBarSpace(extra = 16) {
 export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: BottomTabBarProps) {
   const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
+  const dark = mode === "dark";
 
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.wrap, { bottom: Math.max(insets.bottom, BAR_GAP) }]}
+      style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, BAR_GAP) }]}
     >
+      {/* Fade the page into the background behind the bar, so scrolling
+          content (cards are the same colour as the bar in light mode, and
+          close to it in dark) never butts straight up against the pill. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[`${colors.background}00`, `${colors.background}E6`, colors.background]}
+        locations={[0, 0.4, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <View
         style={[
           styles.bar,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-            shadowOpacity: mode === "light" ? 0.12 : 0.4,
-          },
+          dark
+            ? {
+                // Elevated surface + a faint light edge: shadows are invisible
+                // on a near-black page, so lift the bar with tone instead.
+                backgroundColor: colors.surfaceSecondary,
+                borderColor: "rgba(255, 255, 255, 0.10)",
+                borderWidth: 1,
+                shadowOpacity: 0.6,
+              }
+            : {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowOpacity: 0.12,
+              },
         ]}
       >
         {state.routes.map((route, index) => {
@@ -49,7 +71,7 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: B
             typeof options.tabBarLabel === "string"
               ? options.tabBarLabel
               : options.title ?? route.name;
-          const color = focused ? colors.textInverse : colors.textMuted;
+          const color = focused ? colors.onBrand : colors.textMuted;
 
           const onPress = () => {
             const event = emitter.emit({
@@ -87,7 +109,7 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: B
                   layout={layout}
                   style={[
                     styles.item,
-                    focused && [styles.itemActive, { backgroundColor: colors.primary }],
+                    focused && [styles.itemActive, { backgroundColor: colors.brand }],
                   ]}
                 >
                   {options.tabBarIcon?.({ focused, color, size: 22 })}
@@ -113,8 +135,11 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: B
 const styles = StyleSheet.create({
   wrap: {
     position: "absolute",
-    left: 16,
-    right: 16,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: FADE_HEIGHT,
+    paddingHorizontal: 16,
     alignItems: "center",
   },
   bar: {

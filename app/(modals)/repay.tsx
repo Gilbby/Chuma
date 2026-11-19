@@ -113,7 +113,7 @@ export default function Repay() {
         testID="repay-success"
       >
         <View style={styles.successWrap}>
-          <View style={[styles.successCircle, { backgroundColor: pending ? colors.warning : colors.primary }]}>
+          <View style={[styles.successCircle, { backgroundColor: pending ? colors.warning : colors.brand }]}>
             {pending ? (
               <Clock size={56} color="#fff" strokeWidth={2.5} />
             ) : (
@@ -379,8 +379,8 @@ const ModeRow = ({
       style={[
         styles.radio,
         {
-          borderColor: active ? colors.primary : colors.borderStrong,
-          backgroundColor: active ? colors.primary : "transparent",
+          borderColor: active ? colors.brand : colors.borderStrong,
+          backgroundColor: active ? colors.brand : "transparent",
         },
       ]}
     >

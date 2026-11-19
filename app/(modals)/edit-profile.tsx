@@ -182,7 +182,7 @@ export default function EditProfile() {
               <Pressable onPress={pickImage} testID="edit-profile-avatar-btn">
                 <View style={{ position: "relative" }}>
                   <Image source={{ uri: avatar }} style={styles.avatar} />
-                  <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
+                  <View style={[styles.cameraBadge, { backgroundColor: colors.brand }]}>
                     <Camera size={14} color="#fff" />
                   </View>
                 </View>

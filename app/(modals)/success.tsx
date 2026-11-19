@@ -36,7 +36,7 @@ export default function Success() {
         <Animated.View
           style={[
             styles.circle,
-            { backgroundColor: colors.primary, borderColor: colors.primaryAccent },
+            { backgroundColor: colors.brand, borderColor: colors.primaryAccent },
             aStyle,
           ]}
         >

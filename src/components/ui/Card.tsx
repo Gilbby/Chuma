@@ -21,6 +21,10 @@ export const Card: React.FC<Props> = ({ children, style, padding = 16, testID, e
         {
           backgroundColor: colors.surface,
           borderColor: colors.border,
+          // Dark mode: the card's surface already separates it from the
+          // background, and a border reads as a glowing outline (worst on
+          // stacked cards like Group Health). Light mode keeps the hairline.
+          borderWidth: mode === "dark" ? 0 : 1,
           padding,
           shadowOpacity: elevated && mode === "light" ? 0.06 : 0,
         },

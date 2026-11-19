@@ -116,9 +116,9 @@ export default function ReceiptScreen() {
 <meta charset="utf-8" />
 <style>
   @page { margin: 24px; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #064E3B; background: #fff; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #123D30; background: #fff; }
   .wrap { max-width: 520px; margin: 0 auto; }
-  .header { background: #0A5C36; color: #fff; padding: 28px; border-radius: 20px 20px 0 0; }
+  .header { background: #075C3D; color: #fff; padding: 28px; border-radius: 20px 20px 0 0; }
   .brand { display:flex; align-items:center; gap:12px; margin-bottom: 18px; }
   .logo { width: 36px; height: 36px; border-radius: 11px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.45); display:inline-flex; align-items:center; justify-content:center; }
   .brand-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
@@ -127,14 +127,14 @@ export default function ReceiptScreen() {
   .body { background: #fff; border: 1px solid #E5E7EB; border-top: 0; padding: 26px 28px; border-radius: 0 0 20px 20px; }
   .row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #F3F5F4; }
   .row:last-child { border-bottom: 0; }
-  .row .k { color: #6B7280; font-size: 13px; }
-  .row .v { color: #064E3B; font-weight: 600; font-size: 14px; max-width: 60%; text-align: right; }
+  .row .k { color: #6A7470; font-size: 13px; }
+  .row .v { color: #123D30; font-weight: 600; font-size: 14px; max-width: 60%; text-align: right; }
   .status { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
   .status.completed { background: #D1FAE5; color: #059669; }
   .status.pending { background: #FEF3C7; color: #B45309; }
   .status.failed { background: #FEE2E2; color: #DC2626; }
   .foot { margin-top: 22px; text-align: center; color: #9CA3AF; font-size: 11px; line-height: 18px; }
-  .id { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: #6B7280; letter-spacing: 0.5px; }
+  .id { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: #6A7470; letter-spacing: 0.5px; }
   .stamp { display:inline-block; margin-top: 10px; border: 2px solid #10B981; color: #10B981; padding: 6px 12px; border-radius: 6px; font-weight: 800; letter-spacing: 1.5px; transform: rotate(-6deg); font-size: 12px; }
 </style>
 </head>
@@ -206,7 +206,7 @@ export default function ReceiptScreen() {
         {/* Receipt card */}
         <View style={[styles.receipt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {/* Top emerald band */}
-          <View style={[styles.band, { backgroundColor: colors.primary }]}>
+          <View style={[styles.band, { backgroundColor: colors.brand }]}>
             <View style={styles.brand}>
               <View style={styles.logoSm}>
                 <Image
