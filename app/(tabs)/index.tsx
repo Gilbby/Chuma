@@ -8,6 +8,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTabBarSpace } from "@/src/components/navigation/FloatingTabBar";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import {
@@ -81,6 +82,7 @@ function formatPayoutDate(iso: string): string {
 
 export default function Home() {
   const { colors, mode } = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const { role, can } = useRole();
 
@@ -363,7 +365,7 @@ export default function Home() {
       testID="home-screen"
     >
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: tabBarSpace }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >

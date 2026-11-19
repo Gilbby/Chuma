@@ -10,6 +10,7 @@ import {
   TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTabBarSpace } from "@/src/components/navigation/FloatingTabBar";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useTheme } from "@/src/theme/ThemeContext";
 import { KYC_ENABLED, GROUP_FEES_ENABLED } from "@/src/constants";
@@ -51,6 +52,7 @@ const SEARCH_MIN_CHARS = 2;
 
 export default function Groups() {
   const { colors } = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const [groups, setGroups] = useState<Group[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
@@ -529,7 +531,7 @@ export default function Groups() {
         </>
       ) : (
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace }]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >

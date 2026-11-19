@@ -1,12 +1,10 @@
 import React, { useEffect } from "react";
 import { Tabs } from "expo-router";
 import { Home, Users, ArrowLeftRight, User } from "lucide-react-native";
-import { useTheme } from "@/src/theme/ThemeContext";
 import { useRole } from "@/src/contexts/RoleContext";
-import { View, StyleSheet, Platform } from "react-native";
+import { FloatingTabBar } from "@/src/components/navigation/FloatingTabBar";
 
 export default function TabsLayout() {
-  const { colors, mode } = useTheme();
   const { refresh } = useRole();
 
   // The provider mounts above the auth stack, so it derived the role before
@@ -17,43 +15,15 @@ export default function TabsLayout() {
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 88 : 68,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 28 : 10,
-          ...Platform.select({
-            ios: {
-              shadowColor: "#000",
-              shadowOpacity: mode === "light" ? 0.04 : 0,
-              shadowOffset: { width: 0, height: -4 },
-              shadowRadius: 12,
-            },
-            android: { elevation: 8 },
-          }),
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600",
-          letterSpacing: 0.2,
-          marginTop: 2,
-        },
-      }}
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeWrap : null}>
-              <Home size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
-            </View>
+            <Home size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
           ),
           tabBarButtonTestID: "tab-home",
         }}
@@ -63,9 +33,7 @@ export default function TabsLayout() {
         options={{
           title: "Groups",
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeWrap : null}>
-              <Users size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
-            </View>
+            <Users size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
           ),
           tabBarButtonTestID: "tab-groups",
         }}
@@ -75,9 +43,7 @@ export default function TabsLayout() {
         options={{
           title: "Transactions",
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeWrap : null}>
-              <ArrowLeftRight size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
-            </View>
+            <ArrowLeftRight size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
           ),
           tabBarButtonTestID: "tab-transactions",
         }}
@@ -87,9 +53,7 @@ export default function TabsLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeWrap : null}>
-              <User size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
-            </View>
+            <User size={22} color={color} strokeWidth={focused ? 2.4 : 2} />
           ),
           tabBarButtonTestID: "tab-profile",
         }}
@@ -97,7 +61,3 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  activeWrap: { alignItems: "center", justifyContent: "center" },
-});

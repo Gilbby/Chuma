@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, Image, Switch, Modal, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTabBarSpace } from "@/src/components/navigation/FloatingTabBar";
 import { useRouter, useFocusEffect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useTheme } from "@/src/theme/ThemeContext";
@@ -46,6 +47,7 @@ import { useRole } from "@/src/contexts/RoleContext";
 
 export default function Profile() {
   const { colors, mode, toggle } = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const { role, setRole, description, isTester } = useRole();
   // Off until the phone says it has an enrolled fingerprint/face and the user
@@ -149,7 +151,7 @@ export default function Profile() {
       edges={["top"]}
       testID="profile-screen"
     >
-      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: tabBarSpace }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.textMain }]}>Profile</Text>
         </View>
