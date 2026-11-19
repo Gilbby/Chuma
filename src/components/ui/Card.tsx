@@ -21,12 +21,13 @@ export const Card: React.FC<Props> = ({ children, style, padding = 16, testID, e
         {
           backgroundColor: colors.surface,
           borderColor: colors.border,
-          // Dark mode: the card's surface already separates it from the
-          // background, and a border reads as a glowing outline (worst on
-          // stacked cards like Group Health). Light mode keeps the hairline.
-          borderWidth: mode === "dark" ? 0 : 1,
           padding,
-          shadowOpacity: elevated && mode === "light" ? 0.06 : 0,
+          // No border in either theme - it reads as a glowing outline, worst
+          // on stacked cards like Group Health. Dark mode separates cards by
+          // surface tone; light mode (white on near-white) by a soft shadow.
+          // Callers can still opt into a border (e.g. a selected state).
+          boxShadow:
+            mode === "dark" ? undefined : elevated ? CARD_SHADOW_ELEVATED : CARD_SHADOW,
         },
         style as ViewStyle,
       ]}
@@ -36,13 +37,14 @@ export const Card: React.FC<Props> = ({ children, style, padding = 16, testID, e
   );
 };
 
+// Tinted with the primary text colour so shadows read warm, not grey.
+const CARD_SHADOW = "0px 4px 16px rgba(18, 61, 48, 0.06), 0px 1px 3px rgba(18, 61, 48, 0.05)";
+const CARD_SHADOW_ELEVATED =
+  "0px 8px 24px rgba(18, 61, 48, 0.10), 0px 2px 6px rgba(18, 61, 48, 0.06)";
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.xl,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 16,
-    elevation: 0,
+    borderWidth: 0,
   },
 });

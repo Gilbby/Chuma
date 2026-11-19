@@ -80,8 +80,12 @@ function formatPayoutDate(iso: string): string {
   });
 }
 
+// Green-tinted lift for the balance card (light mode only - shadows don't
+// read on the dark background, where the card stands out by colour).
+const HERO_SHADOW = "0px 12px 28px rgba(7, 92, 61, 0.22), 0px 3px 8px rgba(7, 92, 61, 0.12)";
+
 export default function Home() {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const { role, can } = useRole();
@@ -422,60 +426,64 @@ export default function Home() {
         ) : (
           <>
             {/* Hero Balance Card */}
-        <View
-          style={[
-            styles.heroCard,
-            { backgroundColor: colors.brand },
-          ]}
-        >
-          <View style={styles.heroLabelRow}>
-            <Text style={styles.heroLabel}>Total balance</Text>
-            <Pressable
-              onPress={toggleBalance}
-              hitSlop={12}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-              accessibilityLabel={balanceHidden ? "Show balance" : "Hide balance"}
-              testID="home-balance-toggle"
-            >
-              {balanceHidden ? (
-                <EyeOff size={20} color="rgba(255,255,255,0.9)" />
-              ) : (
-                <Eye size={20} color="rgba(255,255,255,0.9)" />
-              )}
-            </Pressable>
-          </View>
-          <Text style={styles.heroAmount} testID="home-balance-amount">
-            {balanceHidden ? "K ••••••" : formatZMW(myTotalSavings)}
-          </Text>
-          <View style={styles.heroRow}>
-            <View>
-              <Text style={styles.heroSubLabel}>Active groups</Text>
-              <Text style={styles.heroSubValue}>
-                {groups.length} {groups.length === 1 ? "group" : "groups"}
-              </Text>
+        {/* The card clips its contents (overflow: hidden), so the shadow
+            lives on this wrapper. Borderless + soft lift, like <Card>. */}
+        <View style={[styles.heroShadow, mode === "light" && { boxShadow: HERO_SHADOW }]}>
+          <View
+            style={[
+              styles.heroCard,
+              { backgroundColor: colors.brand },
+            ]}
+          >
+            <View style={styles.heroLabelRow}>
+              <Text style={styles.heroLabel}>Total balance</Text>
+              <Pressable
+                onPress={toggleBalance}
+                hitSlop={12}
+                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+                accessibilityLabel={balanceHidden ? "Show balance" : "Hide balance"}
+                testID="home-balance-toggle"
+              >
+                {balanceHidden ? (
+                  <EyeOff size={20} color="rgba(255,255,255,0.9)" />
+                ) : (
+                  <Eye size={20} color="rgba(255,255,255,0.9)" />
+                )}
+              </Pressable>
             </View>
-            {/* What the cash keeper has paid out so far of the church cash they
-                handle: banked, on mobile money, moved elsewhere or spent on a
-                project. Tapping opens the Payouts tab. */}
-            {cashToDeliver !== null && (
-              <>
-                <View style={styles.heroDivider} />
-                <Pressable
-                  onPress={() =>
-                    router.push({ pathname: "/approvals", params: { tab: "deliveries" } })
-                  }
-                  hitSlop={8}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-                  accessibilityLabel="Payouts"
-                  testID="home-cash-to-deliver"
-                >
-                  <Text style={styles.heroSubLabel}>Payouts</Text>
-                  <Text style={styles.heroSubValue}>
-                    {balanceHidden ? "K ••••" : formatZMW(cashToDeliver)} ›
-                  </Text>
-                </Pressable>
-              </>
-            )}
+            <Text style={styles.heroAmount} testID="home-balance-amount">
+              {balanceHidden ? "K ••••••" : formatZMW(myTotalSavings)}
+            </Text>
+            <View style={styles.heroRow}>
+              <View>
+                <Text style={styles.heroSubLabel}>Active groups</Text>
+                <Text style={styles.heroSubValue}>
+                  {groups.length} {groups.length === 1 ? "group" : "groups"}
+                </Text>
+              </View>
+              {/* What the cash keeper has paid out so far of the church cash they
+                  handle: banked, on mobile money, moved elsewhere or spent on a
+                  project. Tapping opens the Payouts tab. */}
+              {cashToDeliver !== null && (
+                <>
+                  <View style={styles.heroDivider} />
+                  <Pressable
+                    onPress={() =>
+                      router.push({ pathname: "/approvals", params: { tab: "deliveries" } })
+                    }
+                    hitSlop={8}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                    accessibilityLabel="Payouts"
+                    testID="home-cash-to-deliver"
+                  >
+                    <Text style={styles.heroSubLabel}>Payouts</Text>
+                    <Text style={styles.heroSubValue}>
+                      {balanceHidden ? "K ••••" : formatZMW(cashToDeliver)} ›
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
           </View>
         </View>
 
@@ -717,9 +725,11 @@ const OverviewCard = ({
         styles.overviewCard,
         {
           backgroundColor: colors.surface,
-          borderColor: colors.border,
-          // Borderless in dark mode, matching <Card>.
-          borderWidth: mode === "dark" ? 0 : 1,
+          // Borderless; soft shadow in light mode - matches <Card>.
+          boxShadow:
+            mode === "dark"
+              ? undefined
+              : "0px 4px 16px rgba(18, 61, 48, 0.06), 0px 1px 3px rgba(18, 61, 48, 0.05)",
         },
       ]}
       testID={testID}
@@ -768,8 +778,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   metaText: { fontSize: 12, marginLeft: 8 },
+  heroShadow: { marginHorizontal: 20, borderRadius: 24 },
   heroCard: {
-    marginHorizontal: 20,
     padding: 22,
     borderRadius: 24,
     overflow: "hidden",
@@ -838,7 +848,6 @@ const styles = StyleSheet.create({
     width: 160,
     padding: 16,
     borderRadius: 20,
-    borderWidth: 1,
   },
   overviewDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 10 },
   overviewLabel: { fontSize: 11, fontWeight: "600", letterSpacing: 0.4 },

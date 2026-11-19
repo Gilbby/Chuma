@@ -1,9 +1,19 @@
-import React from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentRef,
+  type RefObject,
+} from "react";
 import { View, Pressable, StyleSheet, Platform } from "react-native";
 import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
+import { BlurView, BlurTargetView } from "expo-blur";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { useTheme } from "@/src/theme/ThemeContext";
 
@@ -11,8 +21,31 @@ import { useTheme } from "@/src/theme/ThemeContext";
 export const TAB_BAR_HEIGHT = 64;
 /** Gap between the pill and the bottom safe-area edge. */
 const BAR_GAP = 12;
-/** How far above the pill the background fade starts. */
-const FADE_HEIGHT = 32;
+
+/**
+ * Frosted-glass look: a real blur of the page behind the bar, with a tinted
+ * layer on top so the page's colours come through softened rather than sharp.
+ * Raise `intensity` for a heavier frost, raise the tint alpha for a more solid
+ * bar.
+ */
+const GLASS = {
+  intensity: 60,
+  tint: {
+    light: "rgba(255, 255, 255, 0.55)",
+    dark: "rgba(28, 41, 35, 0.55)", // surfaceSecondary #1C2923
+  },
+  rim: {
+    light: "rgba(18, 61, 48, 0.14)",
+    dark: "rgba(255, 255, 255, 0.14)",
+  },
+  // `boxShadow` (not shadow*/elevation): its outset shadow is drawn only
+  // OUTSIDE the pill, so it lifts the bar off the page without darkening the
+  // see-through glass. A wide soft layer for float + a tight one for the edge.
+  shadow: {
+    light: "0px 10px 30px rgba(18, 61, 48, 0.16), 0px 2px 8px rgba(18, 61, 48, 0.10)",
+    dark: "0px 10px 30px rgba(0, 0, 0, 0.55), 0px 2px 8px rgba(0, 0, 0, 0.35)",
+  },
+};
 
 const layout = LinearTransition.springify().damping(18).stiffness(180);
 
@@ -21,141 +54,204 @@ const layout = LinearTransition.springify().damping(18).stiffness(180);
  * screen. Tab screens add this to their scroll content's bottom padding so the
  * last item can scroll clear of the bar.
  */
-export function useTabBarSpace(extra = 24) {
+export function useTabBarSpace(extra = 16) {
   const insets = useSafeAreaInsets();
   return TAB_BAR_HEIGHT + Math.max(insets.bottom, BAR_GAP) + extra;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Blur targets                                                              */
+/*                                                                           */
+/* On Android expo-blur can only blur content inside a <BlurTargetView>, and  */
+/* the BlurView must not sit inside that target. The tab bar is a sibling of  */
+/* the screens, so each screen is wrapped in its own target (via the tab      */
+/* navigator's `screenLayout`) and registers it here; the bar blurs whichever */
+/* screen is focused. On iOS and web the target is a plain View and the blur  */
+/* works on whatever is behind it.                                           */
+/* ------------------------------------------------------------------------ */
+
+type ViewRef = ComponentRef<typeof View>;
+type TargetRef = RefObject<ViewRef | null>;
+type Registry = {
+  targets: Record<string, TargetRef>;
+  register: (routeKey: string, ref: TargetRef | null) => void;
+};
+
+const BlurTargetsContext = createContext<Registry | null>(null);
+
+export function TabBlurProvider({ children }: { children: React.ReactNode }) {
+  const [targets, setTargets] = useState<Record<string, TargetRef>>({});
+  const register = useCallback((routeKey: string, ref: TargetRef | null) => {
+    setTargets((prev) => {
+      if (ref ? prev[routeKey] === ref : !(routeKey in prev)) return prev;
+      const next = { ...prev };
+      if (ref) next[routeKey] = ref;
+      else delete next[routeKey];
+      return next;
+    });
+  }, []);
+  const value = useMemo(() => ({ targets, register }), [targets, register]);
+  return <BlurTargetsContext.Provider value={value}>{children}</BlurTargetsContext.Provider>;
+}
+
+/** Wraps one tab screen so the floating bar can blur it. */
+export function TabBlurTarget({
+  routeKey,
+  children,
+}: {
+  routeKey: string;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<ViewRef>(null);
+  const register = useContext(BlurTargetsContext)?.register;
+  useEffect(() => {
+    register?.(routeKey, ref);
+    return () => register?.(routeKey, null);
+  }, [register, routeKey]);
+  return (
+    <BlurTargetView ref={ref} style={styles.target} collapsable={false}>
+      {children}
+    </BlurTargetView>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
 
 export function FloatingTabBar({ state, descriptors, emitter, navigateToTab }: BottomTabBarProps) {
   const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
   const dark = mode === "dark";
+  const blurTarget = useContext(BlurTargetsContext)?.targets[state.routes[state.index].key];
 
   return (
     <View
       pointerEvents="box-none"
       style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, BAR_GAP) }]}
     >
-      {/* Fade the page into the background behind the bar, so scrolling
-          content (cards are the same colour as the bar in light mode, and
-          close to it in dark) never butts straight up against the pill. */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={[`${colors.background}00`, `${colors.background}E6`, colors.background]}
-        locations={[0, 0.4, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View
-        style={[
-          styles.bar,
-          dark
-            ? {
-                // Elevated surface + a faint light edge: shadows are invisible
-                // on a near-black page, so lift the bar with tone instead.
-                backgroundColor: colors.surfaceSecondary,
-                borderColor: "rgba(255, 255, 255, 0.10)",
-                borderWidth: 1,
-                shadowOpacity: 0.6,
+      <View style={[styles.shell, { boxShadow: dark ? GLASS.shadow.dark : GLASS.shadow.light }]}>
+        <View
+          style={[styles.bar, { borderColor: dark ? GLASS.rim.dark : GLASS.rim.light }]}
+        >
+          {/* Native needs a registered target before it can blur (Android
+              otherwise warns and falls back); the tint alone covers that first
+              frame. */}
+          {blurTarget || Platform.OS !== "android" ? (
+            <BlurView
+              blurTarget={blurTarget}
+              blurMethod="dimezisBlurViewSdk31Plus"
+              intensity={GLASS.intensity}
+              tint={dark ? "dark" : "light"}
+              style={[StyleSheet.absoluteFill, styles.rounded]}
+              pointerEvents="none"
+            />
+          ) : null}
+          <View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              styles.rounded,
+              { backgroundColor: dark ? GLASS.tint.dark : GLASS.tint.light },
+            ]}
+          />
+
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            const focused = state.index === index;
+            const label =
+              typeof options.tabBarLabel === "string"
+                ? options.tabBarLabel
+                : options.title ?? route.name;
+            const color = focused ? colors.onBrand : colors.textMuted;
+
+            const onPress = () => {
+              const event = emitter.emit({
+                type: "tabPress",
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!focused && !event.defaultPrevented) {
+                if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                navigateToTab(route.key);
               }
-            : {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowOpacity: 0.12,
-              },
-        ]}
-      >
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const focused = state.index === index;
-          const label =
-            typeof options.tabBarLabel === "string"
-              ? options.tabBarLabel
-              : options.title ?? route.name;
-          const color = focused ? colors.onBrand : colors.textMuted;
+            };
 
-          const onPress = () => {
-            const event = emitter.emit({
-              type: "tabPress",
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!focused && !event.defaultPrevented) {
-              if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-              navigateToTab(route.key);
-            }
-          };
+            const onLongPress = () => {
+              emitter.emit({ type: "tabLongPress", target: route.key });
+            };
 
-          const onLongPress = () => {
-            emitter.emit({ type: "tabLongPress", target: route.key });
-          };
-
-          return (
-            <Animated.View
-              key={route.key}
-              layout={layout}
-              style={[styles.slot, focused && styles.slotActive]}
-            >
-              <Pressable
-                onPress={onPress}
-                onLongPress={onLongPress}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: focused }}
-                accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-                testID={options.tabBarButtonTestID}
-                style={styles.press}
-                hitSlop={4}
+            return (
+              <Animated.View
+                key={route.key}
+                layout={layout}
+                style={[styles.slot, focused && styles.slotActive]}
               >
-                <Animated.View
-                  layout={layout}
-                  style={[
-                    styles.item,
-                    focused && [styles.itemActive, { backgroundColor: colors.brand }],
-                  ]}
+                <Pressable
+                  onPress={onPress}
+                  onLongPress={onLongPress}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: focused }}
+                  accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+                  testID={options.tabBarButtonTestID}
+                  style={styles.press}
+                  hitSlop={4}
                 >
-                  {options.tabBarIcon?.({ focused, color, size: 22 })}
-                  {focused ? (
-                    <Animated.Text
-                      entering={FadeIn.duration(180)}
-                      numberOfLines={1}
-                      style={[styles.label, { color }]}
-                    >
-                      {label}
-                    </Animated.Text>
-                  ) : null}
-                </Animated.View>
-              </Pressable>
-            </Animated.View>
-          );
-        })}
+                  <Animated.View
+                    layout={layout}
+                    style={[
+                      styles.item,
+                      focused && [styles.itemActive, { backgroundColor: colors.brand }],
+                    ]}
+                  >
+                    {options.tabBarIcon?.({ focused, color, size: 22 })}
+                    {focused ? (
+                      <Animated.Text
+                        entering={FadeIn.duration(180)}
+                        numberOfLines={1}
+                        style={[styles.label, { color }]}
+                      >
+                        {label}
+                      </Animated.Text>
+                    ) : null}
+                  </Animated.View>
+                </Pressable>
+              </Animated.View>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  target: { flex: 1 },
   wrap: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingTop: FADE_HEIGHT,
     paddingHorizontal: 16,
     alignItems: "center",
   },
-  bar: {
+  // Carries the shadow. Kept separate from `bar` because the bar clips its
+  // blur layers with overflow: hidden.
+  shell: {
     width: "100%",
     maxWidth: 480,
+    borderRadius: TAB_BAR_HEIGHT / 2,
+  },
+  bar: {
+    width: "100%",
     height: TAB_BAR_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     borderRadius: TAB_BAR_HEIGHT / 2,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 24,
-    elevation: 12,
+    borderWidth: 1,
+    // Clip the blur and tint layers to the pill shape.
+    overflow: "hidden",
   },
+  rounded: { borderRadius: TAB_BAR_HEIGHT / 2 },
   slot: {
     flex: 1,
     height: "100%",

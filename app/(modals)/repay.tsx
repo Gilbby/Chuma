@@ -195,8 +195,9 @@ export default function Repay() {
               <Card
                 padding={16}
                 style={{
-                  borderColor: active ? colors.primary : colors.border,
-                  borderWidth: active ? 2 : 1,
+                  // Cards are borderless; only the selected loan gets an outline.
+                  borderColor: colors.primary,
+                  borderWidth: active ? 2 : 0,
                 }}
               >
                 <View style={styles.rowBetween}>
