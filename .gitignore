@@ -17,6 +17,8 @@ expo-env.d.ts
 /android
 /ios
 .kotlin/
+# Gradle build cache (e.g. inside local native modules under modules/)
+**/.gradle/
 *.orig.*
 *.jks
 *.p8
