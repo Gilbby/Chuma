@@ -3,5 +3,9 @@
   // import the generated android/ Gradle project. Left on, it spawns its own
   // Gradle daemons after every prebuild, which collide with release builds.
   "java.import.gradle.enabled": false,
-  "java.import.exclusions": ["**/node_modules/**", "**/android/**"]
+  "java.import.exclusions": ["**/node_modules/**", "**/android/**"],
+  // Same for the "Gradle for Java" extension: it falls back to Gradle 7.5.1,
+  // which can't run on Java 21. Builds go through `npx expo run:android` /
+  // android/gradlew (Gradle 9.4.1) instead.
+  "gradle.autoDetect": "off"
 }
